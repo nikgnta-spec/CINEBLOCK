@@ -197,3 +197,81 @@ a { color: inherit; text-decoration: none; }
 .add-shot-row td { padding: 10px; }
 .add-shot-btn { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
 .add-shot-btn:hover { color: var(--text); }
+
+
+/* Project management controls */
+.project-switcher {
+  max-width: 220px;
+  min-width: 110px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+}
+.project-switcher:focus-visible {
+  outline: 2px solid var(--text-muted);
+  outline-offset: 2px;
+}
+button:focus-visible,
+.scene-item:focus-visible,
+.visual-ref-card:focus-visible {
+  outline: 2px solid var(--text-muted);
+  outline-offset: 2px;
+}
+
+@media (max-width: 1200px) {
+  .topbar {
+    height: auto;
+    min-height: 48px;
+    padding: 8px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .topbar-left,
+  .topbar-right {
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .topbar-right {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .topbar-left,
+  .topbar-right {
+    width: 100%;
+  }
+  .project-switcher {
+    min-width: 0;
+    flex: 1 1 140px;
+  }
+  .tabs {
+    padding: 0 8px;
+  }
+  .project-info {
+    padding: 24px 16px;
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .visual-refs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .shotlist-toolbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .shotlist-toolbar-left {
+    flex-wrap: wrap;
+  }
+  .shotlist-layout {
+    min-height: 0;
+  }
+  .scene-sidebar {
+    width: 160px;
+  }
+}
