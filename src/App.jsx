@@ -437,7 +437,7 @@ export default function App() {
   const [saveStatus, setSaveStatus] = useState('loading')
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const [exportMode, setExportMode] = useState('shotlist-table')
-  const [exportOrientation, setExportOrientation] = useState('portrait')
+  const [exportOrientation, setExportOrientation] = useState('landscape')
   const [printRequest, setPrintRequest] = useState(false)
   const printStartedRef = useRef(false)
   const backupInputRef = useRef(null)
