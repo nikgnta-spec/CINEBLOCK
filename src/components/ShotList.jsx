@@ -365,7 +365,13 @@ export default function ShotList({
                       {shot.movements.map(m => (
                         <span key={m} className="movement-tag">
                           {m}
-                          <button onClick={() => removeMovement(shot.id, m)}><X size={9} /></button>
+                          <button
+                            onClick={() => removeMovement(shot.id, m)}
+                            title={`Remove movement ${m}`}
+                            aria-label={`Remove movement ${m}`}
+                          >
+                            <X size={9} />
+                          </button>
                         </span>
                       ))}
                       <MovementPicker
