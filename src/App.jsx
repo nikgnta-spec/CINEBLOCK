@@ -728,7 +728,7 @@ export default function App() {
             title="Pilih bagian laporan dan orientasi halaman untuk PDF."
           >
             <Download size={13} />
-            Export PDF
+            Ekspor PDF
           </button>
         </div>
       </div>
@@ -746,7 +746,7 @@ export default function App() {
                 <h2 id="export-dialog-title">Ekspor PDF</h2>
                 <p>Pilih konten laporan dan orientasi halaman.</p>
               </div>
-              <button className="export-dialog-close" type="button" onClick={() => setExportDialogOpen(false)} aria-label="Close export dialog">
+              <button className="export-dialog-close" type="button" onClick={() => setExportDialogOpen(false)} aria-label="Tutup dialog ekspor">
                 <X size={18} />
               </button>
             </header>
