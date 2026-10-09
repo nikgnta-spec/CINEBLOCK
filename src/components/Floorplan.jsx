@@ -363,7 +363,8 @@ export default function Floorplan({
     setHistoryRevision(value => value + 1)
     setDrawStart(null)
     setPreviewPoint(null)
-    setViewBox(getFittedViewBox(layout))
+    // Keep the user's current zoom and pan when switching scenes.
+    // Fitting the canvas remains available through the explicit Fit control.
   }, [scene?.id])
 
   useEffect(() => {
