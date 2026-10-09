@@ -1,11 +1,53 @@
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus, X, Trash2 } from 'lucide-react'
 
-const SIZES = ['ECU', 'CU', 'MCU', 'MS', 'MLS', 'LS', 'WS', 'EWS']
-const ANGLES = ['Eye Level', 'Low Angle', 'High Angle', 'Dutch', 'Bird Eye', 'Worm Eye']
-const MOVEMENTS = ['Static', 'Handheld', 'Dolly In', 'Dolly Out', 'Pan L', 'Pan R', 'Tilt Up', 'Tilt Down', 'Tracking', 'Crane Up', 'Crane Down', 'Steadicam', 'Pedestal Up', 'Pedestal Down', 'Blocking']
-const SUPPORTS = ['Sticks / Tripod', 'Handheld', 'Monopod', 'Steadicam', 'Gimbal', 'Slider', 'Dolly', 'Crane / Jib', 'Dana Dolly']
-const SOUNDS = ['Boom', 'Lav', 'Boom + Lav', 'MOS']
+const SIZES = [
+  'ECU', 'CU', 'MCU', 'MS', 'MLS', 'FS', 'LS', 'ELS', 'WS', 'EWS', 'W',
+  'CU (OTS)', 'MCU (OTS)', 'ECU (OTS)', 'MS (OTS)', 'MLS (OTS)', 'LS (OTS)',
+]
+const CAMERAS = [
+  'ARRI Alexa 35', 'ARRI Alexa Mini', 'ARRI Alexa Mini LF', 'ARRI Alexa LF',
+  'ARRI Alexa 65', 'ARRI Amira', 'Sony FX3', 'Sony FX6', 'Sony FX9',
+  'Sony VENICE', 'Sony VENICE 2', 'Sony BURANO',
+  'Canon C70', 'Canon C80', 'Canon C200', 'Canon C300 Mark III',
+  'Canon C400', 'Canon C500 Mark II', 'RED KOMODO', 'RED KOMODO-X',
+  'RED V-RAPTOR', 'Blackmagic Pocket Cinema Camera 4K',
+  'Blackmagic Pocket Cinema Camera 6K', 'Blackmagic URSA Mini Pro 12K',
+  'Panasonic VariCam', 'Panasonic EVA1', 'DJI Ronin 4D', 'iPhone',
+]
+const ANGLES = [
+  'Eye Level', 'Low Angle', 'High Angle', 'Extreme Low', 'Extreme High',
+  'Dutch Tilt', 'POV', "Bird's Eye", "Worm's Eye", 'Overhead',
+  'Shoulder Level', 'Hip Level', 'Ground Level', 'Profile',
+  'Three-Quarter', 'Over-the-Shoulder',
+]
+const LENSES = [
+  '14 mm', '15 mm', '16 mm', '18 mm', '20 mm', '21 mm', '24 mm', '25 mm',
+  '28 mm', '29 mm', '32 mm', '35 mm', '40 mm', '50 mm', '65 mm', '75 mm',
+  '85 mm', '100 mm', '105 mm', '135 mm', '150 mm', '180 mm', '200 mm',
+  '14–24 mm', '16–35 mm', '17–28 mm', '24–70 mm', '24–105 mm',
+  '28–70 mm', '70–200 mm', 'TBD', 'Custom…',
+]
+const MOVEMENTS = [
+  'Static', 'Pan', 'Pan L', 'Pan R', 'Whip Pan', 'Tilt', 'Tilt Up', 'Tilt Down',
+  'Pedestal', 'Pedestal Up', 'Pedestal Down', 'Dolly', 'Dolly In', 'Dolly Out',
+  'Truck', 'Truck L', 'Truck R', 'Arc', 'Orbit', 'Tracking Shot', 'Tracking',
+  'Crane / Boom', 'Crane Up', 'Crane Down', 'Jib Up', 'Jib Down', 'Zoom',
+  'Rack Focus', 'Steadicam', 'Handheld', 'Floating', 'Slider', 'Roll', 'Push In',
+  'Pull Out', 'Blocking',
+]
+const EQUIPMENT = [
+  'Sticks / Tripod', 'Handheld', 'Shoulder Rig', 'Easyrig', 'Monopod',
+  'Steadicam', 'Gimbal', 'DJI Ronin / MOVI', 'Slider', 'Dolly', 'Dana Dolly',
+  'Doorway Dolly', 'Jib Arm', 'Crane / Boom', 'Technocrane', 'Condor / Cherry Picker',
+  'Hi-Hat', 'Baby Legs', 'Remote Head', 'Camera Car', 'Russian Arm', 'Drone',
+  'Helicam', 'Cable Cam', 'Suction Mount', 'Body Mount', 'Wheelchair Rig',
+  'Underwater Housing', 'Snorricam', 'Motion Control', 'Turntable', 'Probe Lens Rig',
+]
+const SOUNDS = [
+  'Boom', 'Lav', 'Lav + Boom', 'Lavs + Boom', 'Plant Mic', 'Wireless Boom',
+  'Wired Boom', 'MOS', 'Playback', 'Wild Track', 'None',
+]
 
 export default function ShotList({ scenes, onChange, defaultShot, defaultScene }) {
   const [activeIdx, setActiveIdx] = useState(0)
@@ -163,6 +205,12 @@ export default function ShotList({ scenes, onChange, defaultShot, defaultScene }
         </div>
 
         <div className="shot-table-wrap">
+          <datalist id="camera-options">
+            {CAMERAS.map(option => <option key={option} value={option} />)}
+          </datalist>
+          <datalist id="lens-options">
+            {LENSES.map(option => <option key={option} value={option} />)}
+          </datalist>
           <table className="shot-table">
             <thead>
               <tr>
@@ -173,7 +221,7 @@ export default function ShotList({ scenes, onChange, defaultShot, defaultScene }
                 <th style={{ width: 100 }}>Angle</th>
                 <th style={{ width: 80 }}>Lens</th>
                 <th style={{ minWidth: 140 }}>Movement</th>
-                <th style={{ minWidth: 120 }}>Support</th>
+                <th style={{ minWidth: 140 }}>Equipment</th>
                 <th style={{ width: 90 }}>Sound</th>
                 <th style={{ width: 60 }}>Take</th>
                 <th style={{ width: 60 }}>Script</th>
@@ -194,13 +242,13 @@ export default function ShotList({ scenes, onChange, defaultShot, defaultScene }
                     <SelectCell value={shot.size} onChange={v => updateShot(shot.id, 'size', v)} options={SIZES} placeholder="Size" />
                   </td>
                   <td>
-                    <input className="cell-input" value={shot.camera} onChange={e => updateShot(shot.id, 'camera', e.target.value)} placeholder="Camera" />
+                    <input className="cell-input" list="camera-options" value={shot.camera} onChange={e => updateShot(shot.id, 'camera', e.target.value)} placeholder="Camera" aria-label="Camera model (choose or type)" />
                   </td>
                   <td>
                     <SelectCell value={shot.angle} onChange={v => updateShot(shot.id, 'angle', v)} options={ANGLES} placeholder="Angle" />
                   </td>
                   <td>
-                    <input className="cell-input" value={shot.lens} onChange={e => updateShot(shot.id, 'lens', e.target.value)} placeholder="35mm" />
+                    <input className="cell-input" list="lens-options" value={shot.lens} onChange={e => updateShot(shot.id, 'lens', e.target.value)} placeholder="Choose / type" aria-label="Lens focal length (choose or type)" />
                   </td>
                   <td>
                     <div className="movement-cell">
@@ -217,7 +265,7 @@ export default function ShotList({ scenes, onChange, defaultShot, defaultScene }
                     </div>
                   </td>
                   <td>
-                    <SelectCell value={shot.support} onChange={v => updateShot(shot.id, 'support', v)} options={SUPPORTS} placeholder="Support" />
+                    <SelectCell value={shot.equipment ?? shot.support ?? ''} onChange={v => updateShot(shot.id, 'equipment', v)} options={EQUIPMENT} placeholder="Equipment" />
                   </td>
                   <td>
                     <SelectCell value={shot.sound} onChange={v => updateShot(shot.id, 'sound', v)} options={SOUNDS} placeholder="Sound" />
@@ -296,7 +344,9 @@ function MovementPicker({ onPick, existing }) {
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius)',
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          minWidth: 140,
+          minWidth: 160,
+          maxHeight: 260,
+          overflowY: 'auto',
           padding: '4px 0',
         }}>
           {available.map(m => (
