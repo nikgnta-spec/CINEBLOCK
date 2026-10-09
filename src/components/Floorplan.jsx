@@ -286,6 +286,8 @@ export default function Floorplan({
   defaultScene,
   floorplans,
   onFloorplansChange,
+  selectedShotId,
+  onSelectedShotIdChange,
 }) {
   const svgRef = useRef(null)
   const dragRef = useRef(null)
@@ -335,6 +337,13 @@ export default function Floorplan({
       setTool('select')
     }
   }, [scene?.id, layout, selected])
+
+  useEffect(() => {
+    if (!scene || !selectedShotId) return
+    const linkedCamera = layout.cameras.find(camera => camera.shotId === selectedShotId)
+    setSelected(linkedCamera ? { type: 'camera', id: linkedCamera.id } : null)
+    setSelectedWaypoint(null)
+  }, [scene?.id, selectedShotId, layout.cameras])
 
   useEffect(() => {
     if (!scene) return
@@ -503,6 +512,8 @@ export default function Floorplan({
 
   const beginObjectDrag = (type, item, event) => {
     if (tool === 'pan') return
+    if (type === 'camera') onSelectedShotIdChange?.(item.shotId || '')
+    else onSelectedShotIdChange?.('')
     event.stopPropagation()
     if (tool === 'room' || tool === 'wall') return
     if (tool === 'path') setTool('select')
@@ -1810,7 +1821,7 @@ export default function Floorplan({
                 <div className="floorplan-empty-state"><Layers2 size={24} /><span>Belum ada objek</span></div>
               ) : (
                 allObjects.map(object => (
-                  <button key={object.entityType + object.id} className="floorplan-object-row" onClick={() => setSelected({ type: object.entityType, id: object.id })}>
+                  <button key={object.entityType + object.id} className="floorplan-object-row" onClick={() => { setSelected({ type: object.entityType, id: object.id }); onSelectedShotIdChange?.(object.entityType === 'camera' ? (object.shotId || '') : '') }}>
                     <span className={'floorplan-type-icon ' + object.entityType}>
                       <FloorplanObjectIcon type={object.entityType} size={22} />
                     </span>

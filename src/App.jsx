@@ -145,21 +145,21 @@ function normalizeSavedScenes(savedScenes) {
   })
 }
 
-const defaultScene = (num) => ({
+const defaultScene = (num, cameraDefault = '') => ({
   id: crypto.randomUUID(),
   name: `Scene ${String(num).padStart(2, '0')}`,
   location: '',
   intExt: 'INT',
   dayNight: 'DAY',
-  shots: [defaultShot(1)],
+  shots: [defaultShot(1, cameraDefault)],
 })
 
-const defaultShot = (num) => ({
+const defaultShot = (num, cameraDefault = '') => ({
   id: crypto.randomUUID(),
   num: String(num).padStart(3, '0'),
   subject: '',
   size: '',
-  camera: '',
+  camera: cameraDefault,
   angle: '',
   lens: '',
   movements: [],
@@ -413,6 +413,7 @@ export default function App() {
   const [project, setProject] = useState(defaultProject)
   const [scenes, setScenes] = useState(() => [defaultScene(1)])
   const [activeSceneId, setActiveSceneId] = useState('')
+  const [selectedShotId, setSelectedShotId] = useState('')
   const [floorplans, setFloorplans] = useState({})
   const [projects, setProjects] = useState([])
   const [activeProjectId, setActiveProjectId] = useState('')
@@ -823,8 +824,10 @@ export default function App() {
                 onChange={setScenes}
                 activeSceneId={activeSceneId}
                 onActiveSceneChange={setActiveSceneId}
-                defaultShot={defaultShot}
-                defaultScene={defaultScene}
+                defaultShot={num => defaultShot(num, project.camera)}
+                defaultScene={num => defaultScene(num, project.camera)}
+                selectedShotId={selectedShotId}
+                onSelectedShotIdChange={setSelectedShotId}
               />
             )}
             {tab === 'floorplan' && (
@@ -833,8 +836,10 @@ export default function App() {
                 onChange={setScenes}
                 activeSceneId={activeSceneId}
                 onActiveSceneChange={setActiveSceneId}
-                defaultShot={defaultShot}
-                defaultScene={defaultScene}
+                defaultShot={num => defaultShot(num, project.camera)}
+                defaultScene={num => defaultScene(num, project.camera)}
+                selectedShotId={selectedShotId}
+                onSelectedShotIdChange={setSelectedShotId}
                 floorplans={floorplans}
                 onFloorplansChange={setFloorplans}
               />

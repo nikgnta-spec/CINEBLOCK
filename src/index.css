@@ -1016,6 +1016,9 @@ button:focus-visible,
 .shot-table th.shot-col-actions { z-index:3; }
 .shot-table tbody tr:not(.add-shot-row) td:last-child { z-index:2; }
 .shot-table tbody tr:hover td:last-child { background:var(--bg-subtle); }
+.shot-table tbody tr.shot-row.is-selected td { background:color-mix(in srgb, var(--accent-bg) 42%, var(--bg)); }
+.shot-table tbody tr.shot-row.is-selected td:last-child { background:var(--accent-bg); }
+.shot-table tbody tr.shot-row.is-selected .shot-num { color:var(--accent); }
 .movement-tag { max-width:180px; }
 .movement-tag button { min-width:18px; min-height:18px; display:inline-flex; align-items:center; justify-content:center; }
 .add-shot-btn { min-height:34px; }

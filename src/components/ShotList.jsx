@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { SIZES, ANGLES, LENSES, MOVEMENTS, EQUIPMENT } from '../shotOptions'
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Trash2, Copy } from 'lucide-react'
 
@@ -26,10 +26,18 @@ export default function ShotList({
   onActiveSceneChange,
   defaultShot,
   defaultScene,
+  selectedShotId,
+  onSelectedShotIdChange,
 }) {
   const matchingIdx = scenes.findIndex(s => s.id === activeSceneId)
   const activeIdx = matchingIdx >= 0 ? matchingIdx : 0
   const scene = scenes[activeIdx]
+
+  useEffect(() => {
+    if (!selectedShotId || !scene?.shots.some(shot => shot.id === selectedShotId)) return
+    const rows = Array.from(document.querySelectorAll('[data-shot-id]'))
+    rows.find(row => row.dataset.shotId === selectedShotId)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [selectedShotId, scene?.id])
 
   const setActiveIdx = (nextIdxOrUpdater) => {
     const nextIdx = typeof nextIdxOrUpdater === 'function'
@@ -311,7 +319,7 @@ export default function ShotList({
             </thead>
             <tbody>
               {scene.shots.map((shot) => (
-                <tr key={shot.id}>
+                <tr key={shot.id} data-shot-id={shot.id} className={selectedShotId === shot.id ? 'shot-row is-selected' : 'shot-row'} onClick={() => onSelectedShotIdChange?.(shot.id)}>
                   <td><div className="shot-num">{shot.num}</div></td>
                   <td>
                     <input className="cell-input" value={shot.subject} onChange={e => updateShot(shot.id, 'subject', e.target.value)} placeholder="Subjek" />
