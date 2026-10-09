@@ -1612,6 +1612,31 @@ button:focus-visible,
 }
 
 
+
+
+/* Storyboard PDF pagination: use fragmentable columns instead of grid rows.
+   Grid row fragmentation can leave large unused areas when cards stay intact. */
+@media print {
+  .print-mode-storyboard .print-storyboard-all-shots {
+    display: block !important;
+    column-count: 2 !important;
+    column-gap: 3mm !important;
+    column-fill: auto !important;
+    align-items: initial !important;
+  }
+  .print-mode-storyboard .print-storyboard-card {
+    display: inline-block !important;
+    width: 100% !important;
+    margin: 0 0 3mm !important;
+    vertical-align: top !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .print-mode-storyboard.print-orientation-landscape .print-storyboard-all-shots {
+    column-count: 3 !important;
+  }
+}
+
 /* Print canvas must stay white even when the application UI uses dark color-scheme. */
 @media print {
   :root,
