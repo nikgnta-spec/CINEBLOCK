@@ -1,19 +1,66 @@
 import { useRef } from 'react'
 import { Plus, X } from 'lucide-react'
 
+function readAsDataUrl(fileOrBlob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(reader.error || new Error('Could not read image file'))
+    reader.readAsDataURL(fileOrBlob)
+  })
+}
+
+async function makePersistentImage(file) {
+  const originalDataUrl = await readAsDataUrl(file)
+
+  // Keep vector and animated images intact.
+  if (file.type === 'image/svg+xml' || file.type === 'image/gif') {
+    return originalDataUrl
+  }
+
+  const image = await new Promise((resolve, reject) => {
+    const element = new Image()
+    element.onload = () => resolve(element)
+    element.onerror = () => reject(new Error('Could not open the selected image'))
+    element.src = originalDataUrl
+  })
+
+  const maxDimension = 1280
+  const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
+
+  const context = canvas.getContext('2d')
+  if (!context) return originalDataUrl
+
+  context.drawImage(image, 0, 0, canvas.width, canvas.height)
+  const optimizedBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.78))
+  return optimizedBlob ? readAsDataUrl(optimizedBlob) : originalDataUrl
+}
+
 export default function ProjectInfo({ project, onChange }) {
   const set = (key, val) => onChange(p => ({ ...p, [key]: val }))
   const fileRefs = useRef([])
 
-  const handleRefImg = (idx, e) => {
-    const file = e.target.files[0]
+  const handleRefImg = async (idx, e) => {
+    const input = e.target
+    const file = input.files?.[0]
     if (!file) return
-    const url = URL.createObjectURL(file)
-    onChange(p => {
-      const refs = [...p.visualRefs]
-      refs[idx] = url
-      return { ...p, visualRefs: refs }
-    })
+
+    try {
+      const dataUrl = await makePersistentImage(file)
+      onChange(p => {
+        const refs = [...p.visualRefs]
+        refs[idx] = dataUrl
+        return { ...p, visualRefs: refs }
+      })
+    } catch (error) {
+      console.error('CINEBLOCK could not load visual reference:', error)
+      window.alert('The selected image could not be loaded. Please try another image.')
+    } finally {
+      input.value = ''
+    }
   }
 
   const removeRef = (idx) => {
