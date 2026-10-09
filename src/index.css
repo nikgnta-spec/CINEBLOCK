@@ -308,3 +308,13 @@ button:focus-visible,
   flex-shrink: 0;
   gap: 0;
 }
+
+
+.app-loading {
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
