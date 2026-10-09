@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Camera, Sun, Square, Minus, MousePointer2, Route, Trash2,
-  RotateCw, Plus, Grid2X2, ArrowRight, MapPin,
+  RotateCw, Grid2X2, MapPin,
 } from 'lucide-react'
 
 const MOVEMENTS = [
