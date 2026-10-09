@@ -470,6 +470,7 @@ export default function Floorplan({
       }
       object = { id: makeId(), ...position, angle: 0, shotId: targetShot.id, path: [] }
       updateLayout(previous => ({ ...previous, cameras: [...previous.cameras, object] }))
+      onSelectedShotIdChange?.(targetShot.id)
     }
 
     setSelected({ type, id: object.id })
@@ -956,6 +957,7 @@ export default function Floorplan({
       return
     }
     updateSelected({ shotId: nextShotId })
+    onSelectedShotIdChange?.(nextShotId || '')
   }
 
   const deleteSelected = () => {

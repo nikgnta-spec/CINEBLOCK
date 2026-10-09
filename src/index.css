@@ -1067,3 +1067,72 @@ button:focus-visible,
   .scene-navigator-rename { opacity:1; }
   .scene-navigator-compact-input { flex:1; min-width:0; width:auto; }
 }
+
+
+/* Stage 2 follow-up — camera/shot focus and small-screen shot table ergonomics. */
+.shot-table th:first-child,
+.shot-table tbody td:first-child {
+  position: sticky;
+  left: 0;
+  min-width: 62px;
+  width: 62px;
+  background: var(--bg);
+  z-index: 3;
+  box-shadow: 7px 0 10px -10px var(--border-strong);
+}
+.shot-table th:nth-child(2),
+.shot-table tbody td:nth-child(2) {
+  position: sticky;
+  left: 62px;
+  min-width: 160px;
+  background: var(--bg);
+  z-index: 2;
+  box-shadow: 7px 0 10px -10px var(--border-strong);
+}
+.shot-table thead th:first-child,
+.shot-table thead th:nth-child(2) { z-index: 6; }
+.shot-table tbody tr:hover td:first-child,
+.shot-table tbody tr:hover td:nth-child(2) { background: var(--bg-subtle); }
+.shot-table tbody tr.shot-row.is-selected td:first-child,
+.shot-table tbody tr.shot-row.is-selected td:nth-child(2) { background: var(--accent-bg); }
+.shot-table tbody tr.add-shot-row td { position: static; }
+.shot-table tbody tr.add-shot-row td:first-child { position: static; }
+
+/* Tablet: preserve the dense table but keep scene navigation and row actions reachable. */
+@media (max-width: 1024px) {
+  .shotlist-toolbar { padding: 10px 14px; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
+  .shotlist-toolbar-left { flex-wrap: wrap; gap: 8px; min-width: 0; }
+  .scene-sidebar { width: 156px; }
+  .scene-navigator-rename { opacity: 1; }
+  .shot-table th { padding: 9px 8px; }
+  .shot-table td:last-child .btn { min-width: 36px; min-height: 36px; padding: 8px !important; }
+  .shot-table td:last-child > div { gap: 2px; }
+  .shot-table .movement-tag { max-width: 142px; }
+  .shot-time-summary { font-size: 11px; }
+}
+
+/* Phone: turn the scene list into a horizontal strip; the shot table remains horizontally scrollable. */
+@media (max-width: 680px) {
+  .shotlist-page { min-height: 0; }
+  .shotlist-toolbar { padding: 10px 12px; }
+  .shotlist-toolbar-left { width: 100%; }
+  .shotlist-toolbar > div:last-child { width: 100%; justify-content: flex-end; }
+  .shotlist-layout { flex-direction: column; min-height: 0; }
+  .scene-sidebar {
+    width: 100%;
+    height: 112px;
+    flex: 0 0 112px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .scene-sidebar-header { padding: 6px 10px 4px; }
+  .scene-navigator-list { display: flex; overflow-x: auto; overflow-y: hidden; padding-bottom: 3px; }
+  .scene-navigator-list .scene-item { flex: 0 0 180px; align-self: stretch; border-left: 0; border-bottom: 2px solid transparent; }
+  .scene-navigator-list .scene-item.active { border-left: 0; border-bottom-color: var(--accent); }
+  .scene-navigator-list .scene-navigator-rename { opacity: 1; }
+  .shot-table-wrap { width: 100%; min-width: 0; min-height: 0; }
+  .shot-table th:first-child, .shot-table tbody td:first-child { left: 0; }
+  .shot-table th:nth-child(2), .shot-table tbody td:nth-child(2) { left: 62px; }
+  .shot-table th, .shot-table td { font-size: 12px; }
+  .scene-slugline { flex-wrap: wrap; }
+}
