@@ -485,6 +485,10 @@ button:focus-visible,
   touch-action: none;
   user-select: none;
 }
+.floorplan-canvas text {
+  font-family: var(--font);
+  letter-spacing: 0;
+}
 .floorplan-canvas.can-select { cursor: default; }
 .floorplan-canvas.can-draw { cursor: crosshair; }
 .floorplan-inspector {
