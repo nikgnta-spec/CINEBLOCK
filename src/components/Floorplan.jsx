@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   MousePointer2, Square, Minus, PersonStanding, Camera, Sun, Route,
-  Trash2, RotateCw, Plus, X, Crosshair, Layers2, ChevronDown,
+  Trash2, RotateCw, Plus, Layers2,
 } from 'lucide-react'
 
 const MOVEMENTS = [
@@ -363,7 +363,6 @@ export default function Floorplan({
   }
 
   const objectColor = type => type === 'camera' ? '#2563eb' : type === 'actor' ? '#8b5cf6' : '#d97706'
-  const lightOptions = selectedType === 'light' ? LIGHT_TYPES : []
   const movementOptions = selectedType === 'actor'
     ? ACTOR_MOVEMENTS
     : selectedType === 'light'
