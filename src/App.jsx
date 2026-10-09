@@ -488,7 +488,7 @@ export default function App() {
       pageStyle.id = 'cineblock-print-page-settings'
       document.head.appendChild(pageStyle)
     }
-    pageStyle.textContent = `@page { size: A4 ${exportOrientation}; margin: 12mm; }\n@media print { html, body, #root, .app, .print-report { box-sizing: border-box !important; max-width: 100% !important; } }`
+    pageStyle.textContent = `@page { size: A4 ${exportOrientation}; margin: 0; }\n@media print { html, body, #root, .app, .print-report { box-sizing: border-box !important; max-width: 100% !important; } }`
 
     window.print()
     setPrintRequest(false)
@@ -802,7 +802,7 @@ export default function App() {
             <header className="export-dialog-header">
               <div>
                 <h2 id="export-dialog-title">Ekspor PDF</h2>
-                <p>Pilih format konten dan orientasi halaman. Format tabel tidak menyertakan Status atau Storyboard.</p>
+                <p>Pilih format konten dan orientasi halaman. Tabel tanpa Status/Storyboard. Di dialog cetak, matikan “Headers and footers” agar tanggal dan URL tidak tercetak di tepi.</p>
               </div>
               <button className="export-dialog-close" type="button" onClick={() => setExportDialogOpen(false)} aria-label="Tutup dialog ekspor">
                 <X size={18} />

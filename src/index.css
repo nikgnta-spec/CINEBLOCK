@@ -776,7 +776,7 @@ button:focus-visible,
 
 @page {
   size: A4 portrait;
-  margin: 12mm 12mm 14mm;
+  margin: 0;
 }
 
 @media print {
@@ -1383,4 +1383,81 @@ button:focus-visible,
   .print-storyboard-notes { margin: 6px 0 0; padding-top: 5px; border-top: 1px solid #e5e7eb; font-size: 7pt; white-space: pre-wrap; overflow-wrap: anywhere; }
   .print-orientation-landscape .print-storyboard-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .print-orientation-portrait .print-storyboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+
+/* PDF edge and overflow fix: paint a full white sheet, then inset report content. */
+@media print {
+  html, body, #root {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  body, #root, .app, .print-report {
+    box-sizing: border-box !important;
+    color: #111827 !important;
+  }
+  .app {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  .app > .print-report {
+    display: block !important;
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 12mm 12mm 14mm !important;
+    overflow: visible !important;
+    background: #fff !important;
+    color: #111827 !important;
+  }
+  .print-report, .print-report * { box-sizing: border-box !important; }
+  .print-cover, .print-shot-list-section, .print-plan-page {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    background: #fff !important;
+    color: #111827 !important;
+  }
+  .print-shot-list-section, .print-scene-shots, .print-scene-heading,
+  .print-storyboard-grid, .print-storyboard-card, .print-plan-page {
+    overflow: visible !important;
+  }
+  .print-shot-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed !important;
+  }
+  .print-shot-table th, .print-shot-table td {
+    max-width: 0;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+  }
+  .print-shot-table tr { break-inside: auto !important; page-break-inside: auto !important; }
+  .print-mode-shotlist-table .print-plan-page,
+  .print-mode-storyboard .print-plan-page { display: none !important; }
+  .print-mode-floorplan .print-cover,
+  .print-mode-floorplan .print-shot-list-section { display: none !important; }
+  .print-orientation-landscape .print-plan-svg { max-height: 145mm !important; }
+  .print-orientation-portrait .print-plan-svg { max-height: 210mm !important; }
+  .print-storyboard-card, .print-storyboard-image, .print-storyboard-placeholder {
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+  .print-storyboard-image img { max-width: 100% !important; max-height: 100% !important; }
 }
