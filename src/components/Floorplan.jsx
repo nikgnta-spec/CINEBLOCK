@@ -1289,17 +1289,17 @@ export default function Floorplan({
   const deleteSelected = () => {
     if (!selected) return
 
-    // If this camera created its shot automatically, deleting that camera
-    // should remove the paired auto-created shot as well. Shots that existed
-    // before the camera was added remain untouched.
-    const autoCreatedShot = selected.type === 'camera'
-      ? autoCreatedShotsByCameraRef.current.get(selected.id)
+    // A camera marker represents the shot linked to it. Remove that linked
+    // shot when deleting the camera, including shots created before this
+    // component session (the in-memory auto-created-shot map is not persistent).
+    const camera = selected.type === 'camera'
+      ? layout.cameras.find(item => item.id === selected.id)
       : null
-    if (autoCreatedShot?.sceneId === scene?.id) {
-      const shotId = autoCreatedShot.shot.id
+    const linkedShotId = camera?.shotId || ''
+    if (linkedShotId) {
       onChange(previousScenes => previousScenes.map(item => item.id !== scene.id ? item : ({
         ...item,
-        shots: renumberShots(item.shots.filter(shot => shot.id !== shotId)),
+        shots: renumberShots(item.shots.filter(shot => shot.id !== linkedShotId)),
       })))
       autoCreatedShotsByCameraRef.current.delete(selected.id)
     }
