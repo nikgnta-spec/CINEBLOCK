@@ -558,6 +558,46 @@ button:focus-visible,
 .floorplan-shot-data > div { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
 .floorplan-shot-data span { color: var(--text-muted); font-size: 12px; }
 .floorplan-shot-data strong { overflow-wrap: anywhere; color: var(--text); font-size: 13px; font-weight: 500; }
+.floorplan-camera-fields { gap: 8px; }
+.floorplan-camera-fields > label {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.floorplan-shot-chips {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.floorplan-shot-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 5px 7px 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-subtle);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.floorplan-shot-chip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+.floorplan-shot-chip button:hover { color: var(--danger); }
+.floorplan-field-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
 .floorplan-unlinked { padding: 12px; border-radius: 6px; background: var(--bg-subtle); color: var(--text-muted); font-size: 13px; }
 .floorplan-path-button {
   display: flex;
