@@ -1136,3 +1136,22 @@ button:focus-visible,
   .shot-table th, .shot-table td { font-size: 12px; }
   .scene-slugline { flex-wrap: wrap; }
 }
+
+
+/* Stage 3A — theme switch and visible keyboard shortcut cues. */
+.theme-toggle { width:40px; min-width:40px; height:40px; min-height:40px; padding:0; color:var(--text); }
+.theme-toggle:hover { color:var(--accent); border-color:var(--accent-border); background:var(--accent-bg); }
+.floorplan-shortcut-key {
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:17px; height:18px; margin-left:2px; padding:0 4px;
+  border:1px solid var(--border-strong); border-radius:4px;
+  color:var(--text-placeholder); background:var(--bg);
+  font-family:var(--font); font-size:10px; line-height:1; font-weight:600;
+}
+.floorplan-tool-button.active .floorplan-shortcut-key {
+  color:var(--accent); border-color:var(--accent-border); background:var(--accent-bg);
+}
+@media (max-width: 768px) {
+  .theme-toggle { width:44px; min-width:44px; height:44px; min-height:44px; }
+  .floorplan-shortcut-key { display:none; }
+}

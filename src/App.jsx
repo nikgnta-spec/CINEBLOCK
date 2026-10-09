@@ -5,7 +5,7 @@ import ShotList from './components/ShotList'
 import Floorplan from './components/Floorplan'
 import SceneNavigator from './components/SceneNavigator'
 import PrintReport from './components/PrintReport'
-import { Download, Upload, Plus, Trash2, X, FileText, PanelsTopLeft, RectangleHorizontal, RectangleVertical, MoreHorizontal } from 'lucide-react'
+import { Download, Upload, Plus, Trash2, X, FileText, PanelsTopLeft, RectangleHorizontal, RectangleVertical, MoreHorizontal, Sun, Moon } from 'lucide-react'
 import { loadAppState, saveAppState } from './storage'
 
 const TABS = [
@@ -410,6 +410,13 @@ function normalizeWorkspaceProjects(savedProjects) {
 }
 
 export default function App() {
+  const [theme, setTheme] = useState(() => {
+    try {
+      return window.localStorage.getItem('cineblock.ui-theme') === 'light' ? 'light' : 'dark'
+    } catch {
+      return 'dark'
+    }
+  })
   const [tab, setTab] = useState('floorplan')
   const [project, setProject] = useState(defaultProject)
   const [scenes, setScenes] = useState(() => [defaultScene(1)])
@@ -426,6 +433,15 @@ export default function App() {
   const [printRequest, setPrintRequest] = useState(false)
   const printStartedRef = useRef(false)
   const backupInputRef = useRef(null)
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    try {
+      window.localStorage.setItem('cineblock.ui-theme', theme)
+    } catch {
+      // Theme remains active for this session when browser storage is unavailable.
+    }
+  }, [theme])
 
   const changeActiveScene = sceneId => {
     if (sceneId !== activeSceneId) setSelectedShotId('')
@@ -733,6 +749,15 @@ export default function App() {
                   ? 'Gagal menyimpan'
                   : 'Tersimpan di perangkat ini'}
           </span>
+          <button
+            className="btn btn-secondary theme-toggle"
+            type="button"
+            onClick={() => setTheme(current => current === 'dark' ? 'light' : 'dark')}
+            aria-label={theme === 'dark' ? 'Aktifkan tema terang' : 'Aktifkan tema gelap'}
+            title={theme === 'dark' ? 'Aktifkan tema terang' : 'Aktifkan tema gelap'}
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
           <button className="btn btn-secondary" onClick={downloadBackup} disabled={!hydrated}>
             <Download size={13} /> Backup
           </button>

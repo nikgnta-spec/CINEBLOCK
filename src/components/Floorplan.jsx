@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2,
+  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Camera, Lightbulb,
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
 import {
@@ -971,6 +971,45 @@ export default function Floorplan({
     setTool('select')
   }
 
+  useEffect(() => {
+    const handleFloorplanShortcut = event => {
+      const target = event.target
+      if (target instanceof HTMLElement && (
+        target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+      )) return
+      if (event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return
+
+      const key = event.key.toLowerCase()
+      if (key === 'v') {
+        event.preventDefault()
+        setTool('select')
+        setSelectedWaypoint(null)
+        return
+      }
+      if (key === 'c') {
+        event.preventDefault()
+        addObject('camera')
+        return
+      }
+      if (key === 'l') {
+        event.preventDefault()
+        addObject('light')
+        return
+      }
+      if (['delete', 'backspace'].includes(key)) {
+        if (selectedWaypoint) {
+          event.preventDefault()
+          deleteSelectedWaypoint()
+        } else if (selected) {
+          event.preventDefault()
+          deleteSelected()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleFloorplanShortcut)
+    return () => window.removeEventListener('keydown', handleFloorplanShortcut)
+  }, [addObject, deleteSelected, deleteSelectedWaypoint, selected, selectedWaypoint])
+
   const clearLayout = () => {
     if (!window.confirm('Kosongkan room, wall, properti, aktor, kamera, dan lampu pada scene ini?')) return
     updateLayout(() => ({ ...EMPTY_LAYOUT }))
@@ -1013,8 +1052,8 @@ export default function Floorplan({
 
       <div className="floorplan-main-tools" role="toolbar" aria-label="Alat Floorplan">
         <div className="floorplan-tool-group">
-          <button className={'floorplan-tool-button' + (tool === 'select' ? ' active' : '')} onClick={() => setTool('select')} title="Pilih dan pindahkan" aria-label="Pilih dan pindahkan" aria-pressed={tool === 'select'}>
-            <MousePointer2 size={19} />
+          <button className={'floorplan-tool-button' + (tool === 'select' ? ' active' : '')} onClick={() => setTool('select')} title="Pilih dan pindahkan (V)" aria-label="Pilih dan pindahkan (V)" aria-pressed={tool === 'select'}>
+            <MousePointer2 size={19} /><kbd className="floorplan-shortcut-key">V</kbd>
           </button>
           <button className={'floorplan-tool-button' + (tool === 'pan' ? ' active' : '')} onClick={() => setTool(tool === 'pan' ? 'select' : 'pan')} title="Geser tampilan kanvas" aria-label="Geser tampilan kanvas" aria-pressed={tool === 'pan'}>
             <Hand size={18} /><span>Geser kanvas</span>
@@ -1038,14 +1077,14 @@ export default function Floorplan({
           <button className="floorplan-tool-button" onClick={() => addObject('actor')} title="Tambah aktor" aria-label="Tambah aktor">
             <FloorplanObjectIcon type="actor" size={22} /><span>Aktor</span>
           </button>
-          <button className="floorplan-tool-button" onClick={() => addObject('camera')} title="Tambah kamera dan hubungkan ke shot" aria-label="Tambah kamera">
-            <FloorplanObjectIcon type="camera" size={22} /><span>Camera</span>
+          <button className="floorplan-tool-button" onClick={() => addObject('camera')} title="Tambah kamera dan hubungkan ke shot (C)" aria-label="Tambah kamera (C)">
+            <FloorplanObjectIcon type="camera" size={22} /><span>Kamera</span><kbd className="floorplan-shortcut-key">C</kbd>
           </button>
           <button className="floorplan-tool-button" onClick={() => addObject('prop')} title="Tambah properti atau furnitur" aria-label="Tambah properti">
             <FloorplanObjectIcon type="prop" size={22} /><span>Properti</span>
           </button>
-          <button className="floorplan-tool-button" onClick={() => addObject('light')} title="Tambah lampu" aria-label="Tambah lampu">
-            <FloorplanObjectIcon type="light" size={22} /><span>Lampu</span>
+          <button className="floorplan-tool-button" onClick={() => addObject('light')} title="Tambah lampu (L)" aria-label="Tambah lampu (L)">
+            <FloorplanObjectIcon type="light" size={22} /><span>Lampu</span><kbd className="floorplan-shortcut-key">L</kbd>
           </button>
         </div>
         <span className="floorplan-tool-spacer" />
