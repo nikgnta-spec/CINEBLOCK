@@ -754,7 +754,7 @@ export default function Floorplan({
       return shot ? ('Shot ' + shot.num + (shot.subject ? ' — ' + shot.subject : '')) : 'Unlinked camera'
     }
     if (type === 'light') return item.label || item.lightType || 'Light'
-    if (type === 'prop') return item.label || item.propType || 'Prop'
+    if (type === 'prop') return item.propType || 'Prop'
     const fallback = ({ room: 'Room', wall: 'Wall', door: 'Door', window: 'Window', actor: 'Actor' })[type] || type
     return item.label || fallback
   }
@@ -1171,7 +1171,7 @@ export default function Floorplan({
                           paintOrder="stroke"
                           pointerEvents="none"
                         >
-                          {object.label || (type === 'prop' ? object.propType : type)}
+                          {type === 'prop' ? (object.propType || 'Prop') : (object.label || (type === 'door' ? 'Door' : 'Window'))}
                         </text>
                       )}
                     </g>
@@ -1429,70 +1429,25 @@ export default function Floorplan({
               )}
 
               {selectedType === 'room' && (
-                <>
-                  <section className="floorplan-inspector-section">
-                    <label htmlFor="room-label">Room name</label>
-                    <input id="room-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
-                  </section>
-                  <section className="floorplan-inspector-section">
-                    <div className="floorplan-section-title">Dimensions</div>
-                    <div className="floorplan-size-grid">
-                      <label className="floorplan-size-field" htmlFor="room-length">
-                        <span>Length (X)</span>
-                        <input id="room-length" type="number" className="floorplan-field" min="40" max={Math.max(40, MAP_WIDTH - selectedEntity.x)} value={selectedEntity.width} onChange={event => updateSelected({ width: event.target.value === '' ? '' : Number(event.target.value) })}
-                        onBlur={event => updateSelected({ width: Math.round(clamp(event.target.value, 40, Math.max(40, MAP_WIDTH - selectedEntity.x))) })} />
-                      </label>
-                      <label className="floorplan-size-field" htmlFor="room-width">
-                        <span>Width (Y)</span>
-                        <input id="room-width" type="number" className="floorplan-field" min="40" max={Math.max(40, MAP_HEIGHT - selectedEntity.y)} value={selectedEntity.height} onChange={event => updateSelected({ height: event.target.value === '' ? '' : Number(event.target.value) })}
-                        onBlur={event => updateSelected({ height: Math.round(clamp(event.target.value, 40, Math.max(40, MAP_HEIGHT - selectedEntity.y))) })} />
-                      </label>
-                    </div>
-                  </section>
-                </>
-              )}
-
-              {['door', 'window', 'prop'].includes(selectedType) && (
-                <>
-                  <section className="floorplan-inspector-section">
-                    <label htmlFor="fixture-label">{selectedType === 'prop' ? 'Prop name' : selectedType === 'door' ? 'Door label' : 'Window label'}</label>
-                    <input id="fixture-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
-                    {selectedType === 'prop' && (
-                      <>
-                        <label htmlFor="prop-type">Prop type</label>
-                        <select id="prop-type" className="floorplan-field" value={selectedEntity.propType || 'Custom'} onChange={event => updateSelected({ propType: event.target.value })}>
-                          {PROP_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
-                        </select>
-                      </>
-                    )}
-                  </section>
-                  <section className="floorplan-inspector-section">
-                    <div className="floorplan-section-title">Dimensions</div>
-                    <div className="floorplan-size-grid">
-                      <label className="floorplan-size-field" htmlFor="fixture-length">
-                        <span>Length</span>
-                        <input id="fixture-length" type="number" className="floorplan-field" min="12" max={Math.max(12, MAP_WIDTH - selectedEntity.x)} value={selectedEntity.width} onChange={event => updateSelected({ width: event.target.value === '' ? '' : Number(event.target.value) })}
-                        onBlur={event => updateSelected({ width: Math.round(clamp(event.target.value, 12, Math.min(300, Math.max(12, MAP_WIDTH - selectedEntity.x)))) })} />
-                      </label>
-                      <label className="floorplan-size-field" htmlFor="fixture-width">
-                        <span>Width</span>
-                        <input id="fixture-width" type="number" className="floorplan-field" min="8" max={Math.max(8, MAP_HEIGHT - selectedEntity.y)} value={selectedEntity.height} onChange={event => updateSelected({ height: event.target.value === '' ? '' : Number(event.target.value) })}
-                        onBlur={event => updateSelected({ height: Math.round(clamp(event.target.value, 8, Math.min(200, Math.max(8, MAP_HEIGHT - selectedEntity.y)))) })} />
-                      </label>
-                    </div>
-                  </section>
-                </>
-              )}
-
-              {selectedType === 'wall' && (
                 <section className="floorplan-inspector-section">
-                  <div className="floorplan-section-title">Wall</div>
-                  <div className="floorplan-size-grid">
-                    <label className="floorplan-size-field" htmlFor="wall-x1"><span>Start X</span><input id="wall-x1" type="number" className="floorplan-field" value={selectedEntity.x1} onChange={event => updateSelected({ x1: clamp(event.target.value, 0, MAP_WIDTH) })} /></label>
-                    <label className="floorplan-size-field" htmlFor="wall-y1"><span>Start Y</span><input id="wall-y1" type="number" className="floorplan-field" value={selectedEntity.y1} onChange={event => updateSelected({ y1: clamp(event.target.value, 0, MAP_HEIGHT) })} /></label>
-                    <label className="floorplan-size-field" htmlFor="wall-x2"><span>End X</span><input id="wall-x2" type="number" className="floorplan-field" value={selectedEntity.x2} onChange={event => updateSelected({ x2: clamp(event.target.value, 0, MAP_WIDTH) })} /></label>
-                    <label className="floorplan-size-field" htmlFor="wall-y2"><span>End Y</span><input id="wall-y2" type="number" className="floorplan-field" value={selectedEntity.y2} onChange={event => updateSelected({ y2: clamp(event.target.value, 0, MAP_HEIGHT) })} /></label>
-                  </div>
+                  <label htmlFor="room-label">Room name</label>
+                  <input id="room-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
+                </section>
+              )}
+
+              {['door', 'window'].includes(selectedType) && (
+                <section className="floorplan-inspector-section">
+                  <label htmlFor="fixture-label">{selectedType === 'door' ? 'Door label' : 'Window label'}</label>
+                  <input id="fixture-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
+                </section>
+              )}
+
+              {selectedType === 'prop' && (
+                <section className="floorplan-inspector-section">
+                  <label htmlFor="prop-type">Prop type</label>
+                  <select id="prop-type" className="floorplan-field" value={selectedEntity.propType || 'Custom'} onChange={event => updateSelected({ propType: event.target.value, label: event.target.value })}>
+                    {PROP_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+                  </select>
                 </section>
               )}
             </>
