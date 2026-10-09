@@ -401,14 +401,6 @@ button:focus-visible,
 }
 .floorplan-icon-button:hover { background: var(--bg-hover); color: var(--text); }
 .floorplan-icon-button.danger { color: var(--danger); }
-.floorplan-top-meta {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  color: var(--text-muted);
-  font-size: 13px;
-}
-.floorplan-top-meta span { white-space: nowrap; }
 .floorplan-main-tools {
   display: flex;
   flex: 0 0 62px;
@@ -420,6 +412,26 @@ button:focus-visible,
   overflow-x: auto;
 }
 .floorplan-tool-group { display: flex; align-items: center; gap: 6px; }
+.floorplan-structure-group {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 5px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-subtle);
+}
+.floorplan-structure-label {
+  padding: 0 7px 0 3px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.floorplan-structure-group .floorplan-tool-button { padding-inline: 9px; }
 .floorplan-tool-button {
   display: inline-flex;
   align-items: center;
