@@ -316,6 +316,9 @@ export default function Floorplan({
   const dragHistoryBeforeRef = useRef(null)
   const historyActionRef = useRef(false)
   const historyRef = useRef({ sceneId: null, past: [], future: [], lastLayout: null })
+  // Track shots created as a side effect of adding a camera so Undo/Redo can
+  // reverse and restore that paired change together with the floorplan layout.
+  const autoCreatedShotsByCameraRef = useRef(new Map())
 
   const scene = scenes.find(item => item.id === activeSceneId) || scenes[0]
   const layout = scene ? (floorplans?.[scene.id] || EMPTY_LAYOUT) : EMPTY_LAYOUT
@@ -481,6 +484,25 @@ export default function Floorplan({
     history.lastLayout = cloneLayoutSnapshot(previous)
     historyActionRef.current = true
     setHistoryRevision(value => value + 1)
+
+    // A camera may have created its linked shot automatically. Undoing the
+    // camera's creation must also undo that shot creation.
+    const currentCameraIds = new Set(current.cameras.map(camera => camera.id))
+    const previousCameraIds = new Set(previous.cameras.map(camera => camera.id))
+    const autoShotsToRemove = [...autoCreatedShotsByCameraRef.current.entries()]
+      .filter(([cameraId, record]) => record.sceneId === scene.id
+        && currentCameraIds.has(cameraId)
+        && !previousCameraIds.has(cameraId))
+      .map(([, record]) => record.shot.id)
+
+    if (autoShotsToRemove.length) {
+      const removedShotIds = new Set(autoShotsToRemove)
+      onChange(previousScenes => previousScenes.map(item => item.id !== scene.id ? item : ({
+        ...item,
+        shots: item.shots.filter(shot => !removedShotIds.has(shot.id)),
+      })))
+    }
+
     updateLayout(() => cloneLayoutSnapshot(previous))
     applyEntitySelection([])
     onSelectedShotIdChange?.('')
@@ -496,6 +518,27 @@ export default function Floorplan({
     history.lastLayout = cloneLayoutSnapshot(next)
     historyActionRef.current = true
     setHistoryRevision(value => value + 1)
+
+    // Redo restores the paired auto-created shot when it restores that camera.
+    const currentCameraIds = new Set(current.cameras.map(camera => camera.id))
+    const nextCameraIds = new Set(next.cameras.map(camera => camera.id))
+    const autoShotsToRestore = [...autoCreatedShotsByCameraRef.current.entries()]
+      .filter(([cameraId, record]) => record.sceneId === scene.id
+        && !currentCameraIds.has(cameraId)
+        && nextCameraIds.has(cameraId))
+      .map(([, record]) => record.shot)
+
+    if (autoShotsToRestore.length) {
+      onChange(previousScenes => previousScenes.map(item => {
+        if (item.id !== scene.id) return item
+        const existingShotIds = new Set(item.shots.map(shot => shot.id))
+        const restoredShots = autoShotsToRestore.filter(shot => !existingShotIds.has(shot.id))
+        return restoredShots.length
+          ? { ...item, shots: renumberShots([...item.shots, ...restoredShots]) }
+          : item
+      }))
+    }
+
     updateLayout(() => cloneLayoutSnapshot(next))
     applyEntitySelection([])
     onSelectedShotIdChange?.('')
@@ -615,14 +658,23 @@ export default function Floorplan({
     } else {
       const linkedShotIds = new Set(layout.cameras.map(camera => camera.shotId).filter(Boolean))
       let targetShot = scene.shots.find(shot => !linkedShotIds.has(shot.id))
+      let createdShotAutomatically = false
       if (!targetShot) {
         targetShot = defaultShot(scene.shots.length + 1)
+        createdShotAutomatically = true
         onChange(previous => previous.map(currentScene => currentScene.id !== scene.id ? currentScene : ({
           ...currentScene,
           shots: renumberShots([...currentScene.shots, targetShot]),
         })))
       }
-      object = { id: makeId(), ...position, angle: 0, shotId: targetShot.id, path: [] }
+      const cameraId = makeId()
+      object = { id: cameraId, ...position, angle: 0, shotId: targetShot.id, path: [] }
+      if (createdShotAutomatically) {
+        autoCreatedShotsByCameraRef.current.set(cameraId, {
+          sceneId: scene.id,
+          shot: { ...targetShot },
+        })
+      }
       updateLayout(previous => ({ ...previous, cameras: [...previous.cameras, object] }))
       onSelectedShotIdChange?.(targetShot.id)
     }
