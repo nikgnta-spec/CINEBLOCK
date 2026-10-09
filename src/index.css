@@ -665,6 +665,63 @@ button:focus-visible,
   font-weight: 600;
 }
 .floorplan-size-field .floorplan-field { padding: 9px 8px; }
+.floorplan-dimension-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.floorplan-dimension-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-subtle);
+}
+.floorplan-dimension-summary span { color: var(--text-muted); font-size: 12px; }
+.floorplan-dimension-summary strong { color: var(--text); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.floorplan-opening-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.floorplan-opening-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+}
+.floorplan-opening-add:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+.floorplan-opening-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+.floorplan-opening-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 78px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+}
+.floorplan-opening-row .floorplan-field { min-width: 0; flex: 1; padding: 7px 8px; font-size: 12px; }
+.floorplan-opening-row .floorplan-icon-button { width: 32px; height: 32px; flex-basis: 32px; }
+.floorplan-opening-hint { flex: 1; min-width: 0; color: var(--text-muted); font-size: 11px; text-align: right; }
 .floorplan-coordinates input {
   width: 100%;
   min-width: 0;
