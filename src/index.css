@@ -1033,3 +1033,37 @@ button:focus-visible,
 .shot-time-summary strong { color:var(--text); font-weight:600; font-variant-numeric:tabular-nums; }
 @media (max-width:1024px) { .scene-meta-row { gap:8px; } .shot-time-summary { gap:8px; } }
 @media (max-width:680px) { .shot-time-summary { width:100%; } }
+
+
+/* Stage 2 — a shared scene navigator for both Floorplan and Shot List. */
+.scene-sidebar { display:flex; flex-direction:column; min-width:0; }
+.scene-sidebar-header { flex:0 0 auto; }
+.scene-navigator-add, .scene-navigator-rename, .scene-navigator-rename-compact {
+  display:inline-flex; align-items:center; justify-content:center;
+  color:var(--text-muted); border:1px solid transparent; border-radius:6px;
+}
+.scene-navigator-add { width:30px; height:30px; }
+.scene-navigator-add:hover, .scene-navigator-rename:hover, .scene-navigator-rename-compact:hover {
+  color:var(--accent); background:var(--accent-bg); border-color:var(--accent-border);
+}
+.scene-navigator-list { overflow-y:auto; min-height:0; }
+.scene-item { display:flex; align-items:center; gap:3px; padding:4px 6px 4px 10px; }
+.scene-item.active { border-left-color:var(--accent); background:var(--accent-bg); }
+.scene-navigator-item-main {
+  display:flex; flex:1; min-width:0; flex-direction:column; align-items:flex-start;
+  gap:3px; padding:5px 4px; text-align:left; border-radius:5px;
+}
+.scene-navigator-item-main:hover { background:color-mix(in srgb, var(--bg-hover) 70%, transparent); }
+.scene-navigator-item-main .scene-item-name { overflow:hidden; max-width:100%; text-overflow:ellipsis; white-space:nowrap; }
+.scene-navigator-item-main .scene-item-sub { overflow:hidden; max-width:100%; text-overflow:ellipsis; white-space:nowrap; }
+.scene-navigator-rename { width:28px; height:28px; flex:0 0 28px; opacity:0; }
+.scene-item:hover .scene-navigator-rename, .scene-item.active .scene-navigator-rename, .scene-navigator-rename:focus-visible { opacity:1; }
+.scene-navigator-rename-input { width:100%; min-width:0; padding:6px 7px; border:1px solid var(--accent); border-radius:5px; outline:2px solid color-mix(in srgb, var(--accent) 20%, transparent); background:var(--bg); color:var(--text); font-size:13px; }
+.scene-navigator-compact { gap:6px; }
+.scene-navigator-compact-input { width:min(240px, 38vw); min-width:120px; height:40px; padding:7px 10px; border:1px solid var(--accent); border-radius:6px; outline:2px solid color-mix(in srgb, var(--accent) 20%, transparent); background:var(--bg); color:var(--text); font-size:15px; font-weight:600; }
+.scene-current-name { font-size:13px; font-weight:600; color:var(--text); white-space:nowrap; }
+@media (max-width: 768px) {
+  .scene-sidebar { width:140px; }
+  .scene-navigator-rename { opacity:1; }
+  .scene-navigator-compact-input { flex:1; min-width:0; width:auto; }
+}

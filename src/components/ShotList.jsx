@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import SceneNavigator from './SceneNavigator'
 import { SIZES, ANGLES, LENSES, MOVEMENTS, EQUIPMENT } from '../shotOptions'
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Trash2, Copy } from 'lucide-react'
 
@@ -50,8 +51,10 @@ export default function ShotList({
   onActiveSceneChange,
   floorplans,
   defaultShot,
-  defaultScene,
   selectedShotId,
+  onAddScene,
+  onRenameScene,
+  onFloorplansChange,
   onSelectedShotIdChange,
 }) {
   const matchingIdx = scenes.findIndex(s => s.id === activeSceneId)
@@ -78,21 +81,6 @@ export default function ShotList({
     onChange(prev => prev.map(s => s.id === scene.id ? fn(s) : s))
   }
 
-  const nextSceneName = () => {
-    const usedNumbers = new Set(
-      scenes.map(s => Number(s.name.match(/^Scene\s+(\d+)$/i)?.[1])).filter(Number.isFinite),
-    )
-    let candidate = 1
-    while (usedNumbers.has(candidate)) candidate += 1
-    return candidate
-  }
-
-  const addScene = () => {
-    const newScene = defaultScene(nextSceneName())
-    onChange(prev => [...prev, newScene])
-    onActiveSceneChange(newScene.id)
-  }
-
   const deleteScene = (idx) => {
     if (scenes.length <= 1) return
     if (!window.confirm('Hapus scene ini beserta semua shot di dalamnya? Tindakan ini tidak dapat dibatalkan.')) return
@@ -103,6 +91,12 @@ export default function ShotList({
     if (!sceneToDelete) return
 
     onChange(prev => prev.filter(s => s.id !== sceneToDelete.id))
+    onFloorplansChange?.(previous => {
+      const next = { ...previous }
+      delete next[sceneToDelete.id]
+      return next
+    })
+    if (sceneToDelete.shots.some(shot => shot.id === selectedShotId)) onSelectedShotIdChange?.('')
     onActiveSceneChange(fallbackScene?.id || '')
   }
 
@@ -233,13 +227,7 @@ export default function ShotList({
           </div>
           <div>
             <div className="scene-slugline">
-              <input
-                className="scene-select"
-                aria-label="Nama scene"
-                value={scene.name}
-                onChange={e => updateSceneMeta('name', e.target.value)}
-                style={{ border: 'none', fontWeight: 500, fontSize: 13, padding: '4px 0', outline: 'none', background: 'transparent', minWidth: 0 }}
-              />
+              <span className="scene-current-name">{scene.name}</span>
               <span className="scene-slugline-separator" aria-hidden="true">·</span>
               <select
                 className="cell-select scene-slugline-field"
@@ -290,40 +278,18 @@ export default function ShotList({
           >
             <Trash2 size={13} /> Hapus Scene
           </button>
-          <button className="btn btn-secondary" onClick={addScene}>
-            <Plus size={13} /> Scene Baru
-          </button>
         </div>
       </div>
 
       <div className="shotlist-layout">
-        <div className="scene-sidebar">
-          <div className="scene-sidebar-header">
-            Scene
-            <button className="btn-ghost btn" style={{ padding: '2px 4px' }} onClick={addScene}>
-              <Plus size={12} />
-            </button>
-          </div>
-          {scenes.map((s, i) => (
-            <div
-              key={s.id}
-              className={`scene-item${i === activeIdx ? ' active' : ''}`}
-              role="button"
-              tabIndex={0}
-              aria-pressed={i === activeIdx}
-              onClick={() => setActiveIdx(i)}
-              onKeyDown={event => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  setActiveIdx(i)
-                }
-              }}
-            >
-              <div className="scene-item-name">{s.name}</div>
-              <div className="scene-item-sub">{s.intExt}{s.location ? `. ${s.location}` : ''} · {s.dayNight}</div>
-            </div>
-          ))}
-        </div>
+        <SceneNavigator
+          mode="list"
+          scenes={scenes}
+          activeSceneId={activeSceneId}
+          onActiveSceneChange={onActiveSceneChange}
+          onAddScene={onAddScene}
+          onRenameScene={onRenameScene}
+        />
 
         <div className="shot-table-wrap">
           <datalist id="lens-options">

@@ -3,6 +3,7 @@ import './App.css'
 import ProjectInfo from './components/ProjectInfo'
 import ShotList from './components/ShotList'
 import Floorplan from './components/Floorplan'
+import SceneNavigator from './components/SceneNavigator'
 import PrintReport from './components/PrintReport'
 import { Download, Upload, Plus, Trash2, X, FileText, PanelsTopLeft, RectangleHorizontal, RectangleVertical, MoreHorizontal } from 'lucide-react'
 import { loadAppState, saveAppState } from './storage'
@@ -426,6 +427,29 @@ export default function App() {
   const printStartedRef = useRef(false)
   const backupInputRef = useRef(null)
 
+  const changeActiveScene = sceneId => {
+    if (sceneId !== activeSceneId) setSelectedShotId('')
+    setActiveSceneId(sceneId)
+  }
+
+  const addScene = () => {
+    const usedNumbers = new Set(
+      scenes.map(scene => Number(scene.name.match(/^Scene\s+(\d+)$/i)?.[1])).filter(Number.isFinite),
+    )
+    let nextNumber = 1
+    while (usedNumbers.has(nextNumber)) nextNumber += 1
+    const newScene = defaultScene(nextNumber, project.camera)
+    setScenes(previous => [...previous, newScene])
+    setActiveSceneId(newScene.id)
+    setSelectedShotId('')
+  }
+
+  const renameScene = (sceneId, name) => {
+    const nextName = name.trim().slice(0, 120)
+    if (!nextName) return
+    setScenes(previous => previous.map(scene => scene.id === sceneId ? { ...scene, name: nextName } : scene))
+  }
+
   useEffect(() => {
     if (!printRequest) {
       printStartedRef.current = false
@@ -823,12 +847,14 @@ export default function App() {
                 scenes={scenes}
                 onChange={setScenes}
                 activeSceneId={activeSceneId}
-                onActiveSceneChange={setActiveSceneId}
+                onActiveSceneChange={changeActiveScene}
                 floorplans={floorplans}
                 defaultShot={num => defaultShot(num, project.camera)}
-                defaultScene={num => defaultScene(num, project.camera)}
                 selectedShotId={selectedShotId}
                 onSelectedShotIdChange={setSelectedShotId}
+                onAddScene={addScene}
+                onRenameScene={renameScene}
+                onFloorplansChange={setFloorplans}
               />
             )}
             {tab === 'floorplan' && (
@@ -836,9 +862,10 @@ export default function App() {
                 scenes={scenes}
                 onChange={setScenes}
                 activeSceneId={activeSceneId}
-                onActiveSceneChange={setActiveSceneId}
+                onActiveSceneChange={changeActiveScene}
+                onAddScene={addScene}
+                onRenameScene={renameScene}
                 defaultShot={num => defaultShot(num, project.camera)}
-                defaultScene={num => defaultScene(num, project.camera)}
                 selectedShotId={selectedShotId}
                 onSelectedShotIdChange={setSelectedShotId}
                 floorplans={floorplans}

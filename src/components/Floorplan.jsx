@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2,
 } from 'lucide-react'
+import SceneNavigator from './SceneNavigator'
 import {
   SIZES as SHOT_SIZES,
   ANGLES as SHOT_ANGLES,
@@ -283,7 +284,8 @@ export default function Floorplan({
   activeSceneId,
   onActiveSceneChange,
   defaultShot,
-  defaultScene,
+  onAddScene,
+  onRenameScene,
   floorplans,
   onFloorplansChange,
   selectedShotId,
@@ -975,14 +977,6 @@ export default function Floorplan({
     setTool('select')
   }
 
-  const addScene = () => {
-    const newScene = defaultScene(scenes.length + 1)
-    onChange(previous => [...previous, newScene])
-    onActiveSceneChange(newScene.id)
-    setSelected(null)
-    setTool('select')
-  }
-
   const objectName = (type, item) => {
     if (type === 'camera') {
       const shot = scene.shots.find(entry => entry.id === item.shotId)
@@ -1005,23 +999,14 @@ export default function Floorplan({
   return (
     <div className="floorplan-workspace">
       <header className="floorplan-top">
-        <div className="floorplan-scene-control">
-          <select
-            className="floorplan-scene-select"
-            aria-label="Scene aktif"
-            value={scene.id}
-            onChange={event => onActiveSceneChange(event.target.value)}
-          >
-            {scenes.map((item, index) => (
-              <option key={item.id} value={item.id}>
-                {item.name || ('Scene ' + padNum(index + 1))}
-              </option>
-            ))}
-          </select>
-          <button className="floorplan-icon-button" onClick={addScene} title="Tambah scene" aria-label="Tambah scene">
-            <Plus size={18} />
-          </button>
-        </div>
+        <SceneNavigator
+          mode="compact"
+          scenes={scenes}
+          activeSceneId={activeSceneId}
+          onActiveSceneChange={onActiveSceneChange}
+          onAddScene={onAddScene}
+          onRenameScene={onRenameScene}
+        />
       </header>
 
       <div className="floorplan-main-tools" role="toolbar" aria-label="Alat Floorplan">
