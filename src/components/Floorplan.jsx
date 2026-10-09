@@ -504,6 +504,7 @@ export default function Floorplan({
   const deleteSelectedItems = () => {
     const selection = [...selectionRef.current]
     if (selection.length < 2) return
+    if (!window.confirm(`Hapus ${selection.length} objek yang dipilih dari denah? Tindakan ini tidak dapat dibatalkan.`)) return
     updateLayout(previous => {
       const next = { ...previous }
       for (const type of ['rooms', 'walls', 'props', 'actors', 'cameras', 'lights']) {
