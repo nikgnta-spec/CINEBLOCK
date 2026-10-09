@@ -125,7 +125,16 @@ export default function ProjectInfo({ project, onChange }) {
           <div
             key={i}
             className="visual-ref-card"
+            role={ref ? 'group' : 'button'}
+            tabIndex={ref ? -1 : 0}
+            aria-label={ref ? `Visual reference ${i + 1}` : `Add visual reference ${i + 1}`}
             onClick={() => !ref && fileRefs.current[i]?.click()}
+            onKeyDown={event => {
+              if (!ref && (event.key === 'Enter' || event.key === ' ')) {
+                event.preventDefault()
+                fileRefs.current[i]?.click()
+              }
+            }}
           >
             {ref ? (
               <>
