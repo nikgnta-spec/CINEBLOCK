@@ -21,7 +21,7 @@ function FloorplanObjectIcon({ type, size = 20 }) {
     <svg
       width={size}
       height={size}
-      viewBox="-50 -42 100 84"
+      viewBox={type === 'camera' ? '-36 -25 72 50' : '-50 -42 100 84'}
       fill="none"
       stroke="currentColor"
       strokeWidth="3.5"
