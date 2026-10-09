@@ -938,6 +938,14 @@ button:focus-visible,
   .print-muted { color: #6b7280; font-size: 8pt; }
   .print-report-footer { margin-top: 12px; padding-top: 6px; color: #6b7280; border-top: 1px solid #d1d5db; font-size: 7pt; }
 
+  .print-mode-shotlist .print-plan-page { display: none !important; }
+  .print-mode-floorplan .print-cover,
+  .print-mode-floorplan .print-shot-list-section { display: none !important; }
+  .print-mode-floorplan .print-plan-page { break-before: auto; }
+  .print-orientation-landscape .print-shot-fields { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .print-orientation-landscape .print-plan-svg { max-height: 170mm; }
+  .export-dialog-backdrop { display: none !important; }
+
   .print-cover-footer,
   .print-report-footer { display: none; }
 }
