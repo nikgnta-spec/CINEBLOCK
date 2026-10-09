@@ -1456,7 +1456,7 @@ export default function Floorplan({
                         />
                       ))
                     })}
-                    <text x={room.x + 12} y={room.y + 28} fill="var(--text)" fontSize="16" fontWeight="600" pointerEvents="none">
+                    <text x={room.x + 12} y={room.y + 28} fill="var(--text)" fontSize="18" fontWeight="600" pointerEvents="none">
                       {room.label || 'Room'}
                     </text>
                     {openings.map(opening => {
@@ -1672,9 +1672,9 @@ export default function Floorplan({
                           <path
                             d={cameraFov.widePath}
                             fill="var(--text-muted)"
-                            fillOpacity={active ? 0.10 : 0.045}
+                            fillOpacity={active ? 0.16 : 0.09}
                             stroke="var(--text-muted)"
-                            strokeOpacity={active ? 0.58 : 0.28}
+                            strokeOpacity={active ? 0.7 : 0.42}
                             strokeWidth={active ? 1.6 : 1.2}
                             vectorEffect="non-scaling-stroke"
                           />
@@ -1684,7 +1684,7 @@ export default function Floorplan({
                               fill="var(--bg)"
                               fillOpacity="0.28"
                               stroke="var(--text-muted)"
-                              strokeOpacity={active ? 0.65 : 0.32}
+                              strokeOpacity={active ? 0.8 : 0.48}
                               strokeWidth="1.2"
                               strokeDasharray="5 4"
                               vectorEffect="non-scaling-stroke"
@@ -1762,7 +1762,7 @@ export default function Floorplan({
                           x="0"
                           y="40"
                           textAnchor="middle"
-                          fontSize="12"
+                          fontSize="15"
                           fontWeight="500"
                           fill="var(--text)"
                           stroke="var(--bg)"
@@ -1807,12 +1807,12 @@ export default function Floorplan({
                         <circle cx="0" cy="0" r="34" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />
                       ) : null}
                       {type === 'camera' && (
-                        <text x="0" y="46" textAnchor="middle" fontSize="13" fontWeight="600" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" pointerEvents="none">
+                        <text x="0" y="46" textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" pointerEvents="none">
                           {shot ? shot.num : '—'}
                         </text>
                       )}
                       {type === 'light' && (
-                        <text x="0" y="35" textAnchor="middle" fontSize="12" fontWeight="500" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" pointerEvents="none">
+                        <text x="0" y="35" textAnchor="middle" fontSize="13" fontWeight="500" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" pointerEvents="none">
                           {object.lightType || 'Key'}
                         </text>
                       )}
