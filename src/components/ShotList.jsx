@@ -19,6 +19,30 @@ function renumberShots(shots) {
   }))
 }
 
+function durationMinutes(value) {
+  const input = String(value ?? '').trim().toLowerCase()
+  if (!input) return 0
+  const clock = input.match(/^(\d+):([0-5]\d)$/)
+  if (clock) return Number(clock[1]) * 60 + Number(clock[2])
+  const parts = [...input.matchAll(/(\d+(?:[.,]\d+)?)\s*(jam|hours?|hrs?|h|menit|minutes?|mins?|min|m)?/g)]
+    .filter(match => match[0].trim())
+  return parts.reduce((total, match) => {
+    const amount = Number(match[1].replace(',', '.'))
+    const unit = match[2] || ''
+    return total + amount * (['jam', 'hour', 'hours', 'hr', 'hrs', 'h'].includes(unit) ? 60 : 1)
+  }, 0)
+}
+
+function formatDuration(value) {
+  const minutes = Math.round(value)
+  if (!minutes) return '0 mnt'
+  const hours = Math.floor(minutes / 60)
+  const remainder = minutes % 60
+  if (hours && remainder) return hours + ' j ' + remainder + ' mnt'
+  if (hours) return hours + ' j'
+  return minutes + ' mnt'
+}
+
 export default function ShotList({
   scenes,
   onChange,
@@ -32,6 +56,8 @@ export default function ShotList({
   const matchingIdx = scenes.findIndex(s => s.id === activeSceneId)
   const activeIdx = matchingIdx >= 0 ? matchingIdx : 0
   const scene = scenes[activeIdx]
+  const totalSetupMinutes = scene.shots.reduce((sum, shot) => sum + durationMinutes(shot.setup), 0)
+  const totalShootMinutes = scene.shots.reduce((sum, shot) => sum + durationMinutes(shot.estShoot), 0)
 
   useEffect(() => {
     if (!selectedShotId || !scene?.shots.some(shot => shot.id === selectedShotId)) return
@@ -246,7 +272,14 @@ export default function ShotList({
                 <option>DUSK</option>
               </select>
             </div>
-            <div className="shot-count">{scene.shots.length} shot{scene.shots.length !== 1 ? 's' : ''}</div>
+            <div className="scene-meta-row">
+              <span className="shot-count">{scene.shots.length} shot</span>
+              <div className="shot-time-summary" aria-label="Ringkasan estimasi waktu scene">
+                <span>Setup <strong>{formatDuration(totalSetupMinutes)}</strong></span>
+                <span>Shoot <strong>{formatDuration(totalShootMinutes)}</strong></span>
+                <span>Total <strong>{formatDuration(totalSetupMinutes + totalShootMinutes)}</strong></span>
+              </div>
+            </div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>

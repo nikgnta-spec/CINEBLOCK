@@ -1024,3 +1024,12 @@ button:focus-visible,
 .add-shot-btn { min-height:34px; }
 @media (max-width: 1024px) { .scene-slugline { gap:5px; } }
 @media (max-width: 680px) { .scene-slugline { gap:4px; } .scene-location-field { width:100px; } }
+
+
+/* Stage 2 — compact scene time summary. */
+.scene-meta-row { display:flex; align-items:center; gap:12px; margin-top:4px; flex-wrap:wrap; }
+.shot-time-summary { display:inline-flex; flex-wrap:wrap; align-items:center; gap:10px; color:var(--text-muted); font-size:11px; }
+.shot-time-summary > span { display:inline-flex; align-items:center; gap:4px; }
+.shot-time-summary strong { color:var(--text); font-weight:600; font-variant-numeric:tabular-nums; }
+@media (max-width:1024px) { .scene-meta-row { gap:8px; } .shot-time-summary { gap:8px; } }
+@media (max-width:680px) { .shot-time-summary { width:100%; } }
