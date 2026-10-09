@@ -1614,17 +1614,61 @@ export default function Floorplan({
               )}
 
               {selectedType === 'room' && (
-                <section className="floorplan-inspector-section">
-                  <label htmlFor="room-label">Room name</label>
-                  <input id="room-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
-                </section>
+                <>
+                  <section className="floorplan-inspector-section">
+                    <label htmlFor="room-label">Room name</label>
+                    <input id="room-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
+                  </section>
+                  <section className="floorplan-inspector-section">
+                    <div className="floorplan-section-title">Dimensions</div>
+                    <div className="floorplan-dimension-summary">
+                      <div><span>Length</span><strong>{Math.round(Number(selectedEntity.width) || 0)} units</strong></div>
+                      <div><span>Width</span><strong>{Math.round(Number(selectedEntity.height) || 0)} units</strong></div>
+                    </div>
+                  </section>
+                  <section className="floorplan-inspector-section">
+                    <div className="floorplan-section-title">Openings</div>
+                    <div className="floorplan-opening-actions">
+                      <button className="floorplan-opening-add" onClick={() => addOpening('door')}><FloorplanObjectIcon type="door" size={18} /> Add door</button>
+                      <button className="floorplan-opening-add" onClick={() => addOpening('window')}><FloorplanObjectIcon type="window" size={18} /> Add window</button>
+                    </div>
+                    {(selectedEntity.openings || []).map(opening => (
+                      <div className="floorplan-opening-row" key={opening.id}>
+                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Door' : 'Window'}</span>
+                        <select className="floorplan-field" aria-label={'Opening wall side'} value={ROOM_SIDES.some(side => side.value === opening.side) ? opening.side : 'bottom'} onChange={event => updateOpening(opening.id, { side: event.target.value })}>
+                          {ROOM_SIDES.map(side => <option key={side.value} value={side.value}>{side.label}</option>)}
+                        </select>
+                        <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} title="Remove opening" aria-label="Remove opening"><X size={15} /></button>
+                      </div>
+                    ))}
+                  </section>
+                </>
               )}
 
-              {['door', 'window'].includes(selectedType) && (
-                <section className="floorplan-inspector-section">
-                  <label htmlFor="fixture-label">{selectedType === 'door' ? 'Door label' : 'Window label'}</label>
-                  <input id="fixture-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
-                </section>
+              {selectedType === 'wall' && (
+                <>
+                  <section className="floorplan-inspector-section">
+                    <div className="floorplan-section-title">Dimensions</div>
+                    <div className="floorplan-dimension-summary">
+                      <div><span>Length</span><strong>{Math.round(getWallMetrics(selectedEntity).length)} units</strong></div>
+                      <div><span>Width</span><strong>{Math.round(Number(selectedEntity.thickness) || 6)} units</strong></div>
+                    </div>
+                  </section>
+                  <section className="floorplan-inspector-section">
+                    <div className="floorplan-section-title">Openings</div>
+                    <div className="floorplan-opening-actions">
+                      <button className="floorplan-opening-add" onClick={() => addOpening('door')}><FloorplanObjectIcon type="door" size={18} /> Add door</button>
+                      <button className="floorplan-opening-add" onClick={() => addOpening('window')}><FloorplanObjectIcon type="window" size={18} /> Add window</button>
+                    </div>
+                    {(selectedEntity.openings || []).map(opening => (
+                      <div className="floorplan-opening-row" key={opening.id}>
+                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Door' : 'Window'}</span>
+                        <span className="floorplan-opening-hint">Drag on canvas to move</span>
+                        <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} title="Remove opening" aria-label="Remove opening"><X size={15} /></button>
+                      </div>
+                    ))}
+                  </section>
+                </>
               )}
 
               {selectedType === 'prop' && (
