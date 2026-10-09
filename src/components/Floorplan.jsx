@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  MousePointer2, Square, Minus, UserRound, Camera, Lightbulb, Route,
-  Trash2, Plus, Layers2,
+  MousePointer2, Square, Minus, Route, Trash2, Plus, Layers2,
 } from 'lucide-react'
 
 const LIGHT_TYPES = ['Key', 'Fill', 'Back / Rim', 'Practical', 'Ambient', 'Special']
@@ -12,6 +11,70 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 
 const makeId = () => crypto.randomUUID()
 const padNum = number => String(number).padStart(2, '0')
 const normalizeAngle = angle => ((angle % 360) + 360) % 360
+
+function FloorplanObjectIcon({ type, size = 20 }) {
+  if (type === 'light') {
+    return <img className="floorplan-lamp-symbol" src="/assets/lamp-icon.png" width={size} height={size} alt="" draggable="false" />
+  }
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="-50 -42 100 84"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {type === 'actor' ? (
+        <g transform="scale(0.68)">
+          <path d="M-22 -6 C-30 -10 -37 -6 -40 2 C-43 12 -36 22 -27 23 C-21 31 -10 34 0 34 C10 34 21 31 27 23 C36 22 43 12 40 2 C37 -6 30 -10 22 -6" />
+          <path d="M0 -31 C-17 -31 -22 -17 -21 -6 C-20 5 -15 13 -8 15 C-5 16 -4 20 0 21 C4 20 5 16 8 15 C15 13 20 5 21 -6 C22 -17 17 -31 0 -31 Z" />
+          <path d="M-18 0 C-12 -5 -7 6 0 6 C7 6 12 -5 18 0" />
+          <path d="M-25 12 C-28 15 -28 19 -25 23 M25 12 C28 15 28 19 25 23" />
+        </g>
+      ) : (
+        <g>
+          <path d="M9 -9 L33 -20 L33 20 L9 9 Z" />
+          <rect x="-29" y="-15" width="40" height="30" rx="6" />
+        </g>
+      )}
+    </svg>
+  )
+}
+
+function markerPositionIsClear(position, objects, gapX = 82, gapY = 76) {
+  return objects.every(item => Math.abs(item.x - position.x) >= gapX || Math.abs(item.y - position.y) >= gapY)
+}
+
+function findAvailablePosition(layout, occupiedOverrides = null) {
+  const occupied = occupiedOverrides || [
+    ...(layout.actors || []),
+    ...(layout.cameras || []),
+    ...(layout.lights || []),
+  ]
+  const centerX = 500
+  const centerY = 325
+  const stepX = 100
+  const stepY = 82
+
+  for (let ring = 0; ring <= 8; ring += 1) {
+    for (let row = -ring; row <= ring; row += 1) {
+      for (let column = -ring; column <= ring; column += 1) {
+        if (Math.max(Math.abs(row), Math.abs(column)) !== ring) continue
+        const position = { x: centerX + column * stepX, y: centerY + row * stepY }
+        if (position.x < 50 || position.x > MAP_WIDTH - 50 || position.y < 46 || position.y > MAP_HEIGHT - 46) continue
+        if (markerPositionIsClear(position, occupied)) return position
+      }
+    }
+  }
+
+  return { x: centerX, y: centerY }
+}
 
 function renumberShots(shots) {
   return shots.map((shot, index) => ({ ...shot, num: String(index + 1).padStart(3, '0') }))
@@ -29,6 +92,7 @@ export default function Floorplan({
 }) {
   const svgRef = useRef(null)
   const dragRef = useRef(null)
+  const normalizedSceneLayoutsRef = useRef(new Set())
   const [tool, setTool] = useState('select')
   const [selected, setSelected] = useState(null)
   const [drawStart, setDrawStart] = useState(null)
@@ -90,6 +154,48 @@ export default function Floorplan({
     })
   }
 
+  useEffect(() => {
+    if (!scene || normalizedSceneLayoutsRef.current.has(scene.id)) return
+    normalizedSceneLayoutsRef.current.add(scene.id)
+
+    const ordered = [
+      ...layout.actors.map(item => ({ ...item, type: 'actor' })),
+      ...layout.cameras.map(item => ({ ...item, type: 'camera' })),
+      ...layout.lights.map(item => ({ ...item, type: 'light' })),
+    ]
+    const accepted = []
+    const patches = { actors: {}, cameras: {}, lights: {} }
+    let didMove = false
+
+    for (const item of ordered) {
+      if (markerPositionIsClear(item, accepted)) {
+        accepted.push(item)
+        continue
+      }
+      const currentLayout = {
+        actors: accepted.filter(value => value.type === 'actor'),
+        cameras: accepted.filter(value => value.type === 'camera'),
+        lights: accepted.filter(value => value.type === 'light'),
+      }
+      const position = findAvailablePosition(currentLayout, accepted)
+      const movedItem = { ...item, ...position }
+      accepted.push(movedItem)
+      patches[item.type + 's'][item.id] = position
+      didMove = true
+    }
+
+    if (didMove) {
+      updateLayout(previous => ({
+        ...previous,
+        actors: previous.actors.map(item => patches.actors[item.id] ? { ...item, ...patches.actors[item.id] } : item),
+        cameras: previous.cameras.map(item => patches.cameras[item.id] ? { ...item, ...patches.cameras[item.id] } : item),
+        lights: previous.lights.map(item => patches.lights[item.id] ? { ...item, ...patches.lights[item.id] } : item),
+      }))
+    }
+  // One-time repair of obvious old auto-placement collisions when entering a scene.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene?.id, layout])
+
   const getPoint = event => {
     const rect = svgRef.current?.getBoundingClientRect()
     if (!rect || !rect.width || !rect.height) return { x: 0, y: 0 }
@@ -99,16 +205,11 @@ export default function Floorplan({
     }
   }
 
-  const nextPosition = count => ({
-    x: Math.round(420 + (count % 5) * 36),
-    y: Math.round(270 + (Math.floor(count / 5) % 5) * 32),
-  })
-
   // Object buttons create an object immediately. The new marker is selected and
   // can be dragged straight to its final position without another placement click.
   const addObject = type => {
     const count = type === 'actor' ? layout.actors.length : type === 'camera' ? layout.cameras.length : layout.lights.length
-    const position = nextPosition(count)
+    const position = findAvailablePosition(layout)
     let object
 
     if (type === 'actor') {
@@ -392,13 +493,13 @@ export default function Floorplan({
         <span className="floorplan-tool-divider" />
         <div className="floorplan-tool-group">
           <button className="floorplan-tool-button" onClick={() => addObject('actor')} title="Add actor" aria-label="Add actor">
-            <UserRound size={19} /><span>Actor</span>
+            <FloorplanObjectIcon type="actor" size={22} /><span>Actor</span>
           </button>
           <button className="floorplan-tool-button" onClick={() => addObject('camera')} title="Add camera and link a shot" aria-label="Add camera">
-            <Camera size={19} /><span>Camera</span>
+            <FloorplanObjectIcon type="camera" size={22} /><span>Camera</span>
           </button>
           <button className="floorplan-tool-button" onClick={() => addObject('light')} title="Add lighting" aria-label="Add lighting">
-            <Lightbulb size={19} /><span>Lighting</span>
+            <FloorplanObjectIcon type="light" size={22} /><span>Lighting</span>
           </button>
         </div>
         <span className="floorplan-tool-spacer" />
@@ -528,13 +629,18 @@ export default function Floorplan({
                       )}
                       {type === 'light' && (
                         <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
-                          <image href="/assets/lamp-icon.png" x="-22" y="-33" width="44" height="66" preserveAspectRatio="xMidYMid meet" />
+                          <image className="floorplan-lamp-symbol" href="/assets/lamp-icon.png" x="-19" y="-19" width="38" height="38" preserveAspectRatio="xMidYMid meet" />
                         </g>
                       )}
                       {active && <circle cx="0" cy="0" r="34" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
                       {type === 'camera' && (
-                        <text x="0" y="48" textAnchor="middle" fontSize="16" fontWeight="600" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" pointerEvents="none">
+                        <text x="0" y="46" textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" pointerEvents="none">
                           {shot ? shot.num : '—'}
+                        </text>
+                      )}
+                      {type === 'light' && (
+                        <text x="0" y="35" textAnchor="middle" fontSize="13" fontWeight="500" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" pointerEvents="none">
+                          {object.lightType || 'Key'}
                         </text>
                       )}
                     </g>
@@ -571,13 +677,9 @@ export default function Floorplan({
             <>
               <div className="floorplan-inspector-head">
                 <span className={'floorplan-type-icon ' + selectedType}>
-                  {selectedType === 'actor'
-                    ? <UserRound size={21} />
-                    : selectedType === 'camera'
-                      ? <Camera size={20} />
-                      : selectedType === 'light'
-                        ? <Lightbulb size={20} />
-                        : <Square size={20} />}
+                  {selectedType === 'actor' || selectedType === 'camera' || selectedType === 'light'
+                    ? <FloorplanObjectIcon type={selectedType} size={25} />
+                    : <Square size={20} />}
                 </span>
                 <div className="floorplan-inspector-title">
                   <strong>{objectTypeLabel(selectedType)}</strong>
@@ -672,11 +774,7 @@ export default function Floorplan({
                 allObjects.map(object => (
                   <button key={object.entityType + object.id} className="floorplan-object-row" onClick={() => setSelected({ type: object.entityType, id: object.id })}>
                     <span className={'floorplan-type-icon ' + object.entityType}>
-                      {object.entityType === 'actor'
-                        ? <UserRound size={18} />
-                        : object.entityType === 'camera'
-                          ? <Camera size={18} />
-                          : <Lightbulb size={18} />}
+                      <FloorplanObjectIcon type={object.entityType} size={22} />
                     </span>
                     <span className="floorplan-object-row-name">{objectName(object.entityType, object)}</span>
                     <span className="floorplan-object-row-type">{objectTypeLabel(object.entityType)}</span>
