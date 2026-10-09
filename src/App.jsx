@@ -497,18 +497,24 @@ export default function App() {
       </div>
 
       <div className="content">
-        {tab === 'project' && (
-          <ProjectInfo project={project} onChange={setProject} />
-        )}
-        {tab === 'shotlist' && (
-          <ShotList
-            scenes={scenes}
-            onChange={setScenes}
-            activeSceneId={activeSceneId}
-            onActiveSceneChange={setActiveSceneId}
-            defaultShot={defaultShot}
-            defaultScene={defaultScene}
-          />
+        {!hydrated ? (
+          <div className="app-loading" role="status">Loading saved project…</div>
+        ) : (
+          <>
+            {tab === 'project' && (
+              <ProjectInfo project={project} onChange={setProject} />
+            )}
+            {tab === 'shotlist' && (
+              <ShotList
+                scenes={scenes}
+                onChange={setScenes}
+                activeSceneId={activeSceneId}
+                onActiveSceneChange={setActiveSceneId}
+                defaultShot={defaultShot}
+                defaultScene={defaultScene}
+              />
+            )}
+          </>
         )}
       </div>
     </div>
