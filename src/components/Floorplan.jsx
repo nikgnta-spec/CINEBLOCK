@@ -1,9 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  MousePointer2, Square, Minus, Route, Trash2, Plus, Layers2,
+  MousePointer2, Square, Minus, Route, Trash2, Plus, Layers2, X,
 } from 'lucide-react'
+import {
+  SIZES as SHOT_SIZES,
+  ANGLES as SHOT_ANGLES,
+  LENSES as SHOT_LENSES,
+  MOVEMENTS as SHOT_MOVEMENTS,
+  EQUIPMENT as SHOT_EQUIPMENT,
+} from './ShotList'
 
 const LIGHT_TYPES = ['Key', 'Fill', 'Back / Rim', 'Practical', 'Ambient', 'Special']
+const CAMERA_PATH_MOVEMENTS = new Set([
+  'Dolly In', 'Dolly Out', 'Truck Left', 'Truck Right', 'Tracking Shot',
+  'Follow', 'Lead', 'Arc', 'Orbit', 'Crane Up', 'Crane Down',
+  'Jib Up', 'Jib Down', 'Push In', 'Pull Out', 'Reveal', 'Reframe',
+  'Handheld Movement', 'POV Movement', '360 Orbit', 'Blocking',
+])
 const MAP_WIDTH = 1000
 const MAP_HEIGHT = 650
 const EMPTY_LAYOUT = { rooms: [], walls: [], actors: [], cameras: [], lights: [] }
@@ -112,6 +125,9 @@ export default function Floorplan({
   const selectedShot = selectedType === 'camera'
     ? scene?.shots.find(shot => shot.id === selectedEntity.shotId) || null
     : null
+  const selectedShotMovements = selectedShot?.movements || []
+  const selectedCameraCanHavePath = selectedShotMovements.some(movement => CAMERA_PATH_MOVEMENTS.has(movement))
+  const selectedCanHavePath = selectedType === 'actor' || (selectedType === 'camera' && selectedCameraCanHavePath)
 
   useEffect(() => {
     setSelected(null)
@@ -277,8 +293,38 @@ export default function Floorplan({
     setSelected({ type, id: item.id })
   }
 
+  const updateLinkedShot = (key, value) => {
+    if (!scene || selectedType !== 'camera' || !selectedEntity?.shotId) return
+    const sceneId = scene.id
+    const shotId = selectedEntity.shotId
+    onChange(previous => previous.map(currentScene => currentScene.id !== sceneId
+      ? currentScene
+      : {
+        ...currentScene,
+        shots: currentScene.shots.map(shot => shot.id === shotId
+          ? { ...shot, [key]: value }
+          : shot),
+      }))
+  }
+
+  const addShotListItem = (key, value) => {
+    if (!value || !selectedShot) return
+    const current = Array.isArray(selectedShot[key]) ? selectedShot[key] : []
+    if (!current.includes(value)) updateLinkedShot(key, [...current, value])
+  }
+
+  const removeShotListItem = (key, value) => {
+    if (!selectedShot) return
+    const current = Array.isArray(selectedShot[key]) ? selectedShot[key] : []
+    updateLinkedShot(key, current.filter(item => item !== value))
+  }
+
+  useEffect(() => {
+    if (tool === 'path' && !selectedCanHavePath) setTool('select')
+  }, [tool, selectedCanHavePath])
+
   const appendWaypoint = point => {
-    if (!selectedEntity || !selectedType || selectedType === 'light' || selectedType === 'room' || selectedType === 'wall') return
+    if (!selectedEntity || !selectedType || (selectedType === 'camera' && !selectedCameraCanHavePath) || selectedType === 'light' || selectedType === 'room' || selectedType === 'wall') return
     updateLayout(previous => ({
       ...previous,
       [selectedType + 's']: previous[selectedType + 's'].map(item => item.id !== selectedEntity.id
@@ -445,7 +491,6 @@ export default function Floorplan({
   const objectTypeLabel = type => type === 'actor' ? 'Actor' : type === 'camera' ? 'Camera' : type === 'light' ? 'Lighting' : type === 'room' ? 'Room' : 'Wall'
   const objectCount = layout.actors.length + layout.cameras.length + layout.lights.length
   const selectedPath = selectedEntity?.path || []
-  const selectedCanHavePath = selectedType === 'actor' || selectedType === 'camera'
   if (!scene) return null
 
   return (
@@ -574,7 +619,16 @@ export default function Floorplan({
                 const type = object._kind
                 const active = selected?.type === type && selected.id === object.id
                 const shot = type === 'camera' ? scene.shots.find(item => item.id === object.shotId) : null
-                const points = [{ x: object.x, y: object.y }, ...(object.path || [])]
+                const shotMovements = shot?.movements || []
+                const cameraCanHavePath = type === 'camera' && shotMovements.some(movement => CAMERA_PATH_MOVEMENTS.has(movement))
+                const showPath = type === 'actor' || cameraCanHavePath
+                const panLeft = type === 'camera' && shotMovements.includes('Pan Left')
+                const panRight = type === 'camera' && shotMovements.includes('Pan Right')
+                const panBoth = type === 'camera' && shotMovements.includes('Pan') && !panLeft && !panRight
+                const points = [
+                  { x: object.x, y: object.y },
+                  ...(showPath ? (object.path || []) : []),
+                ]
                 const pointString = points.map(point => point.x + ',' + point.y).join(' ')
                 const handleBaseAngle = type === 'actor' ? -90 : type === 'light' ? 90 : 0
                 const handleRadians = (handleBaseAngle + (object.angle || 0)) * Math.PI / 180
@@ -604,9 +658,20 @@ export default function Floorplan({
                         pointerEvents="all"
                       />
                       {type === 'camera' && (
-                        <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
+                        <g transform={'rotate(' + (object.angle || 0) + ') scale(0.78)'} pointerEvents="none">
                           <path d="M9 -9 L33 -20 L33 20 L9 9 Z" fill="var(--bg)" stroke="var(--text)" strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                           <rect x="-29" y="-15" width="40" height="30" rx="6" fill="var(--bg)" stroke="var(--text)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+                        </g>
+                      )}
+                      {type === 'camera' && (panLeft || panRight || panBoth) && (
+                        <g transform={'rotate(' + (object.angle || 0) + ')'} stroke="var(--text-muted)" strokeWidth="2.5" fill="none" pointerEvents="none">
+                          {panBoth || (panLeft && panRight) ? (
+                            <line x1="-38" y1="-26" x2="38" y2="-26" markerStart="url(#floorplan-arrow)" markerEnd="url(#floorplan-arrow)" />
+                          ) : panLeft ? (
+                            <line x1="-4" y1="-26" x2="-42" y2="-26" markerEnd="url(#floorplan-arrow)" />
+                          ) : (
+                            <line x1="4" y1="-26" x2="42" y2="-26" markerEnd="url(#floorplan-arrow)" />
+                          )}
                         </g>
                       )}
                       {type === 'actor' && (
@@ -717,7 +782,7 @@ export default function Floorplan({
               {selectedType === 'camera' && (
                 <>
                   <section className="floorplan-inspector-section">
-                    <label htmlFor="camera-linked-shot">Shot List</label>
+                    <label htmlFor="camera-linked-shot">Shot List link</label>
                     <select
                       id="camera-linked-shot"
                       className="floorplan-field"
@@ -729,33 +794,144 @@ export default function Floorplan({
                         <option key={shot.id} value={shot.id}>{shot.num} — {shot.subject || 'Untitled shot'}</option>
                       ))}
                     </select>
-                    {selectedShot ? (
-                      <div className="floorplan-shot-data">
-                        <div><span>Subject</span><strong>{selectedShot.subject || '—'}</strong></div>
-                        <div><span>Camera</span><strong>{selectedShot.camera || '—'}</strong></div>
-                        <div><span>Shot size</span><strong>{selectedShot.size || '—'}</strong></div>
-                        <div><span>Angle</span><strong>{selectedShot.angle || '—'}</strong></div>
-                        <div><span>Lens</span><strong>{selectedShot.lens || '—'}</strong></div>
-                        <div><span>Movement</span><strong>{(selectedShot.movements || []).join(', ') || '—'}</strong></div>
-                        <div><span>Equipment</span><strong>{(selectedShot.equipment || []).join(', ') || '—'}</strong></div>
-                      </div>
-                    ) : (
-                      <div className="floorplan-unlinked">Camera belum ditautkan ke shot.</div>
-                    )}
                   </section>
-                  <section className="floorplan-inspector-section">
-                    <div className="floorplan-section-title">Path</div>
-                    <button className={'floorplan-path-button' + (tool === 'path' ? ' active' : '')} onClick={() => setTool(tool === 'path' ? 'select' : 'path')}>
-                      <Route size={17} /> {tool === 'path' ? 'Finish path' : 'Draw path'} <span>{selectedPath.length}</span>
-                    </button>
-                    {selectedPath.length > 0 && (
-                      <button className="floorplan-remove-path" onClick={() => updateSelected({ path: [] })}>Remove path</button>
-                    )}
-                  </section>
-                </>
-              )}
+                  {selectedShot ? (
+                    <>
+                      <section className="floorplan-inspector-section floorplan-camera-fields">
+                        <label htmlFor="camera-subject">Subject</label>
+                        <input
+                          id="camera-subject"
+                          className="floorplan-field"
+                          value={selectedShot.subject || ''}
+                          maxLength={1000}
+                          onChange={event => updateLinkedShot('subject', event.target.value)}
+                          placeholder="Shot subject"
+                        />
+                        <label htmlFor="camera-body">Camera</label>
+                        <input
+                          id="camera-body"
+                          className="floorplan-field"
+                          value={selectedShot.camera || ''}
+                          maxLength={200}
+                          onChange={event => updateLinkedShot('camera', event.target.value)}
+                          placeholder="Camera body"
+                        />
+                        <label htmlFor="camera-shot-size">Shot size</label>
+                        <select
+                          id="camera-shot-size"
+                          className="floorplan-field"
+                          value={selectedShot.size || ''}
+                          onChange={event => updateLinkedShot('size', event.target.value)}
+                        >
+                          <option value="">Select shot size</option>
+                          {SHOT_SIZES.map(option => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                        <label htmlFor="camera-angle">Angle</label>
+                        <select
+                          id="camera-angle"
+                          className="floorplan-field"
+                          value={selectedShot.angle || ''}
+                          onChange={event => updateLinkedShot('angle', event.target.value)}
+                        >
+                          <option value="">Select angle</option>
+                          {SHOT_ANGLES.map(option => <option key={option} value={option}>{option}</option>)}
+                        </select>
+                        <label htmlFor="camera-lens">Lens</label>
+                        <input
+                          id="camera-lens"
+                          className="floorplan-field"
+                          list="floorplan-lens-options"
+                          value={selectedShot.lens || ''}
+                          maxLength={100}
+                          onChange={event => updateLinkedShot('lens', event.target.value)}
+                          placeholder="Choose or type focal length"
+                        />
+                        <datalist id="floorplan-lens-options">
+                          {SHOT_LENSES.map(option => <option key={option} value={option} />)}
+                        </datalist>
+                      </section>
 
-              {selectedType === 'light' && (
+                      <section className="floorplan-inspector-section">
+                        <label>Movement</label>
+                        <div className="floorplan-shot-chips">
+                          {(selectedShot.movements || []).map(movement => (
+                            <span className="floorplan-shot-chip" key={movement}>
+                              {movement}
+                              <button type="button" title={'Remove ' + movement} aria-label={'Remove movement ' + movement} onClick={() => removeShotListItem('movements', movement)}>
+                                <X size={12} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                        <select
+                          className="floorplan-field"
+                          aria-label="Add camera movement"
+                          value=""
+                          onChange={event => addShotListItem('movements', event.target.value)}
+                        >
+                          <option value="">+ Add movement</option>
+                          {SHOT_MOVEMENTS.filter(movement => !(selectedShot.movements || []).includes(movement)).map(movement => (
+                            <option key={movement} value={movement}>{movement}</option>
+                          ))}
+                        </select>
+                        {(selectedShot.movements || []).some(movement => movement === 'Pan Left' || movement === 'Pan Right' || movement === 'Pan') && (
+                          <p className="floorplan-field-note">
+                            {selectedShot.movements.includes('Pan Left') && selectedShot.movements.includes('Pan Right')
+                              ? 'Pan arrows show both directions on the canvas.'
+                              : selectedShot.movements.includes('Pan Left')
+                                ? 'Arrow points left.'
+                                : selectedShot.movements.includes('Pan Right')
+                                  ? 'Arrow points right.'
+                                  : 'Pan is shown with a two-way arrow.'}
+                          </p>
+                        )}
+                      </section>
+
+                      <section className="floorplan-inspector-section">
+                        <label>Equipment</label>
+                        <div className="floorplan-shot-chips">
+                          {(selectedShot.equipment || []).map(item => (
+                            <span className="floorplan-shot-chip" key={item}>
+                              {item}
+                              <button type="button" title={'Remove ' + item} aria-label={'Remove equipment ' + item} onClick={() => removeShotListItem('equipment', item)}>
+                                <X size={12} />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                        <select
+                          className="floorplan-field"
+                          aria-label="Add camera equipment"
+                          value=""
+                          onChange={event => addShotListItem('equipment', event.target.value)}
+                        >
+                          <option value="">+ Add equipment</option>
+                          {SHOT_EQUIPMENT.filter(item => !(selectedShot.equipment || []).includes(item)).map(item => (
+                            <option key={item} value={item}>{item}</option>
+                          ))}
+                        </select>
+                      </section>
+
+                      {selectedCameraCanHavePath && (
+                        <section className="floorplan-inspector-section">
+                          <label>Movement path (optional)</label>
+                          <button className={'floorplan-path-button' + (tool === 'path' ? ' active' : '')} onClick={() => setTool(tool === 'path' ? 'select' : 'path')}>
+                            <Route size={17} /> {tool === 'path' ? 'Finish path' : 'Draw path'} <span>{selectedPath.length}</span>
+                          </button>
+                          {selectedPath.length > 0 && (
+                            <button className="floorplan-remove-path" onClick={() => updateSelected({ path: [] })}>Remove path</button>
+                          )}
+                        </section>
+                      )}
+                    </>
+                  ) : (
+                    <div className="floorplan-inspector-section floorplan-unlinked">
+                      <strong>Camera belum ditautkan ke shot.</strong>
+                      <span>Pilih shot di atas untuk mengedit data bersama dengan Shot List.</span>
+                    </div>
+                  )}
+                </>
+              )}{selectedType === 'light' && (
                 <section className="floorplan-inspector-section">
                   <label htmlFor="light-type">Lighting type</label>
                   <select id="light-type" className="floorplan-field" value={selectedEntity.lightType || 'Key'} onChange={event => updateSelected({ lightType: event.target.value })}>
