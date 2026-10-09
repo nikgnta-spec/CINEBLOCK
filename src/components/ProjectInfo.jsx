@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { Plus, X } from 'lucide-react'
+import { Plus, X, ChevronLeft, ChevronRight } from 'lucide-react'
 
 function readAsDataUrl(fileOrBlob) {
   return new Promise((resolve, reject) => {
@@ -66,8 +66,31 @@ export default function ProjectInfo({ project, onChange }) {
   const removeRef = (idx) => {
     onChange(p => {
       const refs = [...p.visualRefs]
+      const labels = [...(p.visualRefLabels || Array(6).fill(''))]
       refs[idx] = null
-      return { ...p, visualRefs: refs }
+      labels[idx] = ''
+      return { ...p, visualRefs: refs, visualRefLabels: labels }
+    })
+  }
+
+  const setRefLabel = (idx, value) => {
+    onChange(p => {
+      const labels = [...(p.visualRefLabels || Array(6).fill(''))]
+      labels[idx] = value
+      return { ...p, visualRefLabels: labels }
+    })
+  }
+
+  const moveRef = (idx, direction) => {
+    const targetIndex = idx + direction
+    if (targetIndex < 0 || targetIndex >= project.visualRefs.length) return
+
+    onChange(p => {
+      const refs = [...p.visualRefs]
+      const labels = [...(p.visualRefLabels || Array(6).fill(''))]
+      ;[refs[idx], refs[targetIndex]] = [refs[targetIndex], refs[idx]]
+      ;[labels[idx], labels[targetIndex]] = [labels[targetIndex], labels[idx]]
+      return { ...p, visualRefs: refs, visualRefLabels: labels }
     })
   }
 
@@ -122,43 +145,78 @@ export default function ProjectInfo({ project, onChange }) {
 
       <div className="visual-refs">
         {project.visualRefs.map((ref, i) => (
-          <div
-            key={i}
-            className="visual-ref-card"
-            role={ref ? 'group' : 'button'}
-            tabIndex={ref ? -1 : 0}
-            aria-label={ref ? `Visual reference ${i + 1}` : `Add visual reference ${i + 1}`}
-            onClick={() => !ref && fileRefs.current[i]?.click()}
-            onKeyDown={event => {
-              if (!ref && (event.key === 'Enter' || event.key === ' ')) {
-                event.preventDefault()
-                fileRefs.current[i]?.click()
-              }
-            }}
-          >
-            {ref ? (
-              <>
-                <img src={ref} alt={`Reference ${i + 1}`} />
+          <div key={i} className="visual-ref-item">
+            <div
+              className="visual-ref-card"
+              role={ref ? 'group' : 'button'}
+              tabIndex={ref ? -1 : 0}
+              aria-label={ref ? `Visual reference ${i + 1}` : `Add visual reference ${i + 1}`}
+              onClick={() => !ref && fileRefs.current[i]?.click()}
+              onKeyDown={event => {
+                if (!ref && (event.key === 'Enter' || event.key === ' ')) {
+                  event.preventDefault()
+                  fileRefs.current[i]?.click()
+                }
+              }}
+            >
+              {ref ? (
+                <>
+                  <img src={ref} alt={project.visualRefLabels?.[i] || `Reference ${i + 1}`} />
+                  <button
+                    className="visual-ref-remove"
+                    onClick={e => { e.stopPropagation(); removeRef(i) }}
+                    aria-label={`Remove visual reference ${i + 1}`}
+                    title="Remove reference"
+                  >
+                    <X size={10} />
+                  </button>
+                </>
+              ) : (
+                <div className="add-icon">
+                  <Plus size={16} strokeWidth={1.5} />
+                  <span>Add Reference</span>
+                </div>
+              )}
+              <input
+                ref={el => fileRefs.current[i] = el}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={e => handleRefImg(i, e)}
+              />
+            </div>
+            <div className="visual-ref-meta">
+              <input
+                className="visual-ref-caption"
+                value={project.visualRefLabels?.[i] || ''}
+                onChange={event => setRefLabel(i, event.target.value)}
+                placeholder={`Reference ${i + 1} label`}
+                maxLength={100}
+                aria-label={`Label for visual reference ${i + 1}`}
+              />
+              <div className="visual-ref-order">
                 <button
-                  className="visual-ref-remove"
-                  onClick={e => { e.stopPropagation(); removeRef(i) }}
+                  className="btn btn-ghost"
+                  style={{ padding: 4 }}
+                  onClick={() => moveRef(i, -1)}
+                  disabled={i === 0}
+                  title="Move reference left"
+                  aria-label="Move reference left"
                 >
-                  <X size={10} />
+                  <ChevronLeft size={13} />
                 </button>
-              </>
-            ) : (
-              <div className="add-icon">
-                <Plus size={16} strokeWidth={1.5} />
-                <span>Add Reference</span>
+                <button
+                  className="btn btn-ghost"
+                  style={{ padding: 4 }}
+                  onClick={() => moveRef(i, 1)}
+                  disabled={i === project.visualRefs.length - 1}
+                  title="Move reference right"
+                  aria-label="Move reference right"
+                >
+                  <ChevronRight size={13} />
+                </button>
               </div>
-            )}
-            <input
-              ref={el => fileRefs.current[i] = el}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={e => handleRefImg(i, e)}
-            />
+            </div>
           </div>
         ))}
       </div>
