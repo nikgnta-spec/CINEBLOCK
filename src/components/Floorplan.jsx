@@ -25,11 +25,7 @@ const makeId = () => crypto.randomUUID()
 const padNum = number => String(number).padStart(2, '0')
 const normalizeAngle = angle => ((angle % 360) + 360) % 360
 
-function FloorplanObjectIcon({ type, size = 20, lampAssetFailed = false, onLampAssetError }) {
-  if (type === 'light' && !lampAssetFailed) {
-    return <img className="floorplan-lamp-symbol" src="/assets/lamp-icon.png" width={size} height={size} alt="" draggable="false" onError={onLampAssetError} />
-  }
-
+function FloorplanObjectIcon({ type, size = 20 }) {
   return (
     <svg
       width={size}
@@ -48,7 +44,7 @@ function FloorplanObjectIcon({ type, size = 20, lampAssetFailed = false, onLampA
           <path d="M-22 -6 C-30 -10 -37 -6 -40 2 C-43 12 -36 22 -27 23 C-21 31 -10 34 0 34 C10 34 21 31 27 23 C36 22 43 12 40 2 C37 -6 30 -10 22 -6" />
           <path d="M0 -31 C-17 -31 -22 -17 -21 -6 C-20 5 -15 13 -8 15 C-5 16 -4 20 0 21 C4 20 5 16 8 15 C15 13 20 5 21 -6 C22 -17 17 -31 0 -31 Z" />
           <path d="M-18 0 C-12 -5 -7 6 0 6 C7 6 12 -5 18 0" />
-          <path d="M-25 12 C-28 15 -28 19 -25 23 M25 12 C28 15 28 19 25 23" />
+          <path d="M-25 12 C-28 15 -28 19 -25 23 M25 12 C28 15 25 19 25 23" />
         </g>
       ) : type === 'camera' ? (
         <g>
@@ -56,10 +52,11 @@ function FloorplanObjectIcon({ type, size = 20, lampAssetFailed = false, onLampA
           <rect x="-29" y="-15" width="40" height="30" rx="6" />
         </g>
       ) : (
-        <g transform="rotate(90)">
-          <path d="M-12 -9 L2 -12 L12 -8 L12 8 L2 12 L-12 9 Z" />
-          <circle cx="6" cy="0" r="4" />
-          <path d="M-12 -5 L-17 -8 M-12 5 L-17 8" />
+        <g transform="rotate(90)" strokeWidth="2.8">
+          <path d="M-13 -8 L-8 -11 L3 -11 L11 -7 L11 7 L3 11 L-8 11 L-13 8 Z" />
+          <path d="M-13 -5 L-18 -9 M-13 5 L-18 9" />
+          <circle cx="7" cy="0" r="4.2" fill="currentColor" stroke="none" />
+          <path d="M-2 -6 L-2 6" strokeOpacity="0.65" />
         </g>
       )}
     </svg>
@@ -172,7 +169,6 @@ export default function Floorplan({
   const [tool, setTool] = useState('select')
   const [selected, setSelected] = useState(null)
   const [selectedWaypoint, setSelectedWaypoint] = useState(null)
-  const [lampAssetFailed, setLampAssetFailed] = useState(false)
   const [drawStart, setDrawStart] = useState(null)
   const [previewPoint, setPreviewPoint] = useState(null)
 
@@ -695,7 +691,7 @@ export default function Floorplan({
             <FloorplanObjectIcon type="camera" size={22} /><span>Camera</span>
           </button>
           <button className="floorplan-tool-button" onClick={() => addObject('light')} title="Add lighting" aria-label="Add lighting">
-            <FloorplanObjectIcon type="light" size={22} lampAssetFailed={lampAssetFailed} onLampAssetError={() => setLampAssetFailed(true)} /><span>Lighting</span>
+            <FloorplanObjectIcon type="light" size={22} /><span>Lighting</span>
           </button>
         </div>
         <span className="floorplan-tool-spacer" />
@@ -933,26 +929,20 @@ export default function Floorplan({
                         </text>
                       )}
                       {type === 'light' && (
-                        !lampAssetFailed ? (
-                          <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
-                            <image
-                              className="floorplan-lamp-symbol"
-                              href="/assets/lamp-icon.png"
-                              x="-19"
-                              y="-19"
-                              width="38"
-                              height="38"
-                              preserveAspectRatio="xMidYMid meet"
-                              onError={() => setLampAssetFailed(true)}
-                            />
-                          </g>
-                        ) : (
-                          <g transform={'rotate(' + (90 + (object.angle || 0)) + ')'} pointerEvents="none" fill="var(--bg)" stroke="var(--text)" strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
-                            <path d="M-12 -9 L2 -12 L12 -8 L12 8 L2 12 L-12 9 Z" />
-                            <circle cx="6" cy="0" r="4" fill="var(--text)" stroke="none" />
-                            <path d="M-12 -5 L-17 -8 M-12 5 L-17 8" fill="none" strokeLinecap="round" />
-                          </g>
-                        )
+                        <g
+                          transform={'rotate(' + (90 + (object.angle || 0)) + ')'}
+                          pointerEvents="none"
+                          fill="var(--bg)"
+                          stroke="var(--text)"
+                          strokeWidth="2.5"
+                          strokeLinejoin="round"
+                          vectorEffect="non-scaling-stroke"
+                        >
+                          <path d="M-13 -8 L-8 -11 L3 -11 L11 -7 L11 7 L3 11 L-8 11 L-13 8 Z" />
+                          <path d="M-13 -5 L-18 -9 M-13 5 L-18 9" fill="none" strokeLinecap="round" />
+                          <circle cx="7" cy="0" r="4.2" fill="var(--text)" stroke="none" />
+                          <path d="M-2 -6 L-2 6" strokeOpacity="0.65" fill="none" />
+                        </g>
                       )}
                       {active && <circle cx="0" cy="0" r="34" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
                       {type === 'camera' && (
@@ -1000,7 +990,7 @@ export default function Floorplan({
               <div className="floorplan-inspector-head">
                 <span className={'floorplan-type-icon ' + selectedType}>
                   {selectedType === 'actor' || selectedType === 'camera' || selectedType === 'light'
-                    ? <FloorplanObjectIcon type={selectedType} size={25} lampAssetFailed={lampAssetFailed} onLampAssetError={() => setLampAssetFailed(true)} />
+                    ? <FloorplanObjectIcon type={selectedType} size={25} />
                     : <Square size={20} />}
                 </span>
                 <div className="floorplan-inspector-title">
