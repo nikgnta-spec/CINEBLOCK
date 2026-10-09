@@ -824,6 +824,7 @@ export default function App() {
                 onChange={setScenes}
                 activeSceneId={activeSceneId}
                 onActiveSceneChange={setActiveSceneId}
+                floorplans={floorplans}
                 defaultShot={num => defaultShot(num, project.camera)}
                 defaultScene={num => defaultScene(num, project.camera)}
                 selectedShotId={selectedShotId}

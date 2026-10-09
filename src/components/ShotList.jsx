@@ -48,6 +48,7 @@ export default function ShotList({
   onChange,
   activeSceneId,
   onActiveSceneChange,
+  floorplans,
   defaultShot,
   defaultScene,
   selectedShotId,
@@ -350,7 +351,7 @@ export default function ShotList({
             </thead>
             <tbody>
               {scene.shots.map((shot) => (
-                <tr key={shot.id} data-shot-id={shot.id} className={selectedShotId === shot.id ? 'shot-row is-selected' : 'shot-row'} onClick={() => onSelectedShotIdChange?.(shot.id)}>
+                <tr key={shot.id} data-shot-id={shot.id} className={selectedShotId === shot.id ? 'shot-row is-selected' : 'shot-row'} onClick={event => { if (!event.target.closest('button')) onSelectedShotIdChange?.(shot.id) }}>
                   <td><div className="shot-num">{shot.num}</div></td>
                   <td>
                     <input className="cell-input" value={shot.subject} onChange={e => updateShot(shot.id, 'subject', e.target.value)} placeholder="Subjek" />
@@ -456,7 +457,14 @@ export default function ShotList({
                         className="btn btn-danger"
                         style={{ padding: 4 }}
                         onClick={() => {
-                          if (window.confirm('Hapus shot ini? Tindakan ini tidak dapat dibatalkan.')) deleteShot(shot.id)
+                          const hasLinkedCamera = (floorplans?.[scene.id]?.cameras || []).some(camera => camera.shotId === shot.id)
+                          const message = hasLinkedCamera
+                            ? 'Hapus shot ini? Marker kamera akan tetap ada di Floorplan, tetapi tautannya akan dilepas. Tindakan ini tidak dapat dibatalkan.'
+                            : 'Hapus shot ini? Tindakan ini tidak dapat dibatalkan.'
+                          if (window.confirm(message)) {
+                            if (selectedShotId === shot.id) onSelectedShotIdChange?.('')
+                            deleteShot(shot.id)
+                          }
                         }}
                         title="Hapus shot"
                         aria-label="Hapus shot"
