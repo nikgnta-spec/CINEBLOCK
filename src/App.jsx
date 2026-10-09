@@ -897,6 +897,7 @@ export default function App() {
             </div>
             <div style={{ display: tab === 'floorplan' ? 'block' : 'none' }}>
               <Floorplan
+                isActive={tab === 'floorplan'}
                 scenes={scenes}
                 onChange={setScenes}
                 activeSceneId={activeSceneId}
