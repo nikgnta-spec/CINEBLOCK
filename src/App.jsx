@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import ProjectInfo from './components/ProjectInfo'
 import ShotList from './components/ShotList'
+import Floorplan from './components/Floorplan'
 import { Download, Upload, Plus, Trash2 } from 'lucide-react'
 import { loadAppState, saveAppState } from './storage'
 
 const TABS = [
   { id: 'project', label: 'Project Info' },
   { id: 'shotlist', label: 'Shot List' },
+  { id: 'floorplan', label: 'Floorplan' },
 ]
 
 const defaultProject = {
@@ -169,7 +171,7 @@ const defaultShot = (num) => ({
   notes: '',
 })
 
-function createProjectRecord(id, project, scenes, activeSceneId) {
+function createProjectRecord(id, project, scenes, activeSceneId, floorplans = {}) {
   const safeId = id || crypto.randomUUID()
   const safeTitle = project?.title?.trim() || 'Untitled Project'
   return {
@@ -178,6 +180,7 @@ function createProjectRecord(id, project, scenes, activeSceneId) {
     project,
     scenes,
     activeSceneId: activeSceneId || scenes[0]?.id || '',
+    floorplans,
     updatedAt: new Date().toISOString(),
   }
 }
@@ -186,6 +189,69 @@ function upsertProject(projects, record) {
   const index = projects.findIndex(item => item.id === record.id)
   if (index < 0) return [...projects, record]
   return projects.map(item => item.id === record.id ? record : item)
+}
+
+function normalizeFloorplanCoordinate(value, max) {
+  const number = Number(value)
+  return Number.isFinite(number) ? Math.max(0, Math.min(max, number)) : 0
+}
+
+function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
+  const result = {}
+  if (!Array.isArray(savedScenes)) return result
+  const source = savedFloorplans && typeof savedFloorplans === 'object' ? savedFloorplans : {}
+
+  for (const scene of savedScenes) {
+    const raw = source[scene.id] && typeof source[scene.id] === 'object'
+      ? source[scene.id]
+      : {}
+    const validShotIds = new Set((scene.shots || []).map(shot => shot.id))
+    const safeId = item => typeof item?.id === 'string' && item.id ? item.id.slice(0, 100) : crypto.randomUUID()
+    const safeLabel = (value, fallback) => typeof value === 'string' ? value.slice(0, 80) : fallback
+    const coords = (value, max) => normalizeFloorplanCoordinate(value, max)
+
+    result[scene.id] = {
+      rooms: (Array.isArray(raw.rooms) ? raw.rooms : []).slice(0, 200).map((item, index) => ({
+        id: safeId(item),
+        x: coords(item.x, 1000),
+        y: coords(item.y, 650),
+        width: Math.max(12, Math.min(1000, Number(item.width) || 100)),
+        height: Math.max(12, Math.min(650, Number(item.height) || 80)),
+        label: safeLabel(item.label, 'Room ' + String(index + 1).padStart(2, '0')),
+      })),
+      walls: (Array.isArray(raw.walls) ? raw.walls : []).slice(0, 500).map(item => ({
+        id: safeId(item),
+        x1: coords(item.x1, 1000),
+        y1: coords(item.y1, 650),
+        x2: coords(item.x2, 1000),
+        y2: coords(item.y2, 650),
+      })),
+      cameras: (Array.isArray(raw.cameras) ? raw.cameras : [])
+        .filter(item => item && validShotIds.has(item.shotId))
+        .slice(0, 200)
+        .map(item => ({
+          id: safeId(item),
+          shotId: item.shotId,
+          x: coords(item.x, 1000),
+          y: coords(item.y, 650),
+          angle: coords(item.angle, 360),
+          movement: safeLabel(item.movement, 'Static'),
+          path: (Array.isArray(item.path) ? item.path : []).slice(0, 100).map(point => ({
+            x: coords(point?.x, 1000),
+            y: coords(point?.y, 650),
+          })),
+        })),
+      lights: (Array.isArray(raw.lights) ? raw.lights : []).slice(0, 200).map((item, index) => ({
+        id: safeId(item),
+        x: coords(item.x, 1000),
+        y: coords(item.y, 650),
+        angle: coords(item.angle, 360),
+        type: safeLabel(item.type, 'Key'),
+        label: safeLabel(item.label, 'Light ' + String(index + 1)),
+      })),
+    }
+  }
+  return result
 }
 
 function normalizeWorkspaceProjects(savedProjects) {
@@ -197,12 +263,14 @@ function normalizeWorkspaceProjects(savedProjects) {
     .map(item => {
       const normalizedProject = normalizeSavedProject(item.project)
       const normalizedScenes = normalizeSavedScenes(item.scenes) || [defaultScene(1)]
+      const normalizedFloorplans = normalizeSavedFloorplans(item.floorplans, normalizedScenes)
       return {
         ...createProjectRecord(
           item.id,
           normalizedProject,
           normalizedScenes,
           item.activeSceneId || normalizedScenes[0]?.id || '',
+          normalizedFloorplans,
         ),
         name: normalizedProject.title?.trim() || item.name || 'Untitled Project',
         updatedAt: item.updatedAt || new Date().toISOString(),
@@ -215,6 +283,7 @@ export default function App() {
   const [project, setProject] = useState(defaultProject)
   const [scenes, setScenes] = useState(() => [defaultScene(1)])
   const [activeSceneId, setActiveSceneId] = useState('')
+  const [floorplans, setFloorplans] = useState({})
   const [projects, setProjects] = useState([])
   const [activeProjectId, setActiveProjectId] = useState('')
   const [hydrated, setHydrated] = useState(false)
@@ -235,6 +304,10 @@ export default function App() {
           : restoredScenes[0]?.id || ''
         let restoredProjects = normalizeWorkspaceProjects(savedState?.projects)
         let restoredProjectId = savedState?.activeProjectId || restoredProjects[0]?.id || crypto.randomUUID()
+        const restoredFloorplans = normalizeSavedFloorplans(
+          savedState?.floorplans ?? restoredProjects.find(item => item.id === restoredProjectId)?.floorplans,
+          restoredScenes,
+        )
 
         // Migrate the original single-project save into the project library.
         restoredProjects = upsertProject(
@@ -244,16 +317,18 @@ export default function App() {
             restoredProject,
             restoredScenes,
             restoredActiveSceneId,
+            restoredFloorplans,
           ),
         )
 
-        if (savedState?.tab === 'shotlist' || savedState?.tab === 'project') {
+        if (savedState?.tab === 'shotlist' || savedState?.tab === 'project' || savedState?.tab === 'floorplan') {
           setTab(savedState.tab)
         }
 
         setProject(restoredProject)
         setScenes(restoredScenes)
         setActiveSceneId(restoredActiveSceneId)
+        setFloorplans(restoredFloorplans)
         setProjects(restoredProjects)
         setActiveProjectId(restoredProjectId)
         setSaveStatus('saved')
@@ -280,13 +355,14 @@ export default function App() {
     setSaveStatus('saving')
     const timeout = window.setTimeout(async () => {
       try {
-        const currentRecord = createProjectRecord(activeProjectId, project, scenes, activeSceneId)
+        const currentRecord = createProjectRecord(activeProjectId, project, scenes, activeSceneId, floorplans)
         const savedProjects = upsertProject(projects, currentRecord)
         await saveAppState({
           tab,
           project,
           scenes,
           activeSceneId,
+          floorplans,
           projects: savedProjects,
           activeProjectId,
         })
@@ -298,10 +374,10 @@ export default function App() {
     }, 250)
 
     return () => window.clearTimeout(timeout)
-  }, [hydrated, tab, project, scenes, activeSceneId, projects, activeProjectId])
+  }, [hydrated, tab, project, scenes, activeSceneId, floorplans, projects, activeProjectId])
 
   const snapshotCurrentProject = () => (
-    createProjectRecord(activeProjectId, project, scenes, activeSceneId)
+    createProjectRecord(activeProjectId, project, scenes, activeSceneId, floorplans)
   )
 
   const switchProject = (projectId) => {
@@ -314,10 +390,12 @@ export default function App() {
     const targetActiveSceneId = targetScenes.some(scene => scene.id === target.activeSceneId)
       ? target.activeSceneId
       : targetScenes[0]?.id || ''
+    const targetFloorplans = normalizeSavedFloorplans(target.floorplans, targetScenes)
     setActiveProjectId(target.id)
     setProject(normalizeSavedProject(target.project))
     setScenes(targetScenes)
     setActiveSceneId(targetActiveSceneId)
+    setFloorplans(targetFloorplans)
     setTab('project')
   }
 
@@ -325,13 +403,15 @@ export default function App() {
     const currentRecord = snapshotCurrentProject()
     const newProject = { ...defaultProject, visualRefs: [...defaultProject.visualRefs] }
     const newScenes = [defaultScene(1)]
-    const newRecord = createProjectRecord(crypto.randomUUID(), newProject, newScenes, newScenes[0].id)
+    const newFloorplans = normalizeSavedFloorplans({}, newScenes)
+    const newRecord = createProjectRecord(crypto.randomUUID(), newProject, newScenes, newScenes[0].id, newFloorplans)
 
     setProjects(previous => [...upsertProject(previous, currentRecord), newRecord])
     setActiveProjectId(newRecord.id)
     setProject(newProject)
     setScenes(newScenes)
     setActiveSceneId(newScenes[0].id)
+    setFloorplans(newFloorplans)
     setTab('project')
   }
 
@@ -348,11 +428,13 @@ export default function App() {
     const targetActiveSceneId = targetScenes.some(scene => scene.id === target.activeSceneId)
       ? target.activeSceneId
       : targetScenes[0]?.id || ''
+    const targetFloorplans = normalizeSavedFloorplans(target.floorplans, targetScenes)
     setProjects(remaining)
     setActiveProjectId(target.id)
     setProject(normalizeSavedProject(target.project))
     setScenes(targetScenes)
     setActiveSceneId(targetActiveSceneId)
+    setFloorplans(targetFloorplans)
     setTab('project')
   }
 
@@ -408,12 +490,14 @@ export default function App() {
       const targetActiveSceneId = targetScenes.some(scene => scene.id === target.activeSceneId)
         ? target.activeSceneId
         : targetScenes[0]?.id || ''
+      const targetFloorplans = normalizeSavedFloorplans(target.floorplans, targetScenes)
 
       setProjects(merged)
       setActiveProjectId(target.id)
       setProject(normalizeSavedProject(target.project))
       setScenes(targetScenes)
       setActiveSceneId(targetActiveSceneId)
+      setFloorplans(targetFloorplans)
       setTab('project')
     } catch (error) {
       console.error('CINEBLOCK could not import backup:', error)
@@ -523,6 +607,16 @@ export default function App() {
                 onActiveSceneChange={setActiveSceneId}
                 defaultShot={defaultShot}
                 defaultScene={defaultScene}
+              />
+            )}
+            {tab === 'floorplan' && (
+              <Floorplan
+                scenes={scenes}
+                onChange={setScenes}
+                activeSceneId={activeSceneId}
+                onActiveSceneChange={setActiveSceneId}
+                floorplans={floorplans}
+                onFloorplansChange={setFloorplans}
               />
             )}
           </>
