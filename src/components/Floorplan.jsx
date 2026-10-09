@@ -499,6 +499,37 @@ export default function Floorplan({
     }))
   }
 
+  const deleteSelectedWaypoint = () => {
+    if (!selectedWaypoint || !selected || selectedWaypoint.type !== selected.type || selectedWaypoint.id !== selected.id) return
+    const { type, id, index } = selectedWaypoint
+    const item = (layout[type + 's'] || []).find(entry => entry.id === id)
+    if (!item || !Array.isArray(item.path) || !item.path[index]) return
+    const nextPath = item.path.filter((_, pathIndex) => pathIndex !== index)
+    updateLayout(previous => ({
+      ...previous,
+      [type + 's']: previous[type + 's'].map(entry => entry.id === id
+        ? { ...entry, path: nextPath }
+        : entry),
+    }))
+    setSelectedWaypoint(nextPath.length
+      ? { type, id, index: Math.min(index, nextPath.length - 1) }
+      : null)
+  }
+
+  useEffect(() => {
+    const handleWaypointDeleteKey = event => {
+      if (!selectedWaypoint || !['Delete', 'Backspace'].includes(event.key)) return
+      const target = event.target
+      if (target instanceof HTMLElement && (
+        target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+      )) return
+      event.preventDefault()
+      deleteSelectedWaypoint()
+    }
+    window.addEventListener('keydown', handleWaypointDeleteKey)
+    return () => window.removeEventListener('keydown', handleWaypointDeleteKey)
+  }, [selectedWaypoint, selected, layout])
+
   const changeCameraLink = (camera, nextShotId) => {
     const anotherCamera = layout.cameras.find(item => item.shotId === nextShotId && item.id !== camera.id)
     if (nextShotId && anotherCamera) {
@@ -859,8 +890,13 @@ export default function Floorplan({
                     <button className={'floorplan-path-button' + (tool === 'path' ? ' active' : '')} onClick={() => setTool(tool === 'path' ? 'select' : 'path')}>
                       <Route size={17} /> {tool === 'path' ? 'Finish path' : 'Draw path'} <span>{selectedPath.length}</span>
                     </button>
+                    {selectedWaypoint?.type === selectedType && selectedWaypoint?.id === selectedEntity.id && (
+                      <button className="floorplan-remove-point" onClick={deleteSelectedWaypoint}>
+                        <Trash2 size={14} /> Remove selected point
+                      </button>
+                    )}
                     {selectedPath.length > 0 && (
-                      <button className="floorplan-remove-path" onClick={() => updateSelected({ path: [] })}>Remove path</button>
+                      <button className="floorplan-remove-path" onClick={() => updateSelected({ path: [] })}>Remove entire path</button>
                     )}
                   </section>
                 </>
@@ -1005,8 +1041,13 @@ export default function Floorplan({
                           <button className={'floorplan-path-button' + (tool === 'path' ? ' active' : '')} onClick={() => setTool(tool === 'path' ? 'select' : 'path')}>
                             <Route size={17} /> {tool === 'path' ? 'Finish path' : 'Draw path'} <span>{selectedPath.length}</span>
                           </button>
+                          {selectedWaypoint?.type === selectedType && selectedWaypoint?.id === selectedEntity.id && (
+                            <button className="floorplan-remove-point" onClick={deleteSelectedWaypoint}>
+                              <Trash2 size={14} /> Remove selected point
+                            </button>
+                          )}
                           {selectedPath.length > 0 && (
-                            <button className="floorplan-remove-path" onClick={() => updateSelected({ path: [] })}>Remove path</button>
+                            <button className="floorplan-remove-path" onClick={() => updateSelected({ path: [] })}>Remove entire path</button>
                           )}
                         </section>
                       )}
