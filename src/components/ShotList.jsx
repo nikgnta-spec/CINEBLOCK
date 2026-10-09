@@ -44,6 +44,13 @@ const SOUNDS = [
   'Wired Boom', 'MOS', 'Playback', 'Wild Track', 'None',
 ]
 
+function renumberShots(shots) {
+  return shots.map((shot, index) => ({
+    ...shot,
+    num: String(index + 1).padStart(3, '0'),
+  }))
+}
+
 export default function ShotList({
   scenes,
   onChange,
@@ -70,7 +77,7 @@ export default function ShotList({
 
   const nextSceneName = () => {
     const usedNumbers = new Set(
-      scenes.map(s => Number(s.name.match(/^Scene\\s+(\\d+)$/i)?.[1])).filter(Number.isFinite),
+      scenes.map(s => Number(s.name.match(/^Scene\s+(\d+)$/i)?.[1])).filter(Number.isFinite),
     )
     let candidate = 1
     while (usedNumbers.has(candidate)) candidate += 1
@@ -122,7 +129,7 @@ export default function ShotList({
       }
       const shots = [...s.shots]
       shots.splice(index + 1, 0, copy)
-      return { ...s, shots }
+      return { ...s, shots: renumberShots(shots) }
     })
   }
 
@@ -133,7 +140,7 @@ export default function ShotList({
       if (index < 0 || targetIndex < 0 || targetIndex >= s.shots.length) return s
       const shots = [...s.shots]
       ;[shots[index], shots[targetIndex]] = [shots[targetIndex], shots[index]]
-      return { ...s, shots }
+      return { ...s, shots: renumberShots(shots) }
     })
   }
 
@@ -147,7 +154,7 @@ export default function ShotList({
   const deleteShot = (shotId) => {
     updateScene(s => ({
       ...s,
-      shots: s.shots.filter(sh => sh.id !== shotId)
+      shots: renumberShots(s.shots.filter(sh => sh.id !== shotId))
     }))
   }
 
@@ -289,7 +296,16 @@ export default function ShotList({
             <div
               key={s.id}
               className={`scene-item${i === activeIdx ? ' active' : ''}`}
+              role="button"
+              tabIndex={0}
+              aria-pressed={i === activeIdx}
               onClick={() => setActiveIdx(i)}
+              onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  setActiveIdx(i)
+                }
+              }}
             >
               <div className="scene-item-name">{s.name}</div>
               <div className="scene-item-sub">{s.intExt}. {s.location || 'No location'} — {s.dayNight}</div>
@@ -422,7 +438,9 @@ export default function ShotList({
                       <button
                         className="btn btn-danger"
                         style={{ padding: 4 }}
-                        onClick={() => deleteShot(shot.id)}
+                        onClick={() => {
+                          if (window.confirm('Delete this shot? This cannot be undone.')) deleteShot(shot.id)
+                        }}
                         title="Delete shot"
                         aria-label="Delete shot"
                       >
