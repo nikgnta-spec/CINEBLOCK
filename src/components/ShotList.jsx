@@ -241,11 +241,10 @@ export default function ShotList({
               />
               <span className="scene-slugline-separator" aria-hidden="true">·</span>
               <select
-                className="cell-select"
+                className="cell-select scene-slugline-field"
                 aria-label="Interior atau eksterior"
                 value={scene.intExt}
                 onChange={e => updateSceneMeta('intExt', e.target.value)}
-                className="cell-select scene-slugline-field"
               >
                 <option>INT</option>
                 <option>EXT</option>
@@ -260,11 +259,10 @@ export default function ShotList({
               />
               <span className="scene-slugline-separator" aria-hidden="true">·</span>
               <select
-                className="cell-select"
+                className="cell-select scene-slugline-field"
                 aria-label="Waktu scene"
                 value={scene.dayNight}
                 onChange={e => updateSceneMeta('dayNight', e.target.value)}
-                className="cell-select scene-slugline-field"
               >
                 <option>DAY</option>
                 <option>NIGHT</option>
