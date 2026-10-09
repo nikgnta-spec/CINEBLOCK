@@ -960,3 +960,37 @@ button:focus-visible,
   .save-status { max-width: none; }
   .project-actions-popover { left: 0; right: auto; }
 }
+
+
+/* Stage 2 — Floorplan canvas navigation. */
+.floorplan-canvas-frame { position: relative; }
+.floorplan-canvas.can-pan { cursor: grab; }
+.floorplan-canvas.can-pan:active { cursor: grabbing; }
+.floorplan-view-controls {
+  position: absolute; z-index: 4; right: 12px; bottom: 12px;
+  display: inline-flex; align-items: center; gap: 4px; padding: 5px;
+  border: 1px solid var(--border-strong); border-radius: 10px;
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  backdrop-filter: blur(12px); box-shadow: var(--shadow);
+}
+.floorplan-view-control-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-width: 34px; height: 34px; padding: 0 8px; border: 1px solid transparent;
+  border-radius: 6px; color: var(--text); background: transparent;
+}
+.floorplan-view-control-button:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--border); }
+.floorplan-view-control-button:disabled { color: var(--text-placeholder); opacity: .55; cursor: not-allowed; }
+.floorplan-zoom-level { min-width: 44px; text-align: center; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.floorplan-view-control-divider { width: 1px; height: 22px; margin: 0 3px; background: var(--border); }
+.floorplan-fit-button { padding-inline: 10px; }
+.floorplan-inspector-head { padding: 14px 16px; }
+.floorplan-inspector-section { padding: 14px 16px; }
+.floorplan-field { padding: 8px 10px; }
+@media (max-width: 1120px) {
+  .floorplan-editor { grid-template-columns: minmax(0, 1fr) 284px; }
+}
+@media (max-width: 780px) {
+  .floorplan-view-controls { right: 8px; bottom: 8px; gap: 2px; padding: 4px; }
+  .floorplan-view-control-button { min-width: 38px; height: 38px; }
+  .floorplan-fit-button span { display: none; }
+}

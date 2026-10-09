@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  MousePointer2, Square, Minus, Route, Trash2, Plus, Layers2, X,
+  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2,
 } from 'lucide-react'
 import {
   SIZES as SHOT_SIZES,
@@ -20,6 +20,61 @@ const CAMERA_PATH_MOVEMENTS = new Set([
 const MAP_WIDTH = 1000
 const MAP_HEIGHT = 650
 const EMPTY_LAYOUT = { rooms: [], walls: [], props: [], actors: [], cameras: [], lights: [] }
+
+function getFittedViewBox(layout) {
+  const points = []
+  const addPoint = (x, y) => {
+    const px = Number(x)
+    const py = Number(y)
+    if (Number.isFinite(px) && Number.isFinite(py)) points.push({ x: px, y: py })
+  }
+
+  ;(layout.rooms || []).forEach(room => {
+    addPoint(room.x, room.y)
+    addPoint(Number(room.x) + Number(room.width), Number(room.y) + Number(room.height))
+  })
+  ;(layout.walls || []).forEach(wall => {
+    addPoint(wall.x1, wall.y1)
+    addPoint(wall.x2, wall.y2)
+  })
+  ;['props', 'actors', 'cameras', 'lights'].forEach(collection => {
+    ;(layout[collection] || []).forEach(item => {
+      const halfWidth = collection === 'props' ? (Number(item.width) || 52) / 2 : 22
+      const halfHeight = collection === 'props' ? (Number(item.height) || 36) / 2 : 22
+      addPoint(Number(item.x) - halfWidth, Number(item.y) - halfHeight)
+      addPoint(Number(item.x) + halfWidth, Number(item.y) + halfHeight)
+      ;(Array.isArray(item.path) ? item.path : []).forEach(point => addPoint(point.x, point.y))
+    })
+  })
+
+  if (!points.length) return { x: 0, y: 0, width: MAP_WIDTH, height: MAP_HEIGHT }
+
+  const padding = 52
+  const minX = Math.max(0, Math.min(...points.map(point => point.x)) - padding)
+  const minY = Math.max(0, Math.min(...points.map(point => point.y)) - padding)
+  const maxX = Math.min(MAP_WIDTH, Math.max(...points.map(point => point.x)) + padding)
+  const maxY = Math.min(MAP_HEIGHT, Math.max(...points.map(point => point.y)) + padding)
+  let width = Math.max(220, maxX - minX)
+  let height = Math.max(143, maxY - minY)
+  const mapAspect = MAP_WIDTH / MAP_HEIGHT
+
+  // Keep the original world-coordinate aspect ratio so fitting the view does
+  // not distort room dimensions or camera/light fields of view.
+  if (width / height < mapAspect) width = height * mapAspect
+  else height = width / mapAspect
+  const scale = Math.min(1, MAP_WIDTH / width, MAP_HEIGHT / height)
+  width *= scale
+  height *= scale
+
+  const centerX = (minX + maxX) / 2
+  const centerY = (minY + maxY) / 2
+  return {
+    x: clamp(centerX - width / 2, 0, MAP_WIDTH - width),
+    y: clamp(centerY - height / 2, 0, MAP_HEIGHT - height),
+    width,
+    height,
+  }
+}
 const PROP_TYPES = ['Table', 'Chair', 'Sofa', 'Bed', 'Desk', 'Cabinet', 'Counter', 'Custom']
 const RESIZE_HANDLES = [
   { key: 'nw', sx: -1, sy: -1, cursor: 'nwse-resize' },
@@ -240,6 +295,7 @@ export default function Floorplan({
   const [selectedWaypoint, setSelectedWaypoint] = useState(null)
   const [drawStart, setDrawStart] = useState(null)
   const [previewPoint, setPreviewPoint] = useState(null)
+  const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: MAP_WIDTH, height: MAP_HEIGHT })
 
   const scene = scenes.find(item => item.id === activeSceneId) || scenes[0]
   const layout = scene ? (floorplans?.[scene.id] || EMPTY_LAYOUT) : EMPTY_LAYOUT
@@ -269,6 +325,7 @@ export default function Floorplan({
     dragRef.current = null
     setDrawStart(null)
     setPreviewPoint(null)
+    setViewBox(getFittedViewBox(layout))
   }, [scene?.id])
 
   useEffect(() => {
@@ -351,10 +408,27 @@ export default function Floorplan({
     const rect = svgRef.current?.getBoundingClientRect()
     if (!rect || !rect.width || !rect.height) return { x: 0, y: 0 }
     return {
-      x: clamp(((event.clientX - rect.left) / rect.width) * MAP_WIDTH, 0, MAP_WIDTH),
-      y: clamp(((event.clientY - rect.top) / rect.height) * MAP_HEIGHT, 0, MAP_HEIGHT),
+      x: clamp(viewBox.x + ((event.clientX - rect.left) / rect.width) * viewBox.width, 0, MAP_WIDTH),
+      y: clamp(viewBox.y + ((event.clientY - rect.top) / rect.height) * viewBox.height, 0, MAP_HEIGHT),
     }
   }
+
+  const zoomCanvas = factor => {
+    setViewBox(current => {
+      const width = clamp(current.width * factor, 220, MAP_WIDTH)
+      const height = width / (MAP_WIDTH / MAP_HEIGHT)
+      const centerX = current.x + current.width / 2
+      const centerY = current.y + current.height / 2
+      return {
+        x: clamp(centerX - width / 2, 0, MAP_WIDTH - width),
+        y: clamp(centerY - height / 2, 0, MAP_HEIGHT - height),
+        width,
+        height,
+      }
+    })
+  }
+
+  const fitCanvas = () => setViewBox(getFittedViewBox(layout))
 
   // Object buttons create an object immediately. The new marker is selected and
   // can be dragged straight to its final position without another placement click.
@@ -548,6 +622,17 @@ export default function Floorplan({
   }
 
   const handleCanvasPointerDown = event => {
+    if (tool === 'pan') {
+      event.preventDefault()
+      svgRef.current?.setPointerCapture?.(event.pointerId)
+      dragRef.current = {
+        mode: 'pan',
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        viewBox: { ...viewBox },
+      }
+      return
+    }
     const point = getPoint(event)
     if (tool === 'room' || tool === 'wall') {
       svgRef.current?.setPointerCapture?.(event.pointerId)
@@ -573,12 +658,24 @@ export default function Floorplan({
   }
 
   const handleCanvasPointerMove = event => {
+    const drag = dragRef.current
+    if (drag?.mode === 'pan') {
+      const rect = svgRef.current?.getBoundingClientRect()
+      if (!rect || !rect.width || !rect.height) return
+      const dx = ((event.clientX - drag.startClientX) / rect.width) * drag.viewBox.width
+      const dy = ((event.clientY - drag.startClientY) / rect.height) * drag.viewBox.height
+      setViewBox({
+        ...drag.viewBox,
+        x: clamp(drag.viewBox.x - dx, 0, MAP_WIDTH - drag.viewBox.width),
+        y: clamp(drag.viewBox.y - dy, 0, MAP_HEIGHT - drag.viewBox.height),
+      })
+      return
+    }
     const point = getPoint(event)
     if (drawStart) {
       setPreviewPoint(point)
       return
     }
-    const drag = dragRef.current
     if (!drag) return
 
     if (drag.mode === 'opening') {
@@ -915,6 +1012,9 @@ export default function Floorplan({
           <button className={'floorplan-tool-button' + (tool === 'select' ? ' active' : '')} onClick={() => setTool('select')} title="Pilih dan pindahkan" aria-label="Pilih dan pindahkan" aria-pressed={tool === 'select'}>
             <MousePointer2 size={19} />
           </button>
+          <button className={'floorplan-tool-button' + (tool === 'pan' ? ' active' : '')} onClick={() => setTool(tool === 'pan' ? 'select' : 'pan')} title="Geser tampilan kanvas" aria-label="Geser tampilan kanvas" aria-pressed={tool === 'pan'}>
+            <Hand size={18} /><span>Geser kanvas</span>
+          </button>
           <button className={'floorplan-tool-button' + (tool === 'path' ? ' active' : '')} onClick={() => setTool(tool === 'path' ? 'select' : 'path')} title="Gambar jalur gerak aktor atau kamera terpilih" aria-label="Gambar jalur gerak" aria-pressed={tool === 'path'} disabled={!selectedCanHavePath}>
             <Route size={19} /><span>Jalur</span>
           </button>
@@ -955,8 +1055,8 @@ export default function Floorplan({
           <div className="floorplan-canvas-frame">
             <svg
               ref={svgRef}
-              className={'floorplan-canvas' + (tool === 'select' ? ' can-select' : ' can-draw')}
-              viewBox={'0 0 ' + MAP_WIDTH + ' ' + MAP_HEIGHT}
+              className={'floorplan-canvas' + (tool === 'select' ? ' can-select' : tool === 'pan' ? ' can-pan' : ' can-draw')}
+              viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
               preserveAspectRatio="none"
               role="img"
               aria-label="Kanvas Floorplan tampak atas"
@@ -1415,6 +1515,13 @@ export default function Floorplan({
                   stroke="var(--text)" strokeWidth="3" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />
               )}
             </svg>
+            <div className="floorplan-view-controls" role="group" aria-label="Kontrol tampilan denah">
+              <button type="button" className="floorplan-view-control-button" onClick={() => zoomCanvas(1.25)} disabled={viewBox.width <= 220} title="Perkecil tampilan" aria-label="Perkecil tampilan"><Minus size={16} /></button>
+              <span className="floorplan-zoom-level" aria-live="polite">{Math.round((MAP_WIDTH / viewBox.width) * 100)}%</span>
+              <button type="button" className="floorplan-view-control-button" onClick={() => zoomCanvas(0.8)} disabled={viewBox.width >= MAP_WIDTH} title="Perbesar tampilan" aria-label="Perbesar tampilan"><Plus size={16} /></button>
+              <span className="floorplan-view-control-divider" />
+              <button type="button" className="floorplan-view-control-button floorplan-fit-button" onClick={fitCanvas} title="Muat seluruh denah ke kanvas" aria-label="Muat seluruh denah ke kanvas"><Maximize2 size={15} /><span>Muat denah</span></button>
+            </div>
           </div>
         </div>
 
