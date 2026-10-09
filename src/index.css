@@ -1606,3 +1606,34 @@ button:focus-visible,
     object-fit: contain !important;
   }
 }
+
+
+/* Print canvas must stay white even when the application UI uses dark color-scheme. */
+@media print {
+  :root,
+  :root[data-theme="dark"],
+  :root[data-theme="light"] {
+    color-scheme: light !important;
+    background-color: #fff !important;
+  }
+  html,
+  body,
+  #root,
+  .app,
+  .app > .print-report,
+  .print-cover,
+  .print-shot-list-section,
+  .print-plan-page {
+    color-scheme: light !important;
+    background-color: #fff !important;
+    background-image: none !important;
+  }
+  html,
+  body,
+  #root,
+  .app,
+  .app > .print-report {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
