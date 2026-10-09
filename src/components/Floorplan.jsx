@@ -350,6 +350,7 @@ export default function Floorplan({
 
   const appendWaypoint = point => {
     if (!selectedEntity || !selectedType || (selectedType === 'camera' && !selectedCameraCanHavePath) || selectedType === 'light' || selectedType === 'room' || selectedType === 'wall') return
+    setSelectedWaypoint(null)
     updateLayout(previous => ({
       ...previous,
       [selectedType + 's']: previous[selectedType + 's'].map(item => item.id !== selectedEntity.id
@@ -489,6 +490,7 @@ export default function Floorplan({
 
   const updateSelected = patch => {
     if (!selected || !selectedEntity) return
+    if (Object.prototype.hasOwnProperty.call(patch, 'path')) setSelectedWaypoint(null)
     updateLayout(previous => ({
       ...previous,
       [selected.type + 's']: previous[selected.type + 's'].map(item => (
@@ -513,6 +515,7 @@ export default function Floorplan({
       [selected.type + 's']: previous[selected.type + 's'].filter(item => item.id !== selected.id),
     }))
     setSelected(null)
+    setSelectedWaypoint(null)
     setTool('select')
   }
 
@@ -520,6 +523,7 @@ export default function Floorplan({
     if (!window.confirm('Clear this scene’s floorplan, actors, cameras and lighting?')) return
     updateLayout(() => ({ ...EMPTY_LAYOUT }))
     setSelected(null)
+    setSelectedWaypoint(null)
     setTool('select')
   }
 
