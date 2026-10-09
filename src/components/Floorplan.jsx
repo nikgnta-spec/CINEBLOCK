@@ -939,6 +939,33 @@ export default function Floorplan({
                           )}
                         </g>
                       )}
+                      {type === 'door' && (
+                        <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none" fill="none" stroke="var(--text)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+                          <path d={'M ' + (-object.width / 2) + ' 0 H ' + (object.width / 2)} strokeWidth="5" />
+                          <path d={'M ' + (-object.width / 2) + ' 0 V ' + (-object.width) + ' A ' + object.width + ' ' + object.width + ' 0 0 1 ' + (object.width / 2) + ' 0'} strokeDasharray="4 4" strokeOpacity="0.72" />
+                          <path d={'M ' + (-object.width / 2) + ' 0 L ' + (-object.width / 2) + ' ' + (-object.width)} />
+                        </g>
+                      )}
+                      {type === 'window' && (
+                        <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none" fill="none" stroke="var(--text)" strokeWidth="2.4" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+                          <path d={'M ' + (-object.width / 2) + ' ' + (-Math.max(5, object.height / 2)) + ' H ' + (object.width / 2) + ' M ' + (-object.width / 2) + ' 0 H ' + (object.width / 2) + ' M ' + (-object.width / 2) + ' ' + Math.max(5, object.height / 2) + ' H ' + (object.width / 2)} />
+                          <path d={'M ' + (-object.width / 2) + ' ' + (-Math.max(5, object.height / 2) - 3) + ' V ' + (Math.max(5, object.height / 2) + 3) + ' M ' + (object.width / 2) + ' ' + (-Math.max(5, object.height / 2) - 3) + ' V ' + (Math.max(5, object.height / 2) + 3)} />
+                        </g>
+                      )}
+                      {type === 'prop' && (
+                        <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none" fill="var(--bg-subtle)" stroke="var(--text)" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+                          <rect x={-object.width / 2} y={-object.height / 2} width={object.width} height={object.height} rx={object.propType === 'Sofa' ? 8 : 2} />
+                          {object.propType === 'Chair' ? (
+                            <path d={'M ' + (-object.width * 0.32) + ' ' + (-object.height * 0.25) + ' H ' + (object.width * 0.32) + ' V ' + (object.height * 0.28)} fill="none" />
+                          ) : object.propType === 'Bed' ? (
+                            <path d={'M ' + (-object.width / 2 + 4) + ' ' + (-object.height / 2 + 9) + ' H ' + (object.width / 2 - 4)} fill="none" />
+                          ) : object.propType === 'Sofa' ? (
+                            <path d={'M ' + (-object.width / 2 + 5) + ' ' + (-object.height / 2 + 6) + ' H ' + (object.width / 2 - 5) + ' V ' + (object.height / 2 - 6) + ' H ' + (-object.width / 2 + 5) + ' Z'} fill="none" />
+                          ) : (
+                            <path d={'M ' + (-object.width * 0.32) + ' 0 H ' + (object.width * 0.32) + ' M 0 ' + (-object.height * 0.3) + ' V ' + (object.height * 0.3)} fill="none" />
+                          )}
+                        </g>
+                      )}
                       {type === 'actor' && (
                         <g transform={'rotate(' + (object.angle || 0) + ') scale(0.68)'} pointerEvents="none">
                           <g fill="none" stroke="var(--text)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
@@ -981,7 +1008,23 @@ export default function Floorplan({
                           <path d="M-2 -6 L-2 6" strokeOpacity="0.65" fill="none" />
                         </g>
                       )}
-                      {active && <circle cx="0" cy="0" r="34" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
+                      {active && ['door', 'window', 'prop'].includes(type) ? (
+                        <rect
+                          x={-object.width / 2 - 5}
+                          y={-object.height / 2 - 5}
+                          width={object.width + 10}
+                          height={object.height + 10}
+                          rx="3"
+                          fill="none"
+                          stroke="var(--text-muted)"
+                          strokeWidth="1.5"
+                          strokeDasharray="4 4"
+                          vectorEffect="non-scaling-stroke"
+                          pointerEvents="none"
+                        />
+                      ) : active ? (
+                        <circle cx="0" cy="0" r="34" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />
+                      ) : null}
                       {type === 'camera' && (
                         <text x="0" y="46" textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" pointerEvents="none">
                           {shot ? shot.num : '—'}
@@ -990,6 +1033,22 @@ export default function Floorplan({
                       {type === 'light' && (
                         <text x="0" y="35" textAnchor="middle" fontSize="13" fontWeight="500" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" pointerEvents="none">
                           {object.lightType || 'Key'}
+                        </text>
+                      )}
+                      {['door', 'window', 'prop'].includes(type) && (
+                        <text
+                          x="0"
+                          y={Math.max(22, Number(object.height) / 2 + 15)}
+                          textAnchor="middle"
+                          fontSize="13"
+                          fontWeight="500"
+                          fill="var(--text)"
+                          stroke="var(--bg)"
+                          strokeWidth="4"
+                          paintOrder="stroke"
+                          pointerEvents="none"
+                        >
+                          {object.label || (type === 'prop' ? object.propType : type)}
                         </text>
                       )}
                     </g>
@@ -1227,9 +1286,62 @@ export default function Floorplan({
               )}
 
               {selectedType === 'room' && (
+                <>
+                  <section className="floorplan-inspector-section">
+                    <label htmlFor="room-label">Room name</label>
+                    <input id="room-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
+                  </section>
+                  <section className="floorplan-inspector-section">
+                    <div className="floorplan-section-title">Dimensions</div>
+                    <div className="floorplan-size-grid">
+                      <label htmlFor="room-length">Length (X)</label>
+                      <input id="room-length" type="number" className="floorplan-field" min="40" max={Math.max(40, MAP_WIDTH - selectedEntity.x)} value={selectedEntity.width} onChange={event => updateSelected({ width: clamp(event.target.value, 40, Math.max(40, MAP_WIDTH - selectedEntity.x)) })} />
+                      <label htmlFor="room-width">Width (Y)</label>
+                      <input id="room-width" type="number" className="floorplan-field" min="40" max={Math.max(40, MAP_HEIGHT - selectedEntity.y)} value={selectedEntity.height} onChange={event => updateSelected({ height: clamp(event.target.value, 40, Math.max(40, MAP_HEIGHT - selectedEntity.y)) })} />
+                    </div>
+                  </section>
+                </>
+              )}
+
+              {['door', 'window', 'prop'].includes(selectedType) && (
+                <>
+                  <section className="floorplan-inspector-section">
+                    <label htmlFor="fixture-label">{selectedType === 'prop' ? 'Prop name' : selectedType === 'door' ? 'Door label' : 'Window label'}</label>
+                    <input id="fixture-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
+                    {selectedType === 'prop' && (
+                      <>
+                        <label htmlFor="prop-type">Prop type</label>
+                        <select id="prop-type" className="floorplan-field" value={selectedEntity.propType || 'Custom'} onChange={event => updateSelected({ propType: event.target.value })}>
+                          {PROP_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+                        </select>
+                      </>
+                    )}
+                  </section>
+                  <section className="floorplan-inspector-section">
+                    <div className="floorplan-section-title">Dimensions</div>
+                    <div className="floorplan-size-grid">
+                      <label htmlFor="fixture-length">Length</label>
+                      <input id="fixture-length" type="number" className="floorplan-field" min="12" max={Math.max(12, MAP_WIDTH - selectedEntity.x)} value={selectedEntity.width} onChange={event => updateSelected({ width: clamp(event.target.value, 12, Math.min(300, Math.max(12, MAP_WIDTH - selectedEntity.x))) })} />
+                      <label htmlFor="fixture-width">Width</label>
+                      <input id="fixture-width" type="number" className="floorplan-field" min="8" max={Math.max(8, MAP_HEIGHT - selectedEntity.y)} value={selectedEntity.height} onChange={event => updateSelected({ height: clamp(event.target.value, 8, Math.min(200, Math.max(8, MAP_HEIGHT - selectedEntity.y))) })} />
+                    </div>
+                  </section>
+                </>
+              )}
+
+              {selectedType === 'wall' && (
                 <section className="floorplan-inspector-section">
-                  <label htmlFor="room-label">Room name</label>
-                  <input id="room-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
+                  <div className="floorplan-section-title">Wall</div>
+                  <div className="floorplan-size-grid">
+                    <label htmlFor="wall-x1">Start X</label>
+                    <input id="wall-x1" type="number" className="floorplan-field" value={selectedEntity.x1} onChange={event => updateSelected({ x1: clamp(event.target.value, 0, MAP_WIDTH) })} />
+                    <label htmlFor="wall-y1">Start Y</label>
+                    <input id="wall-y1" type="number" className="floorplan-field" value={selectedEntity.y1} onChange={event => updateSelected({ y1: clamp(event.target.value, 0, MAP_HEIGHT) })} />
+                    <label htmlFor="wall-x2">End X</label>
+                    <input id="wall-x2" type="number" className="floorplan-field" value={selectedEntity.x2} onChange={event => updateSelected({ x2: clamp(event.target.value, 0, MAP_WIDTH) })} />
+                    <label htmlFor="wall-y2">End Y</label>
+                    <input id="wall-y2" type="number" className="floorplan-field" value={selectedEntity.y2} onChange={event => updateSelected({ y2: clamp(event.target.value, 0, MAP_HEIGHT) })} />
+                  </div>
                 </section>
               )}
             </>
