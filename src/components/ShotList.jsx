@@ -1,9 +1,13 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Plus, X, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Trash2, Copy } from 'lucide-react'
 
 const SIZES = [
-  'ECU', 'CU', 'MCU', 'MS', 'MLS', 'FS', 'LS', 'ELS', 'WS', 'EWS', 'W',
-  'CU (OTS)', 'MCU (OTS)', 'ECU (OTS)', 'MS (OTS)', 'MLS (OTS)', 'LS (OTS)',
+  'Extreme Wide Shot (EWS)', 'Wide Shot (WS)', 'Long Shot (LS)',
+  'Medium Long Shot (MLS)', 'Medium Shot (MS)', 'Medium Full Shot (MFS)',
+  'Medium Close-Up (MCU)', 'Close-Up (CU)', 'Big Close-Up (BCU)',
+  'Extreme Close-Up (ECU)', 'Extreme Extreme Close-Up (XCU)',
+  'Two Shot', 'Three Shot', 'Group Shot', 'Over-the-Shoulder (OTS)',
+  'Insert', 'Cutaway', 'Establishing Shot',
 ]
 const ANGLES = [
   'Eye Level', 'Low Angle', 'High Angle', 'Extreme Low', 'Extreme High',
@@ -19,12 +23,13 @@ const LENSES = [
   '28–70 mm', '70–200 mm', 'TBD',
 ]
 const MOVEMENTS = [
-  'Static', 'Pan', 'Pan L', 'Pan R', 'Whip Pan', 'Tilt', 'Tilt Up', 'Tilt Down',
-  'Pedestal', 'Pedestal Up', 'Pedestal Down', 'Dolly', 'Dolly In', 'Dolly Out',
-  'Truck', 'Truck L', 'Truck R', 'Arc', 'Orbit', 'Tracking Shot', 'Tracking',
-  'Crane / Boom', 'Crane Up', 'Crane Down', 'Jib Up', 'Jib Down', 'Zoom',
-  'Rack Focus', 'Steadicam', 'Handheld', 'Floating', 'Slider', 'Roll', 'Push In',
-  'Pull Out', 'Blocking',
+  'Static', 'Pan', 'Pan Left', 'Pan Right', 'Whip Pan',
+  'Tilt Up', 'Tilt Down', 'Dutch Roll', 'Pedestal Up', 'Pedestal Down',
+  'Dolly In', 'Dolly Out', 'Truck Left', 'Truck Right', 'Tracking Shot',
+  'Follow', 'Lead', 'Arc', 'Orbit', 'Crane Up', 'Crane Down',
+  'Jib Up', 'Jib Down', 'Zoom In', 'Zoom Out', 'Dolly Zoom',
+  'Push In', 'Pull Out', 'Rack Focus', 'Roll', 'Reveal', 'Reframe',
+  'Handheld Movement', 'POV Movement', '360 Orbit', 'Blocking',
 ]
 const EQUIPMENT = [
   'Sticks / Tripod', 'Handheld', 'Shoulder Rig', 'Easyrig', 'Monopod',
@@ -39,25 +44,97 @@ const SOUNDS = [
   'Wired Boom', 'MOS', 'Playback', 'Wild Track', 'None',
 ]
 
-export default function ShotList({ scenes, onChange, defaultShot, defaultScene }) {
-  const [activeIdx, setActiveIdx] = useState(0)
+export default function ShotList({
+  scenes,
+  onChange,
+  activeSceneId,
+  onActiveSceneChange,
+  defaultShot,
+  defaultScene,
+}) {
+  const matchingIdx = scenes.findIndex(s => s.id === activeSceneId)
+  const activeIdx = matchingIdx >= 0 ? matchingIdx : 0
   const scene = scenes[activeIdx]
 
+  const setActiveIdx = (nextIdxOrUpdater) => {
+    const nextIdx = typeof nextIdxOrUpdater === 'function'
+      ? nextIdxOrUpdater(activeIdx)
+      : nextIdxOrUpdater
+    const nextScene = scenes[nextIdx]
+    if (nextScene) onActiveSceneChange(nextScene.id)
+  }
+
   const updateScene = (fn) => {
-    onChange(prev => prev.map((s, i) => i === activeIdx ? fn(s) : s))
+    onChange(prev => prev.map(s => s.id === scene.id ? fn(s) : s))
+  }
+
+  const nextSceneName = () => {
+    const usedNumbers = new Set(
+      scenes.map(s => Number(s.name.match(/^Scene\\s+(\\d+)$/i)?.[1])).filter(Number.isFinite),
+    )
+    let candidate = 1
+    while (usedNumbers.has(candidate)) candidate += 1
+    return candidate
   }
 
   const addScene = () => {
-    const newScene = defaultScene(scenes.length + 1)
+    const newScene = defaultScene(nextSceneName())
     onChange(prev => [...prev, newScene])
-    setActiveIdx(scenes.length)
+    onActiveSceneChange(newScene.id)
+  }
+
+  const deleteScene = (idx) => {
+    if (scenes.length <= 1) return
+    if (!window.confirm('Delete this scene and all of its shots? This cannot be undone.')) return
+
+    const fallbackIndex = idx === 0 ? 1 : idx - 1
+    const fallbackScene = scenes[fallbackIndex]
+    const sceneToDelete = scenes[idx]
+    if (!sceneToDelete) return
+
+    onChange(prev => prev.filter(s => s.id !== sceneToDelete.id))
+    onActiveSceneChange(fallbackScene?.id || '')
+  }
+
+  const nextShotNumber = (shots) => {
+    const numbers = shots.map(shot => Number.parseInt(shot.num, 10)).filter(Number.isFinite)
+    return String(Math.max(0, ...numbers) + 1).padStart(3, '0')
   }
 
   const addShot = () => {
     updateScene(s => ({
       ...s,
-      shots: [...s.shots, defaultShot(s.shots.length + 1)]
+      shots: [...s.shots, defaultShot(nextShotNumber(s.shots))]
     }))
+  }
+
+  const duplicateShot = (shotId) => {
+    updateScene(s => {
+      const index = s.shots.findIndex(shot => shot.id === shotId)
+      if (index < 0) return s
+      const original = s.shots[index]
+      const copy = {
+        ...original,
+        id: crypto.randomUUID(),
+        num: nextShotNumber(s.shots),
+        movements: [...(original.movements || [])],
+        equipment: [...(Array.isArray(original.equipment) ? original.equipment : original.equipment ? [original.equipment] : [])],
+      }
+      const shots = [...s.shots]
+      shots.splice(index + 1, 0, copy)
+      return { ...s, shots }
+    })
+  }
+
+  const moveShot = (shotId, direction) => {
+    updateScene(s => {
+      const index = s.shots.findIndex(shot => shot.id === shotId)
+      const targetIndex = index + direction
+      if (index < 0 || targetIndex < 0 || targetIndex >= s.shots.length) return s
+      const shots = [...s.shots]
+      ;[shots[index], shots[targetIndex]] = [shots[targetIndex], shots[index]]
+      return { ...s, shots }
+    })
   }
 
   const updateShot = (shotId, key, val) => {
@@ -93,6 +170,30 @@ export default function ShotList({ scenes, onChange, defaultShot, defaultScene }
           ? { ...sh, movements: sh.movements.filter(m => m !== mov) }
           : sh
       )
+    }))
+  }
+
+  const addEquipment = (shotId, equipment) => {
+    updateScene(s => ({
+      ...s,
+      shots: s.shots.map(sh => {
+        const current = Array.isArray(sh.equipment) ? sh.equipment : sh.equipment ? [sh.equipment] : []
+        return sh.id === shotId && !current.includes(equipment)
+          ? { ...sh, equipment: [...current, equipment] }
+          : sh
+      })
+    }))
+  }
+
+  const removeEquipment = (shotId, equipment) => {
+    updateScene(s => ({
+      ...s,
+      shots: s.shots.map(sh => {
+        const current = Array.isArray(sh.equipment) ? sh.equipment : sh.equipment ? [sh.equipment] : []
+        return sh.id === shotId
+          ? { ...sh, equipment: current.filter(item => item !== equipment) }
+          : sh
+      })
     }))
   }
 
@@ -162,6 +263,14 @@ export default function ShotList({ scenes, onChange, defaultShot, defaultScene }
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => deleteScene(activeIdx)}
+            disabled={scenes.length <= 1}
+            title={scenes.length <= 1 ? 'Keep at least one scene' : 'Delete current scene'}
+          >
+            <Trash2 size={13} /> Delete Scene
+          </button>
           <button className="btn btn-secondary" onClick={addScene}>
             <Plus size={13} /> New Scene
           </button>
@@ -209,7 +318,7 @@ export default function ShotList({ scenes, onChange, defaultShot, defaultScene }
                 <th style={{ width: 70 }}>Setup</th>
                 <th style={{ width: 80 }}>Est. Shoot</th>
                 <th style={{ minWidth: 120 }}>Notes</th>
-                <th style={{ width: 36 }}></th>
+                <th style={{ width: 116 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -246,7 +355,20 @@ export default function ShotList({ scenes, onChange, defaultShot, defaultScene }
                     </div>
                   </td>
                   <td>
-                    <SelectCell value={shot.equipment ?? shot.support ?? ''} onChange={v => updateShot(shot.id, 'equipment', v)} options={EQUIPMENT} placeholder="Equipment" />
+                    <div className="movement-cell">
+                      {(Array.isArray(shot.equipment) ? shot.equipment : shot.equipment ? [shot.equipment] : shot.support ? [shot.support] : []).map(item => (
+                        <span key={item} className="movement-tag">
+                          {item}
+                          <button onClick={() => removeEquipment(shot.id, item)} title={`Remove ${item}`} aria-label={`Remove ${item}`}>
+                            <X size={9} />
+                          </button>
+                        </span>
+                      ))}
+                      <EquipmentPicker
+                        onPick={item => addEquipment(shot.id, item)}
+                        existing={Array.isArray(shot.equipment) ? shot.equipment : shot.equipment ? [shot.equipment] : shot.support ? [shot.support] : []}
+                      />
+                    </div>
                   </td>
                   <td>
                     <SelectCell value={shot.sound} onChange={v => updateShot(shot.id, 'sound', v)} options={SOUNDS} placeholder="Sound" />
@@ -267,14 +389,46 @@ export default function ShotList({ scenes, onChange, defaultShot, defaultScene }
                     <input className="cell-input" value={shot.notes} onChange={e => updateShot(shot.id, 'notes', e.target.value)} placeholder="Notes..." />
                   </td>
                   <td>
-                    <button
-                      className="btn btn-danger"
-                      style={{ padding: '8px', opacity: 0.4 }}
-                      onClick={() => deleteShot(shot.id)}
-                      title="Delete shot"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                    <div style={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+                      <button
+                        className="btn btn-ghost"
+                        style={{ padding: 4 }}
+                        onClick={() => moveShot(shot.id, -1)}
+                        disabled={scene.shots[0]?.id === shot.id}
+                        title="Move shot up"
+                        aria-label="Move shot up"
+                      >
+                        <ChevronUp size={12} />
+                      </button>
+                      <button
+                        className="btn btn-ghost"
+                        style={{ padding: 4 }}
+                        onClick={() => moveShot(shot.id, 1)}
+                        disabled={scene.shots[scene.shots.length - 1]?.id === shot.id}
+                        title="Move shot down"
+                        aria-label="Move shot down"
+                      >
+                        <ChevronDown size={12} />
+                      </button>
+                      <button
+                        className="btn btn-ghost"
+                        style={{ padding: 4 }}
+                        onClick={() => duplicateShot(shot.id)}
+                        title="Duplicate shot"
+                        aria-label="Duplicate shot"
+                      >
+                        <Copy size={12} />
+                      </button>
+                      <button
+                        className="btn btn-danger"
+                        style={{ padding: 4 }}
+                        onClick={() => deleteShot(shot.id)}
+                        title="Delete shot"
+                        aria-label="Delete shot"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -303,6 +457,52 @@ function SelectCell({ value, onChange, options, placeholder }) {
       <option value="">{placeholder}</option>
       {options.map(o => <option key={o} value={o}>{o}</option>)}
     </select>
+  )
+}
+
+function EquipmentPicker({ onPick, existing }) {
+  const [open, setOpen] = useState(false)
+  const available = EQUIPMENT.filter(item => !existing.includes(item))
+
+  if (available.length === 0) return null
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <button className="add-movement" onClick={() => setOpen(value => !value)}>+ Equipment</button>
+      {open && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          zIndex: 100,
+          background: 'var(--bg)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          minWidth: 180,
+          maxHeight: 260,
+          overflowY: 'auto',
+          padding: '4px 0',
+        }}>
+          {available.map(item => (
+            <button
+              key={item}
+              onClick={() => { onPick(item); setOpen(false) }}
+              style={{
+                display: 'block',
+                width: '100%',
+                textAlign: 'left',
+                padding: '6px 12px',
+                fontSize: 12,
+                color: 'var(--text)',
+              }}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
