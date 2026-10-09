@@ -31,23 +31,42 @@ function normalizeSavedProject(savedProject) {
   const refs = Array.isArray(savedProject?.visualRefs)
     ? savedProject.visualRefs
     : defaultProject.visualRefs
+  const textFields = [
+    'title', 'director', 'dop', 'production', 'genre', 'duration',
+    'format', 'aspectRatio', 'camera', 'lensSystem', 'visualApproach',
+    'lightingApproach',
+  ]
+  const safeTextFields = Object.fromEntries(
+    textFields.map(key => [
+      key,
+      typeof savedProject?.[key] === 'string'
+        ? savedProject[key].slice(0, key === 'visualApproach' || key === 'lightingApproach' ? 5000 : 300)
+        : defaultProject[key],
+    ]),
+  )
+  const refCount = Math.max(6, Math.min(24, refs.length || 0))
+  const labels = Array.isArray(savedProject?.visualRefLabels)
+    ? savedProject.visualRefLabels
+    : []
 
   return {
     ...defaultProject,
-    ...(savedProject || {}),
+    ...safeTextFields,
     visualRefs: Array.from(
-      { length: Math.max(6, refs.length) },
+      { length: refCount },
       (_, index) => {
         const reference = refs[index] ?? null
         // Blob URLs do not survive refreshes; discard stale links from older saves.
         return typeof reference === 'string' && reference.startsWith('blob:')
           ? null
-          : reference
+          : typeof reference === 'string' && reference.startsWith('data:')
+            ? reference
+            : null
       },
     ),
     visualRefLabels: Array.from(
-      { length: Math.max(6, savedProject?.visualRefLabels?.length || 0) },
-      (_, index) => savedProject?.visualRefLabels?.[index] || '',
+      { length: refCount },
+      (_, index) => typeof labels[index] === 'string' ? labels[index].slice(0, 100) : '',
     ),
   }
 }
