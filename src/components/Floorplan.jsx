@@ -89,6 +89,50 @@ function findAvailablePosition(layout, occupiedOverrides = null) {
   return { x: centerX, y: centerY }
 }
 
+const FULL_FRAME_SENSOR_WIDTH_MM = 36
+const FOV_RADIUS = 190
+const FOV_START_X = 12
+
+function parseFocalLengthRange(value) {
+  if (typeof value !== 'string' || !value.trim()) return null
+  const text = value.trim()
+  const rangeMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:mm)?\s*[-–—]\s*(\d+(?:\.\d+)?)\s*mm?/i)
+  if (rangeMatch) {
+    const first = Number(rangeMatch[1])
+    const second = Number(rangeMatch[2])
+    const focalMin = Math.min(first, second)
+    const focalMax = Math.max(first, second)
+    if (focalMin > 0 && focalMax > 0) return { min: focalMin, max: focalMax }
+  }
+  const withUnit = text.match(/(\d+(?:\.\d+)?)\s*mm/i)
+  const fallback = withUnit || text.match(/^\s*(\d+(?:\.\d+)?)\s*$/)
+  if (!fallback) return null
+  const focalLength = Number(fallback[1])
+  return focalLength > 0 ? { min: focalLength, max: focalLength } : null
+}
+
+function horizontalFovDegrees(focalLength) {
+  return 2 * Math.atan(FULL_FRAME_SENSOR_WIDTH_MM / (2 * focalLength)) * 180 / Math.PI
+}
+
+function fovSectorPath(fovDegrees) {
+  const halfAngle = (fovDegrees / 2) * Math.PI / 180
+  const x1 = FOV_RADIUS * Math.cos(-halfAngle)
+  const y1 = FOV_RADIUS * Math.sin(-halfAngle)
+  const x2 = FOV_RADIUS * Math.cos(halfAngle)
+  const y2 = FOV_RADIUS * Math.sin(halfAngle)
+  return 'M ' + FOV_START_X + ' 0 L ' + x1.toFixed(2) + ' ' + y1.toFixed(2)
+    + ' A ' + FOV_RADIUS + ' ' + FOV_RADIUS + ' 0 0 1 ' + x2.toFixed(2) + ' ' + y2.toFixed(2) + ' Z'
+}
+
+function formatFov(focalRange) {
+  if (!focalRange) return ''
+  const widest = horizontalFovDegrees(focalRange.min)
+  const narrowest = horizontalFovDegrees(focalRange.max)
+  if (focalRange.min === focalRange.max) return widest.toFixed(1) + '° horizontal'
+  return widest.toFixed(1) + '°–' + narrowest.toFixed(1) + '° horizontal'
+}
+
 function renumberShots(shots) {
   return shots.map((shot, index) => ({ ...shot, num: String(index + 1).padStart(3, '0') }))
 }
@@ -707,6 +751,14 @@ export default function Floorplan({
                 const type = object._kind
                 const active = selected?.type === type && selected.id === object.id
                 const shot = type === 'camera' ? scene.shots.find(item => item.id === object.shotId) : null
+                const focalRange = type === 'camera' ? parseFocalLengthRange(shot?.lens) : null
+                const cameraFov = focalRange ? {
+                  widePath: fovSectorPath(horizontalFovDegrees(focalRange.min)),
+                  narrowPath: focalRange.max > focalRange.min
+                    ? fovSectorPath(horizontalFovDegrees(focalRange.max))
+                    : null,
+                  label: formatFov(focalRange),
+                } : null
                 const shotMovements = shot?.movements || []
                 const cameraCanHavePath = type === 'camera' && shotMovements.some(movement => CAMERA_PATH_MOVEMENTS.has(movement))
                 const showPath = type === 'actor' || cameraCanHavePath
@@ -764,6 +816,31 @@ export default function Floorplan({
                         fill="transparent"
                         pointerEvents="all"
                       />
+                      {type === 'camera' && cameraFov && (
+                        <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
+                          <path
+                            d={cameraFov.widePath}
+                            fill="var(--text-muted)"
+                            fillOpacity={active ? 0.16 : 0.09}
+                            stroke="var(--text-muted)"
+                            strokeOpacity={active ? 0.7 : 0.42}
+                            strokeWidth={active ? 1.6 : 1.2}
+                            vectorEffect="non-scaling-stroke"
+                          />
+                          {cameraFov.narrowPath && (
+                            <path
+                              d={cameraFov.narrowPath}
+                              fill="var(--bg)"
+                              fillOpacity="0.28"
+                              stroke="var(--text-muted)"
+                              strokeOpacity={active ? 0.8 : 0.48}
+                              strokeWidth="1.2"
+                              strokeDasharray="5 4"
+                              vectorEffect="non-scaling-stroke"
+                            />
+                          )}
+                        </g>
+                      )}
                       {type === 'camera' && (
                         <g transform={'rotate(' + (object.angle || 0) + ') scale(0.78)'} pointerEvents="none">
                           <path d="M9 -9 L33 -20 L33 20 L9 9 Z" fill="var(--bg)" stroke="var(--text)" strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
@@ -969,6 +1046,13 @@ export default function Floorplan({
                           onChange={event => updateLinkedShot('lens', event.target.value)}
                           placeholder="Choose or type focal length"
                         />
+                        {parseFocalLengthRange(selectedShot.lens) ? (
+                          <p className="floorplan-field-note">
+                            Horizontal FOV ≈ {formatFov(parseFocalLengthRange(selectedShot.lens))} · Full-frame
+                          </p>
+                        ) : (
+                          <p className="floorplan-field-note">Enter a focal length in mm to show the camera FOV.</p>
+                        )}
                         <datalist id="floorplan-lens-options">
                           {SHOT_LENSES.map(option => <option key={option} value={option} />)}
                         </datalist>
