@@ -475,7 +475,7 @@ export default function Floorplan({
                 const shot = type === 'camera' ? scene.shots.find(item => item.id === object.shotId) : null
                 const points = [{ x: object.x, y: object.y }, ...(object.path || [])]
                 const pointString = points.map(point => point.x + ',' + point.y).join(' ')
-                const handleBaseAngle = type === 'actor' ? -90 : 0
+                const handleBaseAngle = type === 'actor' ? -90 : type === 'light' ? 90 : 0
                 const handleRadians = (handleBaseAngle + (object.angle || 0)) * Math.PI / 180
                 const handlePoint = {
                   x: object.x + Math.cos(handleRadians) * 44,
@@ -528,9 +528,7 @@ export default function Floorplan({
                       )}
                       {type === 'light' && (
                         <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
-                          <path d="M1 -11 L49 -27 L49 27 L1 11 Z" fill="var(--bg-subtle)" stroke="var(--text-muted)" strokeWidth="1.5" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
-                          <circle cx="0" cy="0" r="12" fill="var(--bg)" stroke="var(--text)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
-                          <circle cx="0" cy="0" r="3.5" fill="var(--text)" />
+                          <image href="/assets/lamp-icon.png" x="-22" y="-33" width="44" height="66" preserveAspectRatio="xMidYMid meet" />
                         </g>
                       )}
                       {active && <circle cx="0" cy="0" r="34" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
