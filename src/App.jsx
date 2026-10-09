@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
 import ProjectInfo from './components/ProjectInfo'
 import ShotList from './components/ShotList'
@@ -23,6 +23,53 @@ const defaultProject = {
   visualApproach: '',
   lightingApproach: '',
   visualRefs: [null, null, null, null, null, null],
+}
+
+const STORAGE_KEY = 'cineblock.app-state.v1'
+
+function readSavedState() {
+  try {
+    const saved = window.localStorage.getItem(STORAGE_KEY)
+    if (!saved) return null
+
+    const parsed = JSON.parse(saved)
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed
+  } catch (error) {
+    console.warn('CINEBLOCK could not read saved data:', error)
+    return null
+  }
+}
+
+function normalizeSavedProject(savedProject) {
+  const refs = Array.isArray(savedProject?.visualRefs)
+    ? savedProject.visualRefs
+    : defaultProject.visualRefs
+
+  return {
+    ...defaultProject,
+    ...(savedProject || {}),
+    visualRefs: Array.from(
+      { length: Math.max(6, refs.length) },
+      (_, index) => refs[index] ?? null,
+    ),
+  }
+}
+
+function normalizeSavedScenes(savedScenes) {
+  if (!Array.isArray(savedScenes) || savedScenes.length === 0) return null
+
+  return savedScenes.map(scene => ({
+    ...scene,
+    shots: Array.isArray(scene.shots)
+      ? scene.shots.map(shot => ({
+          ...shot,
+          movements: Array.isArray(shot.movements) ? shot.movements : [],
+          // Keep projects created before the Support -> Equipment rename readable.
+          equipment: shot.equipment ?? shot.support ?? '',
+        }))
+      : [],
+  }))
 }
 
 const defaultScene = (num) => ({
@@ -53,9 +100,26 @@ const defaultShot = (num) => ({
 })
 
 export default function App() {
+  const [savedState] = useState(() => readSavedState())
   const [tab, setTab] = useState('project')
-  const [project, setProject] = useState(defaultProject)
-  const [scenes, setScenes] = useState([defaultScene(1)])
+  const [project, setProject] = useState(() => normalizeSavedProject(savedState?.project))
+  const [scenes, setScenes] = useState(() => normalizeSavedScenes(savedState?.scenes) || [defaultScene(1)])
+  const [saveStatus, setSaveStatus] = useState('saved')
+
+  useEffect(() => {
+    setSaveStatus('saving')
+    const timeout = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ project, scenes }))
+        setSaveStatus('saved')
+      } catch (error) {
+        console.error('CINEBLOCK could not save data:', error)
+        setSaveStatus('error')
+      }
+    }, 300)
+
+    return () => window.clearTimeout(timeout)
+  }, [project, scenes])
 
   return (
     <div className="app">
@@ -68,6 +132,17 @@ export default function App() {
           </div>
         </div>
         <div className="topbar-right">
+          <span
+            aria-live="polite"
+            title="Project and shot list data are saved in this browser"
+            style={{ fontSize: 11, color: 'var(--text-muted)' }}
+          >
+            {saveStatus === 'saving'
+              ? 'Saving…'
+              : saveStatus === 'error'
+                ? 'Save failed'
+                : 'Saved locally'}
+          </span>
           <button className="btn btn-secondary" style={{ fontSize: 12 }}>
             <Download size={13} />
             Export PDF
