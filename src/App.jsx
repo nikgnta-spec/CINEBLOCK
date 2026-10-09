@@ -3,6 +3,7 @@ import './App.css'
 import ProjectInfo from './components/ProjectInfo'
 import ShotList from './components/ShotList'
 import Floorplan from './components/Floorplan'
+import PrintReport from './components/PrintReport'
 import { Download, Upload, Plus, Trash2 } from 'lucide-react'
 import { loadAppState, saveAppState } from './storage'
 
@@ -699,8 +700,9 @@ export default function App() {
           <button
             className="btn btn-secondary"
             style={{ fontSize: 12 }}
-            disabled
-            title="PDF export is planned as the final feature"
+            onClick={() => window.print()}
+            disabled={!hydrated}
+            title="Open print dialog. Choose Save as PDF to export the report."
           >
             <Download size={13} />
             Export PDF
@@ -753,6 +755,7 @@ export default function App() {
           </>
         )}
       </div>
+      {hydrated && <PrintReport project={project} scenes={scenes} floorplans={floorplans} />}
     </div>
   )
 }
