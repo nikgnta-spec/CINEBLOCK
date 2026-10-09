@@ -203,12 +203,23 @@ export default function Floorplan({
         setTool('select')
         return
       }
+      const firstWaypoint = !(selectedEntity.path || []).length
+      const nextMovement = firstWaypoint && selectedEntity.movement === 'Static'
+        ? selectedType === 'actor' ? 'Walk' : 'Tracking Shot'
+        : selectedEntity.movement || 'Static'
       updateLayout(previous => ({
         ...previous,
         [selectedType + 's']: previous[selectedType + 's'].map(item => item.id !== selectedEntity.id
           ? item
-          : { ...item, path: [...(item.path || []), { x: Math.round(point.x), y: Math.round(point.y) }] }),
+          : {
+            ...item,
+            movement: nextMovement,
+            path: [...(item.path || []), { x: Math.round(point.x), y: Math.round(point.y) }],
+          }),
       }))
+      if (selectedType === 'camera' && firstWaypoint && nextMovement !== selectedMovement) {
+        syncShotMovement(selectedEntity.shotId, nextMovement, selectedMovement)
+      }
       return
     }
     setSelected(null)
