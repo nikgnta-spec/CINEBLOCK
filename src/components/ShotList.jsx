@@ -26,7 +26,7 @@ const LENSES = [
   '28 mm', '29 mm', '32 mm', '35 mm', '40 mm', '50 mm', '65 mm', '75 mm',
   '85 mm', '100 mm', '105 mm', '135 mm', '150 mm', '180 mm', '200 mm',
   '14–24 mm', '16–35 mm', '17–28 mm', '24–70 mm', '24–105 mm',
-  '28–70 mm', '70–200 mm', 'TBD', 'Custom…',
+  '28–70 mm', '70–200 mm', 'TBD',
 ]
 const MOVEMENTS = [
   'Static', 'Pan', 'Pan L', 'Pan R', 'Whip Pan', 'Tilt', 'Tilt Up', 'Tilt Down',
