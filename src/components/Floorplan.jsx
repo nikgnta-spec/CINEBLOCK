@@ -61,6 +61,11 @@ export default function Floorplan({
   const selectedShot = selectedType === 'camera'
     ? scene?.shots.find(shot => shot.id === selectedEntity.shotId) || null
     : null
+  const selectedMovement = selectedType === 'camera'
+    ? (selectedShot?.movements?.includes(selectedEntity?.movement)
+      ? selectedEntity.movement
+      : selectedShot?.movements?.[0] || 'Static')
+    : selectedEntity?.movement || 'Static'
 
   useEffect(() => {
     setSelected(null)
@@ -303,7 +308,7 @@ export default function Floorplan({
   }
 
   const changeMovement = (item, movement) => {
-    const previousMovement = item.movement || ''
+    const previousMovement = selectedType === 'camera' ? selectedMovement : (item.movement || '')
     updateSelected({ movement })
     if (selectedType === 'camera') syncShotMovement(item.shotId, movement, previousMovement)
   }
@@ -615,7 +620,7 @@ export default function Floorplan({
                 <>
                   <section className="floorplan-inspector-section">
                     <label htmlFor="object-movement">Movement</label>
-                    <select id="object-movement" className="floorplan-field" value={selectedEntity.movement || 'Static'} onChange={event => changeMovement(selectedEntity, event.target.value)}>
+                    <select id="object-movement" className="floorplan-field" value={selectedMovement} onChange={event => changeMovement(selectedEntity, event.target.value)}>
                       {(selectedType === 'actor' ? ACTOR_MOVEMENTS : selectedType === 'light' ? LIGHT_MOVEMENTS : MOVEMENTS).map(movement => <option key={movement} value={movement}>{movement}</option>)}
                     </select>
                     <button className={'floorplan-path-button' + (tool === 'path' ? ' active' : '')} onClick={() => setTool(tool === 'path' ? 'select' : 'path')} disabled={selectedType === 'room' || selectedType === 'wall'}>
