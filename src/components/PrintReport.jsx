@@ -256,14 +256,15 @@ function PrintFloorplan({ scene, layout }) {
   )
 }
 
-export default function PrintReport({ project, scenes, floorplans }) {
+export default function PrintReport({ project, scenes, floorplans, mode = 'full', orientation = 'portrait' }) {
   const references = (project.visualRefs || []).map((src, index) => ({
     src,
     label: project.visualRefLabels?.[index] || 'Reference ' + (index + 1),
   })).filter(reference => typeof reference.src === 'string' && reference.src.length > 0)
 
   return (
-    <main className="print-report">
+    <main className={'print-report print-mode-' + mode + ' print-orientation-' + orientation}>
+      {mode !== 'floorplan' && (
       <section className="print-cover">
         <div className="print-brand-row">
           <strong className="print-brand">CINEBLOCK</strong>
@@ -311,7 +312,9 @@ export default function PrintReport({ project, scenes, floorplans }) {
         )}
         <div className="print-cover-footer">Generated with CINEBLOCK</div>
       </section>
+      )}
 
+      {mode !== 'floorplan' && (
       <section className="print-shot-list-section">
         <div className="print-section-kicker">SHOT LIST</div>
         <h2>Scenes & Camera Coverage</h2>
@@ -353,8 +356,9 @@ export default function PrintReport({ project, scenes, floorplans }) {
           </section>
         ))}
       </section>
+      )}
 
-      {scenes.map(scene => (
+      {mode !== 'shotlist' && scenes.map(scene => (
         <PrintFloorplan key={'plan-' + scene.id} scene={scene} layout={floorplans?.[scene.id] || {}} />
       ))}
 
