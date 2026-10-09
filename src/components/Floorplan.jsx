@@ -8,7 +8,7 @@ import {
   LENSES as SHOT_LENSES,
   MOVEMENTS as SHOT_MOVEMENTS,
   EQUIPMENT as SHOT_EQUIPMENT,
-} from './ShotList'
+} from '../shotOptions'
 
 const LIGHT_TYPES = ['Key', 'Fill', 'Back / Rim', 'Practical', 'Ambient', 'Special']
 const CAMERA_PATH_MOVEMENTS = new Set([
@@ -641,7 +641,7 @@ export default function Floorplan({
                     {points.length > 1 && (
                       <polyline points={pointString} fill="none" stroke={active ? 'var(--text)' : 'var(--text-muted)'} strokeOpacity={active ? 0.95 : 0.3} strokeWidth={active ? 3 : 2} strokeDasharray={active ? '9 6' : '5 9'} markerEnd="url(#floorplan-arrow)" vectorEffect="non-scaling-stroke" pointerEvents="none" />
                     )}
-                    {(object.path || []).map((point, index) => (
+                    {(showPath ? (object.path || []) : []).map((point, index) => (
                       <circle key={index} cx={point.x} cy={point.y} r={active ? 5 : 3} fill="var(--bg)" stroke={active ? 'var(--text)' : 'var(--text-muted)'} strokeOpacity={active ? 1 : 0.3} strokeWidth="2" vectorEffect="non-scaling-stroke" pointerEvents="none" />
                     ))}
                     <g
