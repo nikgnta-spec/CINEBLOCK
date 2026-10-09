@@ -154,7 +154,7 @@ export default function Floorplan({
 
   const beginObjectDrag = (type, item, event) => {
     event.stopPropagation()
-    if (tool === 'room' || tool === 'wall' || tool === 'path') return
+    if (tool === 'room' || tool === 'wall') return
     const point = getPoint(event)
     dragRef.current = { mode: 'move', type, id: item.id, start: point, original: item }
     svgRef.current?.setPointerCapture?.(event.pointerId)
@@ -345,14 +345,6 @@ export default function Floorplan({
   const objectCount = layout.actors.length + layout.cameras.length + layout.lights.length
   const selectedPath = selectedEntity?.path || []
   const selectedCanHavePath = selectedType === 'actor' || selectedType === 'camera'
-  const selectedAngle = Number(selectedEntity?.angle) || 0
-  const selectedHandlePoint = selectedEntity
-    ? {
-      x: selectedEntity.x + Math.cos((selectedAngle - 90) * Math.PI / 180) * 54,
-      y: selectedEntity.y + Math.sin((selectedAngle - 90) * Math.PI / 180) * 54,
-    }
-    : null
-
   if (!scene) return null
 
   return (
@@ -498,6 +490,7 @@ export default function Floorplan({
                     <g
                       transform={'translate(' + object.x + ' ' + object.y + ')'}
                       onPointerDown={event => beginObjectDrag(type, object, event)}
+                      style={{ cursor: 'grab' }}
                     >
                       {type === 'camera' && (
                         <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
@@ -528,7 +521,7 @@ export default function Floorplan({
                     </g>
 
                     {active && (
-                      <g onPointerDown={event => beginRotate(type, object, event)}>
+                      <g onPointerDown={event => beginRotate(type, object, event)} style={{ cursor: 'grab' }}>
                         <line x1={object.x} y1={object.y} x2={handlePoint.x} y2={handlePoint.y} stroke="var(--text-muted)" strokeWidth="1.5" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" pointerEvents="none" />
                         <circle cx={handlePoint.x} cy={handlePoint.y} r="12" fill="var(--bg)" stroke="var(--text)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
                         <circle cx={handlePoint.x} cy={handlePoint.y} r="3" fill="var(--text)" vectorEffect="non-scaling-stroke" pointerEvents="none" />
