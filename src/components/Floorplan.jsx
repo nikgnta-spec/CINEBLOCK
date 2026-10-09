@@ -108,6 +108,7 @@ export default function Floorplan({
   const normalizedSceneLayoutsRef = useRef(new Set())
   const [tool, setTool] = useState('select')
   const [selected, setSelected] = useState(null)
+  const [selectedWaypoint, setSelectedWaypoint] = useState(null)
   const [drawStart, setDrawStart] = useState(null)
   const [previewPoint, setPreviewPoint] = useState(null)
 
@@ -131,7 +132,9 @@ export default function Floorplan({
 
   useEffect(() => {
     setSelected(null)
+    setSelectedWaypoint(null)
     setTool('select')
+    dragRef.current = null
     setDrawStart(null)
     setPreviewPoint(null)
   }, [scene?.id])
@@ -272,10 +275,31 @@ export default function Floorplan({
   const beginObjectDrag = (type, item, event) => {
     event.stopPropagation()
     if (tool === 'room' || tool === 'wall') return
+    if (tool === 'path') setTool('select')
     const point = getPoint(event)
     dragRef.current = { mode: 'move', type, id: item.id, start: point, original: item }
     svgRef.current?.setPointerCapture?.(event.pointerId)
     setSelected({ type, id: item.id })
+    setSelectedWaypoint(null)
+  }
+
+  const beginWaypointDrag = (type, item, pathIndex, event) => {
+    event.stopPropagation()
+    const point = getPoint(event)
+    const waypoint = (item.path || [])[pathIndex]
+    if (!waypoint) return
+    dragRef.current = {
+      mode: 'waypoint',
+      type,
+      id: item.id,
+      pathIndex,
+      start: point,
+      original: waypoint,
+    }
+    svgRef.current?.setPointerCapture?.(event.pointerId)
+    setSelected({ type, id: item.id })
+    setSelectedWaypoint({ type, id: item.id, index: pathIndex })
+    setTool('select')
   }
 
   const beginRotate = (type, item, event) => {
@@ -291,6 +315,7 @@ export default function Floorplan({
     }
     svgRef.current?.setPointerCapture?.(event.pointerId)
     setSelected({ type, id: item.id })
+    setSelectedWaypoint(null)
   }
 
   const updateLinkedShot = (key, value) => {
@@ -341,11 +366,21 @@ export default function Floorplan({
       setPreviewPoint(point)
       return
     }
-    if (tool === 'path') {
-      appendWaypoint(point)
+    if (tool === 'select') {
+      setSelected(null)
+      setSelectedWaypoint(null)
+    }
+  }
+
+  const handleCanvasClick = event => {
+    if (tool !== 'path') return
+    if (event.target?.closest?.('[data-floorplan-object="true"], [data-floorplan-waypoint="true"]')) return
+    // Double-click finishes the path and returns to Select/Move.
+    if (event.detail > 1) {
+      setTool('select')
       return
     }
-    if (tool === 'select') setSelected(null)
+    appendWaypoint(getPoint(event))
   }
 
   const handleCanvasPointerMove = event => {
@@ -356,6 +391,23 @@ export default function Floorplan({
     }
     const drag = dragRef.current
     if (!drag) return
+
+    if (drag.mode === 'waypoint') {
+      const waypoint = {
+        x: Math.round(clamp(point.x, 0, MAP_WIDTH)),
+        y: Math.round(clamp(point.y, 0, MAP_HEIGHT)),
+      }
+      updateLayout(previous => ({
+        ...previous,
+        [drag.type + 's']: previous[drag.type + 's'].map(item => item.id !== drag.id
+          ? item
+          : {
+            ...item,
+            path: (item.path || []).map((current, index) => index === drag.pathIndex ? waypoint : current),
+          }),
+      }))
+      return
+    }
 
     if (drag.mode === 'rotate') {
       const pointerAngle = Math.atan2(point.y - drag.center.y, point.x - drag.center.x) * 180 / Math.PI
@@ -564,6 +616,7 @@ export default function Floorplan({
               role="img"
               aria-label="Top-down floorplan canvas"
               onPointerDown={handleCanvasPointerDown}
+              onClick={handleCanvasClick}
               onPointerMove={handleCanvasPointerMove}
               onPointerUp={handleCanvasPointerUp}
               onPointerCancel={handleCanvasPointerUp}
@@ -584,7 +637,7 @@ export default function Floorplan({
               <rect width={MAP_WIDTH} height={MAP_HEIGHT} fill="url(#floorplan-grid-large)" />
 
               {layout.rooms.map(room => (
-                <g key={room.id} onPointerDown={event => beginObjectDrag('room', room, event)}>
+                <g key={room.id} data-floorplan-object="true" onPointerDown={event => beginObjectDrag('room', room, event)} onClick={event => event.stopPropagation()}>
                   <rect
                     x={room.x} y={room.y} width={room.width} height={room.height}
                     fill={selected?.type === 'room' && selected.id === room.id ? 'var(--bg-hover)' : 'var(--bg-subtle)'}
@@ -599,7 +652,7 @@ export default function Floorplan({
               ))}
 
               {layout.walls.map(wall => (
-                <g key={wall.id} onPointerDown={event => beginObjectDrag('wall', wall, event)}>
+                <g key={wall.id} data-floorplan-object="true" onPointerDown={event => beginObjectDrag('wall', wall, event)} onClick={event => event.stopPropagation()}>
                   <line
                     x1={wall.x1} y1={wall.y1} x2={wall.x2} y2={wall.y2}
                     stroke={selected?.type === 'wall' && selected.id === wall.id ? 'var(--text)' : 'var(--border-strong)'}
@@ -637,13 +690,32 @@ export default function Floorplan({
                   y: object.y + Math.sin(handleRadians) * 44,
                 }
                 return (
-                  <g key={type + '-' + object.id}>
+                  <g key={type + '-' + object.id} data-floorplan-object="true" onClick={event => event.stopPropagation()}>
                     {points.length > 1 && (
                       <polyline points={pointString} fill="none" stroke={active ? 'var(--text)' : 'var(--text-muted)'} strokeOpacity={active ? 0.95 : 0.3} strokeWidth={active ? 3 : 2} strokeDasharray={active ? '9 6' : '5 9'} markerEnd="url(#floorplan-arrow)" vectorEffect="non-scaling-stroke" pointerEvents="none" />
                     )}
-                    {(showPath ? (object.path || []) : []).map((point, index) => (
-                      <circle key={index} cx={point.x} cy={point.y} r={active ? 5 : 3} fill="var(--bg)" stroke={active ? 'var(--text)' : 'var(--text-muted)'} strokeOpacity={active ? 1 : 0.3} strokeWidth="2" vectorEffect="non-scaling-stroke" pointerEvents="none" />
-                    ))}
+                    {(showPath ? (object.path || []) : []).map((point, index) => {
+                      const pointSelected = selectedWaypoint?.type === type
+                        && selectedWaypoint.id === object.id
+                        && selectedWaypoint.index === index
+                      return (
+                        <circle
+                          key={index}
+                          data-floorplan-waypoint="true"
+                          cx={point.x}
+                          cy={point.y}
+                          r={pointSelected ? 8 : active ? 6 : 4}
+                          fill={pointSelected ? 'var(--text)' : 'var(--bg)'}
+                          stroke="var(--text)"
+                          strokeOpacity={active ? 1 : 0.55}
+                          strokeWidth={pointSelected ? 2.5 : 2}
+                          vectorEffect="non-scaling-stroke"
+                          style={{ cursor: 'grab' }}
+                          onPointerDown={event => beginWaypointDrag(type, object, index, event)}
+                          onClick={event => event.stopPropagation()}
+                        />
+                      )
+                    })}
                     <g
                       transform={'translate(' + object.x + ' ' + object.y + ')'}
                       onPointerDown={event => beginObjectDrag(type, object, event)}
