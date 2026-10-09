@@ -664,13 +664,24 @@ export default function Floorplan({
                         </g>
                       )}
                       {type === 'camera' && (panLeft || panRight || panBoth) && (
-                        <g transform={'rotate(' + (object.angle || 0) + ')'} stroke="var(--text-muted)" strokeWidth="2.5" fill="none" pointerEvents="none">
+                        <g
+                          transform={'rotate(' + (object.angle || 0) + ')'}
+                          stroke="var(--text-muted)"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          fill="none"
+                          pointerEvents="none"
+                        >
                           {panBoth || (panLeft && panRight) ? (
-                            <line x1="-38" y1="-26" x2="38" y2="-26" markerStart="url(#floorplan-arrow)" markerEnd="url(#floorplan-arrow)" />
+                            <path
+                              d="M 31 22 C 56 22 64 -2 51 -19"
+                              markerStart="url(#floorplan-arrow)"
+                              markerEnd="url(#floorplan-arrow)"
+                            />
                           ) : panLeft ? (
-                            <line x1="-4" y1="-26" x2="-42" y2="-26" markerEnd="url(#floorplan-arrow)" />
+                            <path d="M 55 22 C 64 4 59 -9 49 -19" markerEnd="url(#floorplan-arrow)" />
                           ) : (
-                            <line x1="4" y1="-26" x2="42" y2="-26" markerEnd="url(#floorplan-arrow)" />
+                            <path d="M 49 -19 C 59 -9 64 4 55 22" markerEnd="url(#floorplan-arrow)" />
                           )}
                         </g>
                       )}
