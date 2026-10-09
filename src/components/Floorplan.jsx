@@ -483,6 +483,7 @@ export default function Floorplan({
     setHistoryRevision(value => value + 1)
     updateLayout(() => cloneLayoutSnapshot(previous))
     applyEntitySelection([])
+    onSelectedShotIdChange?.('')
   }
 
   const redoLayout = () => {
@@ -497,6 +498,7 @@ export default function Floorplan({
     setHistoryRevision(value => value + 1)
     updateLayout(() => cloneLayoutSnapshot(next))
     applyEntitySelection([])
+    onSelectedShotIdChange?.('')
   }
 
   const deleteSelectedItems = () => {
@@ -624,8 +626,8 @@ export default function Floorplan({
       onSelectedShotIdChange?.(targetShot.id)
     }
 
-    setSelected({ type, id: object.id })
-    setSelectedWaypoint(null)
+    applyEntitySelection([{ type, id: object.id }], { type, id: object.id })
+    if (type !== 'camera') onSelectedShotIdChange?.('')
     setTool('select')
   }
 
@@ -634,6 +636,8 @@ export default function Floorplan({
     event.stopPropagation()
     event.preventDefault()
     const point = getPoint(event)
+    applyEntitySelection([{ type, id: item.id }], { type, id: item.id })
+    if (type !== 'camera') onSelectedShotIdChange?.('')
     beginDragHistory()
     dragRef.current = {
       mode: 'resize',
@@ -654,6 +658,8 @@ export default function Floorplan({
     if (tool === 'pan') return
     event.stopPropagation()
     event.preventDefault()
+    applyEntitySelection([{ type: 'wall', id: wall.id }], { type: 'wall', id: wall.id })
+    onSelectedShotIdChange?.('')
     beginDragHistory()
     dragRef.current = {
       mode: 'wall-endpoint',
@@ -671,8 +677,9 @@ export default function Floorplan({
     if (tool === 'pan') return
 
     if (event.shiftKey) {
+      const wasSelected = selectionRef.current.some(entry => entry.type === type && entry.id === item.id)
       toggleEntitySelection(type, item.id)
-      if (type === 'camera') onSelectedShotIdChange?.(item.shotId || '')
+      if (type === 'camera') onSelectedShotIdChange?.(wasSelected ? '' : (item.shotId || ''))
       return
     }
 
@@ -1148,7 +1155,8 @@ export default function Floorplan({
           label: 'Room ' + padNum(layout.rooms.length + 1),
         }
         updateLayout(previous => ({ ...previous, rooms: [...previous.rooms, room] }))
-        setSelected({ type: 'room', id: room.id })
+        applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id })
+        onSelectedShotIdChange?.('')
         setTool('select')
       } else if (tool === 'wall' && Math.hypot(width, height) >= 8) {
         const wall = {
@@ -1159,7 +1167,8 @@ export default function Floorplan({
           openings: [],
         }
         updateLayout(previous => ({ ...previous, walls: [...previous.walls, wall] }))
-        setSelected({ type: 'wall', id: wall.id })
+        applyEntitySelection([{ type: 'wall', id: wall.id }], { type: 'wall', id: wall.id })
+        onSelectedShotIdChange?.('')
         setTool('select')
       }
     }
