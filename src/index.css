@@ -787,3 +787,161 @@ button:focus-visible,
   .floorplan-inspector-section { padding: 14px 16px; }
   .floorplan-object-browser { padding: 12px; }
 }
+
+
+/* PDF export uses the browser's native print-to-PDF engine. */
+.print-report { display: none; }
+
+@page {
+  size: A4 portrait;
+  margin: 12mm 12mm 14mm;
+}
+
+@media print {
+  html,
+  body,
+  #root {
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  body { color: #111827 !important; }
+  * {
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .app {
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    color: #111827 !important;
+    background: #fff !important;
+  }
+
+  .app > :not(.print-report) { display: none !important; }
+  .app > .print-report {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #111827 !important;
+    background: #fff !important;
+    font-family: Inter, Arial, sans-serif !important;
+    font-size: 9pt;
+    line-height: 1.35;
+  }
+
+  .print-report h1,
+  .print-report h2,
+  .print-report h3,
+  .print-report p,
+  .print-report figure { margin-top: 0; }
+
+  .print-brand-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #111827;
+    margin-bottom: 28px;
+  }
+  .print-brand { font-size: 15pt; letter-spacing: .09em; }
+  .print-brand-row > span {
+    font-size: 7pt;
+    letter-spacing: .12em;
+    color: #4b5563;
+    text-align: right;
+  }
+  .print-section-kicker {
+    margin: 0 0 7px;
+    color: #4b5563;
+    font-size: 7pt;
+    font-weight: 700;
+    letter-spacing: .15em;
+  }
+  .print-cover h1 { margin: 0 0 18px; font-size: 27pt; line-height: 1.08; overflow-wrap: anywhere; }
+  .print-project-meta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 18px;
+    margin-bottom: 18px;
+    border-top: 1px solid #d1d5db;
+  }
+  .print-project-meta > div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 8px 0;
+    border-bottom: 1px solid #e5e7eb;
+    min-width: 0;
+  }
+  .print-project-meta span,
+  .print-shot-fields span {
+    color: #6b7280;
+    font-size: 7pt;
+    text-transform: uppercase;
+    letter-spacing: .035em;
+  }
+  .print-project-meta strong { font-size: 9pt; font-weight: 600; overflow-wrap: anywhere; }
+  .print-copy-block { margin: 16px 0; break-inside: avoid; }
+  .print-copy-block h2,
+  .print-references h2 { margin: 0 0 6px; font-size: 11pt; }
+  .print-copy-block p { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; font-size: 9pt; }
+  .print-references { margin-top: 20px; break-inside: avoid; }
+  .print-reference-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .print-reference-grid figure { min-width: 0; margin: 0; break-inside: avoid; }
+  .print-reference-grid img { display: block; width: 100%; height: 42mm; object-fit: contain; background: #f3f4f6; }
+  .print-reference-grid figcaption { margin-top: 4px; font-size: 7pt; color: #4b5563; overflow-wrap: anywhere; }
+  .print-cover-footer { margin-top: 28px; padding-top: 8px; border-top: 1px solid #d1d5db; font-size: 7pt; color: #6b7280; }
+
+  .print-shot-list-section { break-before: page; }
+  .print-shot-list-section > h2 { margin: 0 0 18px; font-size: 22pt; }
+  .print-scene-shots { margin: 0 0 22px; }
+  .print-scene-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 0;
+    margin: 0 0 8px;
+    border-top: 2px solid #111827;
+    border-bottom: 1px solid #d1d5db;
+    break-after: avoid;
+  }
+  .print-scene-heading h3 { margin: 0 0 3px; font-size: 13pt; overflow-wrap: anywhere; }
+  .print-scene-heading p { margin: 0; color: #4b5563; font-size: 8pt; }
+  .print-scene-heading > span { flex: 0 0 auto; color: #4b5563; font-size: 8pt; }
+  .print-shot-card { margin: 0 0 10px; padding: 9px 10px 8px; border: 1px solid #d1d5db; border-radius: 2px; break-inside: avoid; }
+  .print-shot-heading { display: flex; gap: 8px; align-items: baseline; padding-bottom: 7px; margin-bottom: 7px; border-bottom: 1px solid #e5e7eb; }
+  .print-shot-heading > strong { flex: 0 0 auto; font-size: 10pt; }
+  .print-shot-heading > span { font-size: 10pt; font-weight: 600; overflow-wrap: anywhere; }
+  .print-shot-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 12px; }
+  .print-shot-fields > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .print-shot-fields strong { font-size: 8pt; font-weight: 500; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .print-shot-notes { margin: 9px 0 0; padding-top: 7px; border-top: 1px solid #e5e7eb; font-size: 8pt; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+  .print-plan-page { break-before: page; }
+  .print-plan-page h2 { margin: 0 0 5px; font-size: 20pt; overflow-wrap: anywhere; }
+  .print-scene-meta { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px; color: #4b5563; font-size: 8pt; }
+  .print-scene-meta span { padding: 3px 7px; border: 1px solid #d1d5db; border-radius: 20px; }
+  .print-plan-svg { display: block; width: 100%; height: auto; max-height: 218mm; border: 1px solid #d1d5db; background: #fff; }
+  .print-plan-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 8px 0 0; color: #4b5563; font-size: 7pt; }
+  .print-muted { color: #6b7280; font-size: 8pt; }
+  .print-report-footer { margin-top: 12px; padding-top: 6px; color: #6b7280; border-top: 1px solid #d1d5db; font-size: 7pt; }
+
+  .print-cover-footer,
+  .print-report-footer { display: none; }
+}
+
+@media screen {
+  .print-report { display: none !important; }
+}
