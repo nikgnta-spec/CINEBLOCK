@@ -416,12 +416,16 @@ button:focus-visible,
   color: var(--text);
 }
 .floorplan-tool-button:disabled { opacity: .35; cursor: not-allowed; }
-.floorplan-tool-button.object-actor { color: #8b5cf6; }
-.floorplan-tool-button.object-camera { color: #2563eb; }
-.floorplan-tool-button.object-light { color: #d97706; }
-.floorplan-tool-button.object-actor.active { border-color: #8b5cf6; background: rgba(139,92,246,.08); }
-.floorplan-tool-button.object-camera.active { border-color: #2563eb; background: rgba(37,99,235,.08); }
-.floorplan-tool-button.object-light.active { border-color: #d97706; background: rgba(217,119,6,.08); }
+.floorplan-tool-button.object-actor,
+.floorplan-tool-button.object-camera,
+.floorplan-tool-button.object-light { color: var(--text); }
+.floorplan-tool-button.object-actor.active,
+.floorplan-tool-button.object-camera.active,
+.floorplan-tool-button.object-light.active {
+  border-color: var(--border-strong);
+  background: var(--bg-subtle);
+  color: var(--text);
+}
 .floorplan-tool-divider { width: 1px; height: 30px; flex-shrink: 0; background: var(--border); }
 .floorplan-tool-spacer { flex: 1; min-width: 12px; }
 .floorplan-clear-button:hover { color: var(--danger); }
@@ -481,11 +485,14 @@ button:focus-visible,
   flex: 0 0 42px;
   border-radius: 8px;
 }
-.floorplan-type-icon.actor { color: #8b5cf6; background: rgba(139,92,246,.11); }
-.floorplan-type-icon.camera { color: #2563eb; background: rgba(37,99,235,.11); }
-.floorplan-type-icon.light { color: #d97706; background: rgba(217,119,6,.12); }
+.floorplan-type-icon.actor,
+.floorplan-type-icon.camera,
+.floorplan-type-icon.light,
 .floorplan-type-icon.room,
-.floorplan-type-icon.wall { color: var(--text-muted); background: var(--bg-subtle); }
+.floorplan-type-icon.wall {
+  color: var(--text);
+  background: var(--bg-subtle);
+}
 .floorplan-inspector-title { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 3px; }
 .floorplan-inspector-title strong { font-size: 16px; font-weight: 600; }
 .floorplan-inspector-title span { color: var(--text-muted); font-size: 13px; }
@@ -514,6 +521,11 @@ button:focus-visible,
 }
 .floorplan-link-card span { color: var(--text-muted); font-size: 12px; }
 .floorplan-link-card strong { font-size: 14px; font-weight: 600; }
+.floorplan-shot-data { display: flex; flex-direction: column; gap: 0; margin-top: 4px; border-top: 1px solid var(--border); }
+.floorplan-shot-data > div { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.floorplan-shot-data span { color: var(--text-muted); font-size: 12px; }
+.floorplan-shot-data strong { overflow-wrap: anywhere; color: var(--text); font-size: 13px; font-weight: 500; }
+.floorplan-unlinked { padding: 12px; border-radius: 6px; background: var(--bg-subtle); color: var(--text-muted); font-size: 13px; }
 .floorplan-path-button {
   display: flex;
   align-items: center;
@@ -530,7 +542,11 @@ button:focus-visible,
   text-align: left;
 }
 .floorplan-path-button:hover { background: var(--bg-hover); }
-.floorplan-path-button.active { color: #2563eb; border-color: #2563eb; background: rgba(37,99,235,.06); }
+.floorplan-path-button.active {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--bg-subtle);
+}
 .floorplan-path-button span { display: inline-flex; align-items: center; justify-content: center; min-width: 23px; height: 23px; margin-left: auto; padding: 0 5px; border-radius: 4px; background: var(--bg-subtle); font-size: 12px; }
 .floorplan-remove-path { align-self: flex-start; color: var(--danger); font-size: 13px; padding: 3px 0; }
 .floorplan-remove-path:hover { text-decoration: underline; }
@@ -576,7 +592,7 @@ button:focus-visible,
 .floorplan-object-row:hover { background: var(--bg-hover); }
 .floorplan-object-row .floorplan-type-icon { width: 36px; height: 36px; flex-basis: 36px; }
 .floorplan-object-row-name { flex: 1; min-width: 0; overflow: hidden; font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.floorplan-object-row-type { color: var(--text-muted); font-size: 10px; font-weight: 600; letter-spacing: .06em; }
+.floorplan-object-row-type { color: var(--text-muted); font-size: 11px; font-weight: 500; letter-spacing: .02em; }
 .floorplan-empty-state { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; min-height: 190px; color: var(--text-muted); font-size: 14px; }
 
 @media (max-width: 1120px) {
