@@ -1302,11 +1302,13 @@ export default function Floorplan({
                     <div className="floorplan-size-grid">
                       <label className="floorplan-size-field" htmlFor="room-length">
                         <span>Length (X)</span>
-                        <input id="room-length" type="number" className="floorplan-field" min="40" max={Math.max(40, MAP_WIDTH - selectedEntity.x)} value={selectedEntity.width} onChange={event => updateSelected({ width: clamp(event.target.value, 40, Math.max(40, MAP_WIDTH - selectedEntity.x)) })} />
+                        <input id="room-length" type="number" className="floorplan-field" min="40" max={Math.max(40, MAP_WIDTH - selectedEntity.x)} value={selectedEntity.width} onChange={event => updateSelected({ width: event.target.value === '' ? '' : Number(event.target.value) })}
+                        onBlur={event => updateSelected({ width: Math.round(clamp(event.target.value, 40, Math.max(40, MAP_WIDTH - selectedEntity.x))) })} />
                       </label>
                       <label className="floorplan-size-field" htmlFor="room-width">
                         <span>Width (Y)</span>
-                        <input id="room-width" type="number" className="floorplan-field" min="40" max={Math.max(40, MAP_HEIGHT - selectedEntity.y)} value={selectedEntity.height} onChange={event => updateSelected({ height: clamp(event.target.value, 40, Math.max(40, MAP_HEIGHT - selectedEntity.y)) })} />
+                        <input id="room-width" type="number" className="floorplan-field" min="40" max={Math.max(40, MAP_HEIGHT - selectedEntity.y)} value={selectedEntity.height} onChange={event => updateSelected({ height: event.target.value === '' ? '' : Number(event.target.value) })}
+                        onBlur={event => updateSelected({ height: Math.round(clamp(event.target.value, 40, Math.max(40, MAP_HEIGHT - selectedEntity.y))) })} />
                       </label>
                     </div>
                   </section>
@@ -1332,11 +1334,13 @@ export default function Floorplan({
                     <div className="floorplan-size-grid">
                       <label className="floorplan-size-field" htmlFor="fixture-length">
                         <span>Length</span>
-                        <input id="fixture-length" type="number" className="floorplan-field" min="12" max={Math.max(12, MAP_WIDTH - selectedEntity.x)} value={selectedEntity.width} onChange={event => updateSelected({ width: clamp(event.target.value, 12, Math.min(300, Math.max(12, MAP_WIDTH - selectedEntity.x))) })} />
+                        <input id="fixture-length" type="number" className="floorplan-field" min="12" max={Math.max(12, MAP_WIDTH - selectedEntity.x)} value={selectedEntity.width} onChange={event => updateSelected({ width: event.target.value === '' ? '' : Number(event.target.value) })}
+                        onBlur={event => updateSelected({ width: Math.round(clamp(event.target.value, 12, Math.min(300, Math.max(12, MAP_WIDTH - selectedEntity.x)))) })} />
                       </label>
                       <label className="floorplan-size-field" htmlFor="fixture-width">
                         <span>Width</span>
-                        <input id="fixture-width" type="number" className="floorplan-field" min="8" max={Math.max(8, MAP_HEIGHT - selectedEntity.y)} value={selectedEntity.height} onChange={event => updateSelected({ height: clamp(event.target.value, 8, Math.min(200, Math.max(8, MAP_HEIGHT - selectedEntity.y))) })} />
+                        <input id="fixture-width" type="number" className="floorplan-field" min="8" max={Math.max(8, MAP_HEIGHT - selectedEntity.y)} value={selectedEntity.height} onChange={event => updateSelected({ height: event.target.value === '' ? '' : Number(event.target.value) })}
+                        onBlur={event => updateSelected({ height: Math.round(clamp(event.target.value, 8, Math.min(200, Math.max(8, MAP_HEIGHT - selectedEntity.y)))) })} />
                       </label>
                     </div>
                   </section>
