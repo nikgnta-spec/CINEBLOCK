@@ -232,6 +232,7 @@ export default function ShotList({
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input
                 className="scene-select"
+                aria-label="Scene name"
                 value={scene.name}
                 onChange={e => updateSceneMeta('name', e.target.value)}
                 style={{ border: 'none', fontWeight: 500, fontSize: 13, padding: '4px 0', outline: 'none', background: 'transparent', minWidth: 0 }}
@@ -239,6 +240,7 @@ export default function ShotList({
               <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
               <select
                 className="cell-select"
+                aria-label="Interior or exterior"
                 value={scene.intExt}
                 onChange={e => updateSceneMeta('intExt', e.target.value)}
                 style={{ fontSize: 12, color: 'var(--text-muted)', width: 'auto', padding: '4px 4px' }}
@@ -249,6 +251,7 @@ export default function ShotList({
               </select>
               <input
                 value={scene.location}
+                aria-label="Scene location"
                 onChange={e => updateSceneMeta('location', e.target.value)}
                 placeholder="Location"
                 style={{ fontSize: 12, color: 'var(--text-muted)', border: 'none', outline: 'none', background: 'transparent', width: 140 }}
@@ -256,6 +259,7 @@ export default function ShotList({
               <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
               <select
                 className="cell-select"
+                aria-label="Scene time of day"
                 value={scene.dayNight}
                 onChange={e => updateSceneMeta('dayNight', e.target.value)}
                 style={{ fontSize: 12, color: 'var(--text-muted)', width: 'auto', padding: '4px 4px' }}
@@ -471,6 +475,7 @@ function SelectCell({ value, onChange, options, placeholder }) {
       className="cell-select"
       value={value}
       onChange={e => onChange(e.target.value)}
+      aria-label={placeholder}
     >
       <option value="">{placeholder}</option>
       {options.map(o => <option key={o} value={o}>{o}</option>)}
