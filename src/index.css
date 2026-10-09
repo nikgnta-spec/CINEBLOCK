@@ -621,6 +621,19 @@ button:focus-visible,
   background: var(--bg-subtle);
 }
 .floorplan-path-button span { display: inline-flex; align-items: center; justify-content: center; min-width: 23px; height: 23px; margin-left: auto; padding: 0 5px; border-radius: 4px; background: var(--bg-subtle); font-size: 12px; }
+.floorplan-remove-point {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 7px;
+  margin-top: 2px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 12px;
+}
+.floorplan-remove-point:hover { border-color: var(--danger); color: var(--danger); }
 .floorplan-remove-path { align-self: flex-start; color: var(--danger); font-size: 13px; padding: 3px 0; }
 .floorplan-remove-path:hover { text-decoration: underline; }
 .floorplan-coordinates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
