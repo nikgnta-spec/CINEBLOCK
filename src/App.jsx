@@ -4,7 +4,7 @@ import ProjectInfo from './components/ProjectInfo'
 import ShotList from './components/ShotList'
 import Floorplan from './components/Floorplan'
 import PrintReport from './components/PrintReport'
-import { Download, Upload, Plus, Trash2 } from 'lucide-react'
+import { Download, Upload, Plus, Trash2, X, FileText, PanelsTopLeft, RectangleHorizontal, RectangleVertical } from 'lucide-react'
 import { loadAppState, saveAppState } from './storage'
 
 const TABS = [
@@ -418,7 +418,32 @@ export default function App() {
   const [activeProjectId, setActiveProjectId] = useState('')
   const [hydrated, setHydrated] = useState(false)
   const [saveStatus, setSaveStatus] = useState('loading')
+  const [exportDialogOpen, setExportDialogOpen] = useState(false)
+  const [exportMode, setExportMode] = useState('full')
+  const [exportOrientation, setExportOrientation] = useState('portrait')
+  const [printRequest, setPrintRequest] = useState(false)
+  const printStartedRef = useRef(false)
   const backupInputRef = useRef(null)
+
+  useEffect(() => {
+    if (!printRequest) {
+      printStartedRef.current = false
+      return
+    }
+    if (printStartedRef.current) return
+    printStartedRef.current = true
+
+    let pageStyle = document.getElementById('cineblock-print-page-settings')
+    if (!pageStyle) {
+      pageStyle = document.createElement('style')
+      pageStyle.id = 'cineblock-print-page-settings'
+      document.head.appendChild(pageStyle)
+    }
+    pageStyle.textContent = `@page { size: A4 ${exportOrientation}; margin: 12mm 12mm 14mm; }`
+
+    window.print()
+    setPrintRequest(false)
+  }, [printRequest, exportOrientation])
 
   useEffect(() => {
     let cancelled = false
@@ -700,15 +725,79 @@ export default function App() {
           <button
             className="btn btn-secondary"
             style={{ fontSize: 12 }}
-            onClick={() => window.print()}
+            onClick={() => setExportDialogOpen(true)}
             disabled={!hydrated}
-            title="Open print dialog. Choose Save as PDF to export the report."
+            title="Choose the report sections and page orientation for PDF export."
           >
             <Download size={13} />
             Export PDF
           </button>
         </div>
       </div>
+
+      {exportDialogOpen && (
+        <div
+          className="export-dialog-backdrop"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) setExportDialogOpen(false)
+          }}
+        >
+          <section className="export-dialog" role="dialog" aria-modal="true" aria-labelledby="export-dialog-title">
+            <header className="export-dialog-header">
+              <div>
+                <h2 id="export-dialog-title">Export PDF</h2>
+                <p>Choose what to include and the page orientation.</p>
+              </div>
+              <button className="export-dialog-close" type="button" onClick={() => setExportDialogOpen(false)} aria-label="Close export dialog">
+                <X size={18} />
+              </button>
+            </header>
+
+            <fieldset className="export-choice-group">
+              <legend>Content</legend>
+              <label className={'export-choice-card' + (exportMode === 'shotlist' ? ' selected' : '')}>
+                <input type="radio" name="export-content" value="shotlist" checked={exportMode === 'shotlist'} onChange={() => setExportMode('shotlist')} />
+                <span className="export-choice-icon"><FileText size={20} /></span>
+                <span className="export-choice-copy"><strong>Shot List</strong><small>Project information and every scene's shot details.</small></span>
+              </label>
+              <label className={'export-choice-card' + (exportMode === 'floorplan' ? ' selected' : '')}>
+                <input type="radio" name="export-content" value="floorplan" checked={exportMode === 'floorplan'} onChange={() => setExportMode('floorplan')} />
+                <span className="export-choice-icon"><PanelsTopLeft size={20} /></span>
+                <span className="export-choice-copy"><strong>Floorplan</strong><small>Floorplan pages for each scene.</small></span>
+              </label>
+              <label className={'export-choice-card' + (exportMode === 'full' ? ' selected' : '')}>
+                <input type="radio" name="export-content" value="full" checked={exportMode === 'full'} onChange={() => setExportMode('full')} />
+                <span className="export-choice-icon"><FileText size={20} /></span>
+                <span className="export-choice-copy"><strong>Full Report</strong><small>Project information, Shot List, and Floorplan.</small></span>
+              </label>
+            </fieldset>
+
+            <fieldset className="export-choice-group export-orientation-group">
+              <legend>Page orientation</legend>
+              <label className={'export-orientation-card' + (exportOrientation === 'portrait' ? ' selected' : '')}>
+                <input type="radio" name="export-orientation" value="portrait" checked={exportOrientation === 'portrait'} onChange={() => setExportOrientation('portrait')} />
+                <RectangleVertical size={23} />
+                <span><strong>Portrait</strong><small>Vertical page</small></span>
+              </label>
+              <label className={'export-orientation-card' + (exportOrientation === 'landscape' ? ' selected' : '')}>
+                <input type="radio" name="export-orientation" value="landscape" checked={exportOrientation === 'landscape'} onChange={() => setExportOrientation('landscape')} />
+                <RectangleHorizontal size={27} />
+                <span><strong>Landscape</strong><small>Horizontal page</small></span>
+              </label>
+            </fieldset>
+
+            <footer className="export-dialog-footer">
+              <button className="btn btn-secondary" type="button" onClick={() => setExportDialogOpen(false)}>Cancel</button>
+              <button className="btn btn-primary" type="button" onClick={() => {
+                setExportDialogOpen(false)
+                setPrintRequest(true)
+              }}>
+                <Download size={14} /> Export PDF
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
 
       <div className="tabs">
         {TABS.map(t => (
@@ -755,7 +844,7 @@ export default function App() {
           </>
         )}
       </div>
-      {hydrated && <PrintReport project={project} scenes={scenes} floorplans={floorplans} />}
+      {hydrated && <PrintReport project={project} scenes={scenes} floorplans={floorplans} mode={exportMode} orientation={exportOrientation} />}
     </div>
   )
 }
