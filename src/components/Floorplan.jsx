@@ -69,6 +69,7 @@ const getOpeningSymbol = (opening, width) => (
     : `M ${-width / 2} -4 H ${width / 2} M ${-width / 2} 0 H ${width / 2} M ${-width / 2} 4 H ${width / 2} M ${-width / 2} -7 V 7 M ${width / 2} -7 V 7`
 )
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0))
+const formatMeters = value => (Math.max(0, Number(value) || 0) / 100).toFixed(2) + ' m'
 const makeId = () => crypto.randomUUID()
 const padNum = number => String(number).padStart(2, '0')
 const normalizeAngle = angle => ((angle % 360) + 360) % 360
@@ -585,21 +586,38 @@ export default function Floorplan({
       const host = (layout[collection] || []).find(item => item.id === drag.id)
       const opening = host?.openings?.find(item => item.id === drag.openingId)
       if (!host || !opening) return
-      let offset = 0.5
+
+      let patch = {}
       let length = 1
+      let offset = 0.5
       if (drag.type === 'wall') {
         const metrics = getWallMetrics(host)
         length = metrics.length || 1
         offset = ((point.x - host.x1) * metrics.ux + (point.y - host.y1) * metrics.uy) / length
       } else {
-        const placement = getRoomOpeningPlacement(host, opening)
-        length = placement.length || 1
-        offset = ['top', 'bottom'].includes(opening.side || 'bottom')
-          ? (point.x - host.x) / length
-          : (point.y - host.y) / length
+        const edges = [
+          { side: 'top', x1: host.x, y1: host.y, x2: host.x + host.width, y2: host.y },
+          { side: 'right', x1: host.x + host.width, y1: host.y, x2: host.x + host.width, y2: host.y + host.height },
+          { side: 'bottom', x1: host.x, y1: host.y + host.height, x2: host.x + host.width, y2: host.y + host.height },
+          { side: 'left', x1: host.x, y1: host.y, x2: host.x, y2: host.y + host.height },
+        ]
+        const projectedEdges = edges.map(edge => {
+          const projection = getWallMetrics({ x1: edge.x1, y1: edge.y1, x2: edge.x2, y2: edge.y2 })
+          const edgeLength = projection.length || 1
+          const rawOffset = ((point.x - edge.x1) * projection.ux + (point.y - edge.y1) * projection.uy) / edgeLength
+          const clampedOffset = clamp(rawOffset, 0, 1)
+          const projectedX = edge.x1 + projection.ux * edgeLength * clampedOffset
+          const projectedY = edge.y1 + projection.uy * edgeLength * clampedOffset
+          return { ...edge, length: edgeLength, offset: rawOffset, distance: Math.hypot(point.x - projectedX, point.y - projectedY) }
+        })
+        const nearestEdge = projectedEdges.reduce((best, edge) => edge.distance < best.distance ? edge : best)
+        length = nearestEdge.length
+        offset = nearestEdge.offset
+        patch.side = nearestEdge.side
       }
-      const minimumOffset = Math.min(0.49, (Number(opening.width) || 48) / (2 * length))
-      const nextOffset = clamp(offset, minimumOffset, 1 - minimumOffset)
+      const openingWidth = Math.min(Number(opening.width) || 48, length)
+      const minimumOffset = Math.min(0.49, openingWidth / (2 * length))
+      patch.offset = clamp(offset, minimumOffset, 1 - minimumOffset)
       updateLayout(previous => ({
         ...previous,
         [collection]: previous[collection].map(item => item.id !== drag.id
@@ -607,7 +625,7 @@ export default function Floorplan({
           : {
             ...item,
             openings: (item.openings || []).map(entry => entry.id === drag.openingId
-              ? { ...entry, offset: nextOffset }
+              ? { ...entry, ...patch }
               : entry),
           }),
       }))
@@ -1622,8 +1640,8 @@ export default function Floorplan({
                   <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Dimensions</div>
                     <div className="floorplan-dimension-summary">
-                      <div><span>Length</span><strong>{Math.round(Number(selectedEntity.width) || 0)} units</strong></div>
-                      <div><span>Width</span><strong>{Math.round(Number(selectedEntity.height) || 0)} units</strong></div>
+                      <div><span>Length</span><strong>{formatMeters(selectedEntity.width)}</strong></div>
+                      <div><span>Width</span><strong>{formatMeters(selectedEntity.height)}</strong></div>
                     </div>
                   </section>
                   <section className="floorplan-inspector-section">
@@ -1635,9 +1653,7 @@ export default function Floorplan({
                     {(selectedEntity.openings || []).map(opening => (
                       <div className="floorplan-opening-row" key={opening.id}>
                         <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Door' : 'Window'}</span>
-                        <select className="floorplan-field" aria-label={'Opening wall side'} value={ROOM_SIDES.some(side => side.value === opening.side) ? opening.side : 'bottom'} onChange={event => updateOpening(opening.id, { side: event.target.value })}>
-                          {ROOM_SIDES.map(side => <option key={side.value} value={side.value}>{side.label}</option>)}
-                        </select>
+                        <span className="floorplan-opening-hint">Drag to move</span>
                         <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} title="Remove opening" aria-label="Remove opening"><X size={15} /></button>
                       </div>
                     ))}
@@ -1650,8 +1666,8 @@ export default function Floorplan({
                   <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Dimensions</div>
                     <div className="floorplan-dimension-summary">
-                      <div><span>Length</span><strong>{Math.round(getWallMetrics(selectedEntity).length)} units</strong></div>
-                      <div><span>Width</span><strong>{Math.round(Number(selectedEntity.thickness) || 6)} units</strong></div>
+                      <div><span>Length</span><strong>{formatMeters(getWallMetrics(selectedEntity).length)}</strong></div>
+                      <div><span>Width</span><strong>{formatMeters(Number(selectedEntity.thickness) || 6)}</strong></div>
                     </div>
                   </section>
                   <section className="floorplan-inspector-section">
