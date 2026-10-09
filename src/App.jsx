@@ -51,7 +51,13 @@ function normalizeSavedScenes(savedScenes) {
           ...shot,
           movements: Array.isArray(shot.movements) ? shot.movements : [],
           // Keep projects created before the Support -> Equipment rename readable.
-          equipment: shot.equipment ?? shot.support ?? '',
+          equipment: Array.isArray(shot.equipment)
+            ? shot.equipment
+            : shot.equipment
+              ? [shot.equipment]
+              : shot.support
+                ? [shot.support]
+                : [],
         }))
       : [],
   }))
@@ -75,7 +81,7 @@ const defaultShot = (num) => ({
   angle: '',
   lens: '',
   movements: [],
-  equipment: '',
+  equipment: [],
   sound: '',
   take: '',
   script: '',
