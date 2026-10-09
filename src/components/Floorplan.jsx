@@ -129,8 +129,8 @@ function formatFov(focalRange) {
   if (!focalRange) return ''
   const widest = horizontalFovDegrees(focalRange.min)
   const narrowest = horizontalFovDegrees(focalRange.max)
-  if (focalRange.min === focalRange.max) return widest.toFixed(1) + '° horizontal'
-  return widest.toFixed(1) + '°–' + narrowest.toFixed(1) + '° horizontal'
+  if (focalRange.min === focalRange.max) return widest.toFixed(1) + '°'
+  return widest.toFixed(1) + '° → ' + narrowest.toFixed(1) + '°'
 }
 
 function renumberShots(shots) {
@@ -757,7 +757,6 @@ export default function Floorplan({
                   narrowPath: focalRange.max > focalRange.min
                     ? fovSectorPath(horizontalFovDegrees(focalRange.max))
                     : null,
-                  label: formatFov(focalRange),
                 } : null
                 const shotMovements = shot?.movements || []
                 const cameraCanHavePath = type === 'camera' && shotMovements.some(movement => CAMERA_PATH_MOVEMENTS.has(movement))
