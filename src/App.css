@@ -343,3 +343,8 @@
 .export-choice-card input, .export-orientation-card input { accent-color: var(--accent); }
 .export-choice-icon { background: var(--bg-hover); color: var(--accent); }
 .export-dialog-close:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+
+@media print {
+  .storyboard-preview-backdrop { display:none !important; }
+}

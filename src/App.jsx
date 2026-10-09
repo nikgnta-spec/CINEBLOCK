@@ -123,6 +123,12 @@ function normalizeSavedScenes(savedScenes) {
           ? [...new Set(sourceShot.movements.filter(item => typeof item === 'string'))]
           : [],
         equipment: [...new Set(legacyEquipment.filter(item => typeof item === 'string'))],
+        status: ['planned', 'done', 'skip'].includes(sourceShot.status) ? sourceShot.status : 'planned',
+        storyboardImage: typeof sourceShot.storyboardImage === 'string'
+          && sourceShot.storyboardImage.length <= 2500000
+          && /^data:image\/(?:jpeg|png|webp);base64,/i.test(sourceShot.storyboardImage)
+          ? sourceShot.storyboardImage
+          : '',
         sound: stringField('sound', 100),
         take: stringField('take', 100),
         script: stringField('script', 100),
@@ -165,6 +171,8 @@ const defaultShot = (num, cameraDefault = '') => ({
   lens: '',
   movements: [],
   equipment: [],
+  status: 'planned',
+  storyboardImage: '',
   sound: '',
   take: '',
   script: '',

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import SceneNavigator from './SceneNavigator'
 import { SIZES, ANGLES, LENSES, MOVEMENTS, EQUIPMENT } from '../shotOptions'
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Trash2, Copy } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Trash2, Copy, Check, CircleSlash, ImagePlus, LayoutGrid, List, Eye } from 'lucide-react'
 
 
 
@@ -44,6 +44,48 @@ function formatDuration(value) {
   return minutes + ' mnt'
 }
 
+async function prepareStoryboardImage(file) {
+  if (!file) return ''
+  if (!file.type.startsWith('image/')) throw new Error('Pilih file gambar untuk storyboard.')
+  if (file.size > 12 * 1024 * 1024) throw new Error('Ukuran gambar maksimal 12 MB.')
+
+  const sourceUrl = URL.createObjectURL(file)
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const element = new Image()
+      element.onload = () => resolve(element)
+      element.onerror = () => reject(new Error('Gambar tidak bisa dibuka. Coba file gambar lain.'))
+      element.src = sourceUrl
+    })
+    const maxDimension = 1000
+    const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Browser tidak bisa memproses gambar ini.')
+    context.fillStyle = '#ffffff'
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.drawImage(image, 0, 0, canvas.width, canvas.height)
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.82))
+    if (!blob) throw new Error('Gambar tidak bisa diproses.')
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Gambar tidak bisa disimpan.'))
+      reader.onerror = () => reject(new Error('Gambar tidak bisa disimpan.'))
+      reader.readAsDataURL(blob)
+    })
+  } finally {
+    URL.revokeObjectURL(sourceUrl)
+  }
+}
+
+function statusLabel(status) {
+  if (status === 'done') return 'Done'
+  if (status === 'skip') return 'Skip'
+  return 'Rencana'
+}
+
 export default function ShotList({
   scenes,
   onChange,
@@ -57,11 +99,22 @@ export default function ShotList({
   onFloorplansChange,
   onSelectedShotIdChange,
 }) {
+  const [viewMode, setViewMode] = useState('table')
+  const [previewShot, setPreviewShot] = useState(null)
   const matchingIdx = scenes.findIndex(s => s.id === activeSceneId)
   const activeIdx = matchingIdx >= 0 ? matchingIdx : 0
   const scene = scenes[activeIdx]
   const totalSetupMinutes = scene.shots.reduce((sum, shot) => sum + durationMinutes(shot.setup), 0)
   const totalShootMinutes = scene.shots.reduce((sum, shot) => sum + durationMinutes(shot.estShoot), 0)
+
+  useEffect(() => {
+    if (!previewShot) return
+    const closeOnEscape = event => {
+      if (event.key === 'Escape') setPreviewShot(null)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [previewShot])
 
   useEffect(() => {
     if (!selectedShotId || !scene?.shots.some(shot => shot.id === selectedShotId)) return
@@ -146,6 +199,27 @@ export default function ShotList({
       ...s,
       shots: s.shots.map(sh => sh.id === shotId ? { ...sh, [key]: val } : sh)
     }))
+  }
+
+  const handleStoryboardUpload = async (shotId, file) => {
+    if (!file) return
+    try {
+      const image = await prepareStoryboardImage(file)
+      updateShot(shotId, 'storyboardImage', image)
+    } catch (error) {
+      window.alert(error.message || 'Storyboard tidak dapat ditambahkan.')
+    }
+  }
+
+  const removeStoryboard = shotId => {
+    updateShot(shotId, 'storyboardImage', '')
+    setPreviewShot(current => current?.id === shotId ? null : current)
+  }
+
+  const setShotStatus = (shotId, nextStatus) => {
+    const current = scene.shots.find(shot => shot.id === shotId)
+    if (!current) return
+    updateShot(shotId, 'status', current.status === nextStatus ? 'planned' : nextStatus)
   }
 
   const deleteShot = (shotId) => {
@@ -269,7 +343,15 @@ export default function ShotList({
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="shotlist-toolbar-actions">
+          <div className="shot-view-toggle" role="group" aria-label="Tampilan Shot List">
+            <button type="button" className={'shot-view-toggle-button' + (viewMode === 'table' ? ' active' : '')} onClick={() => setViewMode('table')} aria-pressed={viewMode === 'table'}>
+              <List size={15} /><span>Tabel</span>
+            </button>
+            <button type="button" className={'shot-view-toggle-button' + (viewMode === 'storyboard' ? ' active' : '')} onClick={() => setViewMode('storyboard')} aria-pressed={viewMode === 'storyboard'}>
+              <LayoutGrid size={15} /><span>Storyboard</span>
+            </button>
+          </div>
           <button
             className="btn btn-secondary"
             onClick={() => deleteScene(activeIdx)}
@@ -291,6 +373,7 @@ export default function ShotList({
           onRenameScene={onRenameScene}
         />
 
+        {viewMode === 'table' ? (
         <div className="shot-table-wrap">
           <datalist id="lens-options">
             {LENSES.map(option => <option key={option} value={option} />)}
@@ -300,6 +383,8 @@ export default function ShotList({
               <tr>
                 <th style={{ width: 62 }}>Shot</th>
                 <th style={{ minWidth: 160 }}>Subjek</th>
+                <th style={{ width: 138 }}>Status</th>
+                <th style={{ width: 140 }}>Storyboard</th>
                 <th style={{ width: 104 }}>Ukuran</th>
                 <th style={{ width: 126 }}>Kamera</th>
                 <th style={{ width: 110 }}>Angle</th>
@@ -321,6 +406,18 @@ export default function ShotList({
                   <td><div className="shot-num">{shot.num}</div></td>
                   <td>
                     <input className="cell-input" value={shot.subject} onChange={e => updateShot(shot.id, 'subject', e.target.value)} placeholder="Subjek" />
+                  </td>
+                  <td>
+                    <ShotStatusControls shot={shot} onSetStatus={nextStatus => setShotStatus(shot.id, nextStatus)} />
+                  </td>
+                  <td>
+                    <StoryboardControl
+                      shot={shot}
+                      onUpload={file => handleStoryboardUpload(shot.id, file)}
+                      onRemove={() => removeStoryboard(shot.id)}
+                      onPreview={() => setPreviewShot(shot)}
+                      compact
+                    />
                   </td>
                   <td>
                     <SelectCell value={shot.size} onChange={v => updateShot(shot.id, 'size', v)} options={SIZES} placeholder="Ukuran" />
@@ -442,7 +539,7 @@ export default function ShotList({
                 </tr>
               ))}
               <tr className="add-shot-row">
-                <td colSpan={15}>
+                <td colSpan={17}>
                   <button className="add-shot-btn" onClick={addShot}>
                     <Plus size={13} /> Tambah Shot
                   </button>
@@ -451,7 +548,84 @@ export default function ShotList({
             </tbody>
           </table>
         </div>
+        ) : (
+          <div className="storyboard-grid">
+            {scene.shots.map(shot => (
+              <article key={shot.id} className={'storyboard-card' + (selectedShotId === shot.id ? ' is-selected' : '')}>
+                <header className="storyboard-card-header">
+                  <button type="button" className="storyboard-card-select" onClick={() => onSelectedShotIdChange?.(shot.id)}>
+                    <span className="storyboard-card-number">{shot.num}</span>
+                    <span className="storyboard-card-title">{shot.subject || 'Subjek belum diisi'}</span>
+                  </button>
+                  <ShotStatusControls shot={shot} onSetStatus={nextStatus => setShotStatus(shot.id, nextStatus)} />
+                </header>
+                <StoryboardControl
+                  shot={shot}
+                  onUpload={file => handleStoryboardUpload(shot.id, file)}
+                  onRemove={() => removeStoryboard(shot.id)}
+                  onPreview={() => setPreviewShot(shot)}
+                />
+                <div className="storyboard-card-details">
+                  <span><small>Ukuran</small><strong>{shot.size || '—'}</strong></span>
+                  <span><small>Kamera</small><strong>{shot.camera || '—'}</strong></span>
+                  <span><small>Lens</small><strong>{shot.lens || '—'}</strong></span>
+                  <span><small>Angle</small><strong>{shot.angle || '—'}</strong></span>
+                  <span><small>Movement</small><strong>{(shot.movements || []).map(item => item === 'Handheld Movement' ? 'Handheld' : item).join(', ') || '—'}</strong></span>
+                </div>
+                {shot.notes && <p className="storyboard-card-notes">{shot.notes}</p>}
+              </article>
+            ))}
+            <button type="button" className="storyboard-add-card" onClick={addShot}>
+              <Plus size={18} /><span>Tambah shot</span>
+            </button>
+          </div>
+        )}
+        {previewShot?.storyboardImage && (
+          <div className="storyboard-preview-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setPreviewShot(null) }}>
+            <section className="storyboard-preview-dialog" role="dialog" aria-modal="true" aria-label={'Storyboard shot ' + previewShot.num}>
+              <header>
+                <div><span>STORYBOARD · {previewShot.num}</span><h2>{previewShot.subject || 'Subjek belum diisi'}</h2></div>
+                <button type="button" className="storyboard-preview-close" onClick={() => setPreviewShot(null)} aria-label="Tutup preview storyboard"><X size={18} /></button>
+              </header>
+              <img src={previewShot.storyboardImage} alt={'Storyboard shot ' + previewShot.num} />
+              <footer><span>Status: {statusLabel(previewShot.status)}</span><button type="button" className="btn btn-secondary" onClick={() => { setPreviewShot(null); setViewMode('table') }}><Eye size={14} /> Kembali ke tabel</button></footer>
+            </section>
+          </div>
+        )}
       </div>
+    </div>
+  )
+}
+
+function ShotStatusControls({ shot, onSetStatus }) {
+  const status = ['done', 'skip'].includes(shot.status) ? shot.status : 'planned'
+  return (
+    <div className="shot-status-controls" role="group" aria-label={'Status shot ' + shot.num}>
+      <button type="button" className={'shot-status-button is-done' + (status === 'done' ? ' active' : '')} aria-pressed={status === 'done'} onClick={() => onSetStatus('done')} title="Tandai shot selesai">
+        <Check size={13} /><span>Done</span>
+      </button>
+      <button type="button" className={'shot-status-button is-skip' + (status === 'skip' ? ' active' : '')} aria-pressed={status === 'skip'} onClick={() => onSetStatus('skip')} title="Tandai shot dilewati">
+        <CircleSlash size={13} /><span>Skip</span>
+      </button>
+    </div>
+  )
+}
+
+function StoryboardControl({ shot, onUpload, onRemove, onPreview, compact = false }) {
+  return (
+    <div className={'storyboard-control' + (compact ? ' is-compact' : '')}>
+      {shot.storyboardImage ? (
+        <button type="button" className="storyboard-thumb-button" onClick={onPreview} title={'Lihat storyboard shot ' + shot.num} aria-label={'Lihat storyboard shot ' + shot.num}>
+          <img src={shot.storyboardImage} alt={'Storyboard shot ' + shot.num} loading="lazy" />
+        </button>
+      ) : (
+        <span className="storyboard-empty-thumb" aria-hidden="true"><ImagePlus size={18} /></span>
+      )}
+      <label className="storyboard-upload-button" title={shot.storyboardImage ? 'Ganti gambar storyboard' : 'Tambah gambar storyboard'}>
+        <ImagePlus size={14} /><span>{compact ? (shot.storyboardImage ? 'Ganti' : 'Tambah') : (shot.storyboardImage ? 'Ganti gambar' : 'Tambah gambar')}</span>
+        <input type="file" accept="image/*" aria-label={'Unggah storyboard shot ' + shot.num} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) onUpload(file) }} />
+      </label>
+      {shot.storyboardImage && <button type="button" className="storyboard-remove-button" onClick={onRemove} title="Hapus gambar storyboard" aria-label={'Hapus storyboard shot ' + shot.num}><X size={13} /></button>}
     </div>
   )
 }

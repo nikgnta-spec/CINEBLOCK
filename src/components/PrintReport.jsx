@@ -340,6 +340,7 @@ export default function PrintReport({ project, scenes, floorplans, mode = 'full'
                     <div><span>Size</span><strong>{display(shot.size)}</strong></div>
                     <div><span>Camera</span><strong>{display(shot.camera)}</strong></div>
                     <div><span>Angle</span><strong>{display(shot.angle)}</strong></div>
+                    <div><span>Status</span><strong>{shot.status === 'done' ? 'Done' : shot.status === 'skip' ? 'Skip' : 'Planned'}</strong></div>
                     <div><span>Lens</span><strong>{display(shot.lens)}</strong></div>
                     <div><span>Movement</span><strong>{display(shot.movements)}</strong></div>
                     <div><span>Equipment</span><strong>{display(shot.equipment)}</strong></div>
@@ -349,6 +350,12 @@ export default function PrintReport({ project, scenes, floorplans, mode = 'full'
                     <div><span>Setup</span><strong>{display(shot.setup)}</strong></div>
                     <div><span>Est. Shoot</span><strong>{display(shot.estShoot)}</strong></div>
                   </div>
+                  {shot.storyboardImage && (
+                    <figure className="print-storyboard">
+                      <img src={shot.storyboardImage} alt={'Storyboard shot ' + (shot.num || shotIndex + 1)} />
+                      <figcaption>Storyboard · {shot.num || String(shotIndex + 1).padStart(3, '0')}</figcaption>
+                    </figure>
+                  )}
                   {shot.notes && <p className="print-shot-notes"><strong>Notes:</strong> {shot.notes}</p>}
                 </article>
               ))
