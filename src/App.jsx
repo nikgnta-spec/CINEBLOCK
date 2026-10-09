@@ -3,6 +3,7 @@ import './App.css'
 import ProjectInfo from './components/ProjectInfo'
 import ShotList from './components/ShotList'
 import { Download } from 'lucide-react'
+import { loadAppState, saveAppState } from './storage'
 
 const TABS = [
   { id: 'project', label: 'Project Info' },
@@ -23,22 +24,6 @@ const defaultProject = {
   visualApproach: '',
   lightingApproach: '',
   visualRefs: [null, null, null, null, null, null],
-}
-
-const STORAGE_KEY = 'cineblock.app-state.v1'
-
-function readSavedState() {
-  try {
-    const saved = window.localStorage.getItem(STORAGE_KEY)
-    if (!saved) return null
-
-    const parsed = JSON.parse(saved)
-    if (!parsed || typeof parsed !== 'object') return null
-    return parsed
-  } catch (error) {
-    console.warn('CINEBLOCK could not read saved data:', error)
-    return null
-  }
 }
 
 function normalizeSavedProject(savedProject) {
@@ -100,28 +85,70 @@ const defaultShot = (num) => ({
 })
 
 export default function App() {
-  const [savedState] = useState(() => readSavedState())
-  const [tab, setTab] = useState(() => (
-    savedState?.tab === 'shotlist' ? 'shotlist' : 'project'
-  ))
-  const [project, setProject] = useState(() => normalizeSavedProject(savedState?.project))
-  const [scenes, setScenes] = useState(() => normalizeSavedScenes(savedState?.scenes) || [defaultScene(1)])
-  const [saveStatus, setSaveStatus] = useState('saved')
+  const [tab, setTab] = useState('project')
+  const [project, setProject] = useState(defaultProject)
+  const [scenes, setScenes] = useState(() => [defaultScene(1)])
+  const [activeSceneId, setActiveSceneId] = useState('')
+  const [hydrated, setHydrated] = useState(false)
+  const [saveStatus, setSaveStatus] = useState('loading')
 
   useEffect(() => {
+    let cancelled = false
+
+    loadAppState()
+      .then(savedState => {
+        if (cancelled) return
+
+        if (savedState?.project) {
+          setProject(normalizeSavedProject(savedState.project))
+        }
+
+        const restoredScenes = normalizeSavedScenes(savedState?.scenes)
+        if (restoredScenes) {
+          setScenes(restoredScenes)
+        }
+
+        if (savedState?.tab === 'shotlist' || savedState?.tab === 'project') {
+          setTab(savedState.tab)
+        }
+
+        setActiveSceneId(
+          savedState?.activeSceneId
+            || restoredScenes?.[0]?.id
+            || '',
+        )
+        setSaveStatus('saved')
+        setHydrated(true)
+      })
+      .catch(error => {
+        console.error('CINEBLOCK could not restore local data:', error)
+        if (!cancelled) {
+          setSaveStatus('error')
+          setHydrated(true)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!hydrated) return undefined
+
     setSaveStatus('saving')
-    const timeout = window.setTimeout(() => {
+    const timeout = window.setTimeout(async () => {
       try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ tab, project, scenes }))
+        await saveAppState({ tab, project, scenes, activeSceneId })
         setSaveStatus('saved')
       } catch (error) {
         console.error('CINEBLOCK could not save data:', error)
         setSaveStatus('error')
       }
-    }, 300)
+    }, 250)
 
     return () => window.clearTimeout(timeout)
-  }, [tab, project, scenes])
+  }, [hydrated, tab, project, scenes, activeSceneId])
 
   return (
     <div className="app">
@@ -136,7 +163,7 @@ export default function App() {
         <div className="topbar-right">
           <span
             aria-live="polite"
-            title="Project and shot list data are saved in this browser"
+            title="Project, shot list, active tab, and active scene are saved on this device"
             style={{ fontSize: 11, color: 'var(--text-muted)' }}
           >
             {saveStatus === 'saving'
@@ -172,6 +199,8 @@ export default function App() {
           <ShotList
             scenes={scenes}
             onChange={setScenes}
+            activeSceneId={activeSceneId}
+            onActiveSceneChange={setActiveSceneId}
             defaultShot={defaultShot}
             defaultScene={defaultScene}
           />
