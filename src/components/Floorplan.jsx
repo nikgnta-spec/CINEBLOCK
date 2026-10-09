@@ -195,6 +195,7 @@ export default function Floorplan({
   const layout = scene ? (floorplans?.[scene.id] || EMPTY_LAYOUT) : EMPTY_LAYOUT
   const allObjects = [
     ...layout.rooms.map(item => ({ ...item, entityType: 'room' })),
+    ...layout.walls.map(item => ({ ...item, entityType: 'wall' })),
     ...layout.doors.map(item => ({ ...item, entityType: 'door' })),
     ...layout.windows.map(item => ({ ...item, entityType: 'window' })),
     ...layout.props.map(item => ({ ...item, entityType: 'prop' })),
@@ -627,7 +628,7 @@ export default function Floorplan({
   }
 
   const clearLayout = () => {
-    if (!window.confirm('Clear this scene’s floorplan, actors, cameras and lighting?')) return
+    if (!window.confirm('Clear this scene’s rooms, walls, doors, windows, props, actors, cameras and lighting?')) return
     updateLayout(() => ({ ...EMPTY_LAYOUT }))
     setSelected(null)
     setSelectedWaypoint(null)
@@ -771,8 +772,8 @@ export default function Floorplan({
                     x={room.x} y={room.y} width={room.width} height={room.height}
                     fill={selected?.type === 'room' && selected.id === room.id ? 'var(--bg-hover)' : 'var(--bg-subtle)'}
                     stroke={selected?.type === 'room' && selected.id === room.id ? 'var(--text)' : 'var(--border-strong)'}
-                    strokeWidth={selected?.type === 'room' && selected.id === room.id ? 3 : 2}
-                    strokeDasharray="7 4" vectorEffect="non-scaling-stroke"
+                    strokeWidth={selected?.type === 'room' && selected.id === room.id ? 3.5 : 2.5}
+                    vectorEffect="non-scaling-stroke"
                   />
                   <text x={room.x + 12} y={room.y + 28} fill="var(--text)" fontSize="18" fontWeight="600" pointerEvents="none">
                     {room.label || 'Room'}
