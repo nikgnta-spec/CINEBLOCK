@@ -1,23 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  MousePointer2, Square, Minus, PersonStanding, Camera, Sun, Route,
-  Trash2, RotateCw, Plus, Layers2,
+  MousePointer2, Square, Minus, UserRound, Camera, Lightbulb, Route,
+  Trash2, Plus, Layers2,
 } from 'lucide-react'
 
-const MOVEMENTS = [
-  'Static', 'Pan', 'Pan Left', 'Pan Right', 'Whip Pan',
-  'Tilt Up', 'Tilt Down', 'Dutch Roll', 'Pedestal Up', 'Pedestal Down',
-  'Dolly In', 'Dolly Out', 'Truck Left', 'Truck Right', 'Tracking Shot',
-  'Follow', 'Lead', 'Arc', 'Orbit', 'Crane Up', 'Crane Down',
-  'Jib Up', 'Jib Down', 'Zoom In', 'Zoom Out', 'Dolly Zoom',
-  'Push In', 'Pull Out', 'Rack Focus', 'Roll', 'Reveal', 'Reframe',
-  'Handheld Movement', 'POV Movement', '360 Orbit', 'Blocking',
-]
-const ACTOR_MOVEMENTS = [
-  'Static', 'Walk', 'Run', 'Enter', 'Exit', 'Cross', 'Sit', 'Stand',
-  'Turn', 'Reach', 'Fight', 'Blocking', 'Follow', 'Lead',
-]
-const LIGHT_MOVEMENTS = ['Static', 'Pan', 'Tilt Up', 'Tilt Down', 'Follow', 'Tracking Shot']
 const LIGHT_TYPES = ['Key', 'Fill', 'Back / Rim', 'Practical', 'Ambient', 'Special']
 const MAP_WIDTH = 1000
 const MAP_HEIGHT = 650
@@ -25,6 +11,7 @@ const EMPTY_LAYOUT = { rooms: [], walls: [], actors: [], cameras: [], lights: []
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0))
 const makeId = () => crypto.randomUUID()
 const padNum = number => String(number).padStart(2, '0')
+const normalizeAngle = angle => ((angle % 360) + 360) % 360
 
 function renumberShots(shots) {
   return shots.map((shot, index) => ({ ...shot, num: String(index + 1).padStart(3, '0') }))
@@ -61,11 +48,6 @@ export default function Floorplan({
   const selectedShot = selectedType === 'camera'
     ? scene?.shots.find(shot => shot.id === selectedEntity.shotId) || null
     : null
-  const selectedMovement = selectedType === 'camera'
-    ? (selectedShot?.movements?.includes(selectedEntity?.movement)
-      ? selectedEntity.movement
-      : selectedShot?.movements?.[0] || 'Static')
-    : selectedEntity?.movement || 'Static'
 
   useEffect(() => {
     setSelected(null)
@@ -85,8 +67,8 @@ export default function Floorplan({
   useEffect(() => {
     if (!scene) return
     const validShotIds = new Set((scene.shots || []).map(shot => shot.id))
-    const orphans = layout.cameras.some(camera => camera.shotId && !validShotIds.has(camera.shotId))
-    if (orphans) {
+    const hasOrphanLinks = layout.cameras.some(camera => camera.shotId && !validShotIds.has(camera.shotId))
+    if (hasOrphanLinks) {
       updateLayout(previous => ({
         ...previous,
         cameras: previous.cameras.map(camera => (
@@ -96,11 +78,11 @@ export default function Floorplan({
         )),
       }))
     }
-  // Keep the floorplan marker when a linked shot is deleted; it can be linked again.
+  // Keep the camera marker if its shot is deleted. It can be linked again later.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene?.id, scene?.shots])
 
-  const updateLayout = (updater) => {
+  const updateLayout = updater => {
     if (!scene) return
     onFloorplansChange(previous => {
       const currentLayout = previous?.[scene.id] || EMPTY_LAYOUT
@@ -108,7 +90,7 @@ export default function Floorplan({
     })
   }
 
-  const getPoint = (event) => {
+  const getPoint = event => {
     const rect = svgRef.current?.getBoundingClientRect()
     if (!rect || !rect.width || !rect.height) return { x: 0, y: 0 }
     return {
@@ -117,26 +99,38 @@ export default function Floorplan({
     }
   }
 
-  const syncShotMovement = (shotId, movement, previousMovement = '') => {
-    if (!shotId || !scene) return
-    onChange(previous => previous.map(item => item.id !== scene.id ? item : ({
-      ...item,
-      shots: item.shots.map(shot => {
-        if (shot.id !== shotId) return shot
-        let movements = Array.isArray(shot.movements) ? [...shot.movements] : []
-        if (previousMovement && previousMovement !== movement) {
-          movements = movements.filter(value => value !== previousMovement)
-        }
-        if (movement && !movements.includes(movement)) movements.push(movement)
-        return { ...shot, movements }
-      }),
-    })))
-  }
+  const nextPosition = count => ({
+    x: Math.round(420 + (count % 5) * 36),
+    y: Math.round(270 + (Math.floor(count / 5) % 5) * 32),
+  })
 
-  const placeObject = (type, point) => {
-    let item
-    if (type === 'camera') {
-      let targetShot = scene.shots.find(shot => !layout.cameras.some(camera => camera.shotId === shot.id))
+  // Object buttons create an object immediately. The new marker is selected and
+  // can be dragged straight to its final position without another placement click.
+  const addObject = type => {
+    const count = type === 'actor' ? layout.actors.length : type === 'camera' ? layout.cameras.length : layout.lights.length
+    const position = nextPosition(count)
+    let object
+
+    if (type === 'actor') {
+      object = {
+        id: makeId(),
+        ...position,
+        angle: 0,
+        label: 'Actor ' + padNum(count + 1),
+        path: [],
+      }
+      updateLayout(previous => ({ ...previous, actors: [...previous.actors, object] }))
+    } else if (type === 'light') {
+      object = {
+        id: makeId(),
+        ...position,
+        angle: 0,
+        lightType: 'Key',
+      }
+      updateLayout(previous => ({ ...previous, lights: [...previous.lights, object] }))
+    } else {
+      const linkedShotIds = new Set(layout.cameras.map(camera => camera.shotId).filter(Boolean))
+      let targetShot = scene.shots.find(shot => !linkedShotIds.has(shot.id))
       if (!targetShot) {
         targetShot = defaultShot(scene.shots.length + 1)
         onChange(previous => previous.map(currentScene => currentScene.id !== scene.id ? currentScene : ({
@@ -144,48 +138,55 @@ export default function Floorplan({
           shots: renumberShots([...currentScene.shots, targetShot]),
         })))
       }
-      const movement = targetShot.movements?.[0] || 'Static'
-      item = {
+      object = {
         id: makeId(),
+        ...position,
+        angle: 0,
         shotId: targetShot.id,
-        x: Math.round(point.x),
-        y: Math.round(point.y),
-        angle: 0,
-        label: 'Camera ' + padNum(layout.cameras.length + 1),
-        movement,
         path: [],
       }
-      updateLayout(previous => ({ ...previous, cameras: [...previous.cameras, item] }))
-      syncShotMovement(targetShot.id, movement)
-    } else if (type === 'actor') {
-      item = {
-        id: makeId(),
-        x: Math.round(point.x),
-        y: Math.round(point.y),
-        angle: 0,
-        label: 'Actor ' + padNum(layout.actors.length + 1),
-        movement: 'Blocking',
-        path: [],
-      }
-      updateLayout(previous => ({ ...previous, actors: [...previous.actors, item] }))
-    } else {
-      item = {
-        id: makeId(),
-        x: Math.round(point.x),
-        y: Math.round(point.y),
-        angle: 0,
-        label: 'Light ' + padNum(layout.lights.length + 1),
-        lightType: 'Key',
-        movement: 'Static',
-        path: [],
-      }
-      updateLayout(previous => ({ ...previous, lights: [...previous.lights, item] }))
+      updateLayout(previous => ({ ...previous, cameras: [...previous.cameras, object] }))
     }
-    setSelected({ type, id: item.id })
+
+    setSelected({ type, id: object.id })
     setTool('select')
   }
 
-  const handleCanvasPointerDown = (event) => {
+  const beginObjectDrag = (type, item, event) => {
+    event.stopPropagation()
+    if (tool === 'room' || tool === 'wall' || tool === 'path') return
+    const point = getPoint(event)
+    dragRef.current = { mode: 'move', type, id: item.id, start: point, original: item }
+    svgRef.current?.setPointerCapture?.(event.pointerId)
+    setSelected({ type, id: item.id })
+  }
+
+  const beginRotate = (type, item, event) => {
+    event.stopPropagation()
+    const point = getPoint(event)
+    dragRef.current = {
+      mode: 'rotate',
+      type,
+      id: item.id,
+      center: { x: item.x, y: item.y },
+      initialAngle: Number(item.angle) || 0,
+      startPointerAngle: Math.atan2(point.y - item.y, point.x - item.x) * 180 / Math.PI,
+    }
+    svgRef.current?.setPointerCapture?.(event.pointerId)
+    setSelected({ type, id: item.id })
+  }
+
+  const appendWaypoint = point => {
+    if (!selectedEntity || !selectedType || selectedType === 'light' || selectedType === 'room' || selectedType === 'wall') return
+    updateLayout(previous => ({
+      ...previous,
+      [selectedType + 's']: previous[selectedType + 's'].map(item => item.id !== selectedEntity.id
+        ? item
+        : { ...item, path: [...(item.path || []), { x: Math.round(point.x), y: Math.round(point.y) }] }),
+    }))
+  }
+
+  const handleCanvasPointerDown = event => {
     const point = getPoint(event)
     if (tool === 'room' || tool === 'wall') {
       svgRef.current?.setPointerCapture?.(event.pointerId)
@@ -193,48 +194,14 @@ export default function Floorplan({
       setPreviewPoint(point)
       return
     }
-    if (tool === 'place-actor' || tool === 'place-camera' || tool === 'place-light') {
-      const type = tool === 'place-actor' ? 'actor' : tool === 'place-camera' ? 'camera' : 'light'
-      placeObject(type, point)
-      return
-    }
     if (tool === 'path') {
-      if (!selectedEntity || !selectedType) {
-        setTool('select')
-        return
-      }
-      const firstWaypoint = !(selectedEntity.path || []).length
-      const nextMovement = firstWaypoint && selectedEntity.movement === 'Static'
-        ? selectedType === 'actor' ? 'Walk' : 'Tracking Shot'
-        : selectedEntity.movement || 'Static'
-      updateLayout(previous => ({
-        ...previous,
-        [selectedType + 's']: previous[selectedType + 's'].map(item => item.id !== selectedEntity.id
-          ? item
-          : {
-            ...item,
-            movement: nextMovement,
-            path: [...(item.path || []), { x: Math.round(point.x), y: Math.round(point.y) }],
-          }),
-      }))
-      if (selectedType === 'camera' && firstWaypoint && nextMovement !== selectedMovement) {
-        syncShotMovement(selectedEntity.shotId, nextMovement, selectedMovement)
-      }
+      appendWaypoint(point)
       return
     }
-    setSelected(null)
+    if (tool === 'select') setSelected(null)
   }
 
-  const beginDrag = (type, item, event) => {
-    event.stopPropagation()
-    if (tool !== 'select') return
-    const point = getPoint(event)
-    dragRef.current = { type, id: item.id, start: point, original: item }
-    svgRef.current?.setPointerCapture?.(event.pointerId)
-    setSelected({ type, id: item.id })
-  }
-
-  const handleCanvasPointerMove = (event) => {
+  const handleCanvasPointerMove = event => {
     const point = getPoint(event)
     if (drawStart) {
       setPreviewPoint(point)
@@ -242,6 +209,19 @@ export default function Floorplan({
     }
     const drag = dragRef.current
     if (!drag) return
+
+    if (drag.mode === 'rotate') {
+      const pointerAngle = Math.atan2(point.y - drag.center.y, point.x - drag.center.x) * 180 / Math.PI
+      const nextAngle = normalizeAngle(drag.initialAngle + pointerAngle - drag.startPointerAngle)
+      updateLayout(previous => ({
+        ...previous,
+        [drag.type + 's']: previous[drag.type + 's'].map(item => (
+          item.id === drag.id ? { ...item, angle: nextAngle } : item
+        )),
+      }))
+      return
+    }
+
     const dx = point.x - drag.start.x
     const dy = point.y - drag.start.y
     updateLayout(previous => ({
@@ -308,36 +288,23 @@ export default function Floorplan({
     dragRef.current = null
   }
 
-  const updateSelected = (patch) => {
+  const updateSelected = patch => {
     if (!selected || !selectedEntity) return
     updateLayout(previous => ({
       ...previous,
-      [selected.type + 's']: previous[selected.type + 's'].map(item => item.id === selected.id
-        ? { ...item, ...patch }
-        : item),
+      [selected.type + 's']: previous[selected.type + 's'].map(item => (
+        item.id === selected.id ? { ...item, ...patch } : item
+      )),
     }))
-  }
-
-  const changeMovement = (item, movement) => {
-    const previousMovement = selectedType === 'camera' ? selectedMovement : (item.movement || '')
-    updateSelected({ movement })
-    if (selectedType === 'camera') syncShotMovement(item.shotId, movement, previousMovement)
   }
 
   const changeCameraLink = (camera, nextShotId) => {
     const anotherCamera = layout.cameras.find(item => item.shotId === nextShotId && item.id !== camera.id)
-    if (anotherCamera) {
+    if (nextShotId && anotherCamera) {
       window.alert('That shot already has a camera marker. Choose a different shot.')
       return
     }
-    const nextShot = scene.shots.find(shot => shot.id === nextShotId)
-    if (!nextShot) {
-      updateSelected({ shotId: '' })
-      return
-    }
-    const movement = camera.movement || nextShot.movements?.[0] || 'Static'
-    updateSelected({ shotId: nextShotId, movement })
-    syncShotMovement(nextShotId, movement)
+    updateSelected({ shotId: nextShotId })
   }
 
   const deleteSelected = () => {
@@ -352,7 +319,7 @@ export default function Floorplan({
 
   const clearLayout = () => {
     if (!window.confirm('Clear this scene’s floorplan, actors, cameras and lighting?')) return
-    updateLayout(() => ({ rooms: [], walls: [], actors: [], cameras: [], lights: [] }))
+    updateLayout(() => ({ ...EMPTY_LAYOUT }))
     setSelected(null)
     setTool('select')
   }
@@ -365,26 +332,26 @@ export default function Floorplan({
     setTool('select')
   }
 
-  const setToolAndSelect = (nextTool) => {
-    setTool(nextTool)
-    if (nextTool === 'select') setSelected(selected)
-  }
-
   const objectName = (type, item) => {
     if (type === 'camera') {
       const shot = scene.shots.find(entry => entry.id === item.shotId)
-      return shot ? ('SHOT ' + shot.num + (shot.subject ? ' · ' + shot.subject : '')) : (item.label || 'Unlinked camera')
+      return shot ? ('Shot ' + shot.num + (shot.subject ? ' — ' + shot.subject : '')) : 'Unlinked camera'
     }
-    return item.label || (type === 'actor' ? 'Actor' : 'Light')
+    if (type === 'light') return item.lightType || 'Key'
+    return item.label || 'Actor'
   }
 
-  const objectColor = type => type === 'camera' ? '#2563eb' : type === 'actor' ? '#8b5cf6' : '#d97706'
-  const movementOptions = selectedType === 'actor'
-    ? ACTOR_MOVEMENTS
-    : selectedType === 'light'
-      ? LIGHT_MOVEMENTS
-      : MOVEMENTS
-  const objectCounts = layout.actors.length + layout.cameras.length + layout.lights.length
+  const objectTypeLabel = type => type === 'actor' ? 'Actor' : type === 'camera' ? 'Camera' : type === 'light' ? 'Lighting' : type === 'room' ? 'Room' : 'Wall'
+  const objectCount = layout.actors.length + layout.cameras.length + layout.lights.length
+  const selectedPath = selectedEntity?.path || []
+  const selectedCanHavePath = selectedType === 'actor' || selectedType === 'camera'
+  const selectedAngle = Number(selectedEntity?.angle) || 0
+  const selectedHandlePoint = selectedEntity
+    ? {
+      x: selectedEntity.x + Math.cos((selectedAngle - 90) * Math.PI / 180) * 54,
+      y: selectedEntity.y + Math.sin((selectedAngle - 90) * Math.PI / 180) * 54,
+    }
+    : null
 
   if (!scene) return null
 
@@ -409,15 +376,15 @@ export default function Floorplan({
           </button>
         </div>
         <div className="floorplan-top-meta">
-          <span>{layout.actors.length} Actors</span>
-          <span>{layout.cameras.length} Cameras</span>
-          <span>{layout.lights.length} Lights</span>
+          <span>{layout.actors.length} Actor{layout.actors.length === 1 ? '' : 's'}</span>
+          <span>{layout.cameras.length} Camera{layout.cameras.length === 1 ? '' : 's'}</span>
+          <span>{layout.lights.length} Lighting</span>
         </div>
       </header>
 
       <div className="floorplan-main-tools" role="toolbar" aria-label="Floorplan tools">
         <div className="floorplan-tool-group">
-          <button className={'floorplan-tool-button' + (tool === 'select' ? ' active' : '')} onClick={() => setToolAndSelect('select')} title="Select and move" aria-label="Select and move" aria-pressed={tool === 'select'}>
+          <button className={'floorplan-tool-button' + (tool === 'select' ? ' active' : '')} onClick={() => setTool('select')} title="Select and move" aria-label="Select and move" aria-pressed={tool === 'select'}>
             <MousePointer2 size={19} />
           </button>
           <button className={'floorplan-tool-button' + (tool === 'room' ? ' active' : '')} onClick={() => setTool('room')} title="Draw room" aria-label="Draw room" aria-pressed={tool === 'room'}>
@@ -426,20 +393,20 @@ export default function Floorplan({
           <button className={'floorplan-tool-button' + (tool === 'wall' ? ' active' : '')} onClick={() => setTool('wall')} title="Draw wall" aria-label="Draw wall" aria-pressed={tool === 'wall'}>
             <Minus size={19} />
           </button>
-          <button className={'floorplan-tool-button' + (tool === 'path' ? ' active' : '')} onClick={() => setTool('path')} title="Add movement path to selected object" aria-label="Add movement path" aria-pressed={tool === 'path'} disabled={!selectedEntity || selectedType === 'room' || selectedType === 'wall'}>
+          <button className={'floorplan-tool-button' + (tool === 'path' ? ' active' : '')} onClick={() => setTool(tool === 'path' ? 'select' : 'path')} title="Draw path for selected actor or camera" aria-label="Draw movement path" aria-pressed={tool === 'path'} disabled={!selectedCanHavePath}>
             <Route size={19} />
           </button>
         </div>
         <span className="floorplan-tool-divider" />
         <div className="floorplan-tool-group">
-          <button className={'floorplan-tool-button object-actor' + (tool === 'place-actor' ? ' active' : '')} onClick={() => setTool('place-actor')} title="Place actor" aria-label="Place actor" aria-pressed={tool === 'place-actor'}>
-            <PersonStanding size={20} /><span>Actor</span>
+          <button className="floorplan-tool-button" onClick={() => addObject('actor')} title="Add actor" aria-label="Add actor">
+            <UserRound size={19} /><span>Actor</span>
           </button>
-          <button className={'floorplan-tool-button object-camera' + (tool === 'place-camera' ? ' active' : '')} onClick={() => setTool('place-camera')} title="Place camera" aria-label="Place camera" aria-pressed={tool === 'place-camera'}>
+          <button className="floorplan-tool-button" onClick={() => addObject('camera')} title="Add camera and link a shot" aria-label="Add camera">
             <Camera size={19} /><span>Camera</span>
           </button>
-          <button className={'floorplan-tool-button object-light' + (tool === 'place-light' ? ' active' : '')} onClick={() => setTool('place-light')} title="Place lighting" aria-label="Place lighting" aria-pressed={tool === 'place-light'}>
-            <Sun size={19} /><span>Lighting</span>
+          <button className="floorplan-tool-button" onClick={() => addObject('light')} title="Add lighting" aria-label="Add lighting">
+            <Lightbulb size={19} /><span>Lighting</span>
           </button>
         </div>
         <span className="floorplan-tool-spacer" />
@@ -471,88 +438,102 @@ export default function Floorplan({
                   <rect width="100" height="100" fill="url(#floorplan-grid-small)" />
                   <path d="M100 0H0V100" fill="none" stroke="var(--border-strong)" strokeWidth="1.2" />
                 </pattern>
-                <marker id="floorplan-arrow-blue" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
-                  <path d="M0,0 L6,3.5 L0,7 Z" fill="#2563eb" />
-                </marker>
-                <marker id="floorplan-arrow-purple" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
-                  <path d="M0,0 L6,3.5 L0,7 Z" fill="#8b5cf6" />
-                </marker>
-                <marker id="floorplan-arrow-amber" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
-                  <path d="M0,0 L6,3.5 L0,7 Z" fill="#d97706" />
+                <marker id="floorplan-arrow" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+                  <path d="M0,0 L6,3.5 L0,7 Z" fill="var(--text-muted)" />
                 </marker>
               </defs>
               <rect width={MAP_WIDTH} height={MAP_HEIGHT} fill="var(--bg)" />
               <rect width={MAP_WIDTH} height={MAP_HEIGHT} fill="url(#floorplan-grid-large)" />
 
-              {layout.rooms.map(room => {
-                const active = selected?.type === 'room' && selected.id === room.id
-                return (
-                  <g key={room.id} onPointerDown={event => beginDrag('room', room, event)}>
-                    <rect x={room.x} y={room.y} width={room.width} height={room.height}
-                      fill={active ? 'rgba(37,99,235,0.08)' : 'rgba(115,115,115,0.06)'}
-                      stroke={active ? '#2563eb' : 'var(--text-muted)'}
-                      strokeWidth={active ? 3 : 2} strokeDasharray="7 4" vectorEffect="non-scaling-stroke" />
-                    <text x={room.x + 12} y={room.y + 28} fill="var(--text)" fontSize="18" fontWeight="600" pointerEvents="none">
-                      {room.label || 'Room'}
-                    </text>
-                  </g>
-                )
-              })}
+              {layout.rooms.map(room => (
+                <g key={room.id} onPointerDown={event => beginObjectDrag('room', room, event)}>
+                  <rect
+                    x={room.x} y={room.y} width={room.width} height={room.height}
+                    fill={selected?.type === 'room' && selected.id === room.id ? 'var(--bg-hover)' : 'var(--bg-subtle)'}
+                    stroke={selected?.type === 'room' && selected.id === room.id ? 'var(--text)' : 'var(--border-strong)'}
+                    strokeWidth={selected?.type === 'room' && selected.id === room.id ? 3 : 2}
+                    strokeDasharray="7 4" vectorEffect="non-scaling-stroke"
+                  />
+                  <text x={room.x + 12} y={room.y + 28} fill="var(--text)" fontSize="18" fontWeight="600" pointerEvents="none">
+                    {room.label || 'Room'}
+                  </text>
+                </g>
+              ))}
 
               {layout.walls.map(wall => (
-                <g key={wall.id} onPointerDown={event => beginDrag('wall', wall, event)}>
-                  <line x1={wall.x1} y1={wall.y1} x2={wall.x2} y2={wall.y2}
-                    stroke={selected?.type === 'wall' && selected.id === wall.id ? '#2563eb' : 'var(--text)'}
+                <g key={wall.id} onPointerDown={event => beginObjectDrag('wall', wall, event)}>
+                  <line
+                    x1={wall.x1} y1={wall.y1} x2={wall.x2} y2={wall.y2}
+                    stroke={selected?.type === 'wall' && selected.id === wall.id ? 'var(--text)' : 'var(--border-strong)'}
                     strokeWidth={selected?.type === 'wall' && selected.id === wall.id ? 8 : 6}
-                    strokeLinecap="square" vectorEffect="non-scaling-stroke" />
+                    strokeLinecap="square" vectorEffect="non-scaling-stroke"
+                  />
                   <line x1={wall.x1} y1={wall.y1} x2={wall.x2} y2={wall.y2}
                     stroke="transparent" strokeWidth="20" vectorEffect="non-scaling-stroke" />
                 </g>
               ))}
 
-              {[...layout.actors.map(item => ({ ...item, _kind: 'actor' })), ...layout.cameras.map(item => ({ ...item, _kind: 'camera' })), ...layout.lights.map(item => ({ ...item, _kind: 'light' }))].map(object => {
-                const kind = object._kind
-                const color = objectColor(kind)
-                const active = selected?.type === kind && selected.id === object.id
+              {[
+                ...layout.actors.map(item => ({ ...item, _kind: 'actor' })),
+                ...layout.cameras.map(item => ({ ...item, _kind: 'camera' })),
+                ...layout.lights.map(item => ({ ...item, _kind: 'light' })),
+              ].map(object => {
+                const type = object._kind
+                const active = selected?.type === type && selected.id === object.id
+                const shot = type === 'camera' ? scene.shots.find(item => item.id === object.shotId) : null
                 const points = [{ x: object.x, y: object.y }, ...(object.path || [])]
                 const pointString = points.map(point => point.x + ',' + point.y).join(' ')
-                const markerEnd = kind === 'camera' ? 'url(#floorplan-arrow-blue)' : kind === 'actor' ? 'url(#floorplan-arrow-purple)' : 'url(#floorplan-arrow-amber)'
+                const handlePoint = {
+                  x: object.x + Math.cos(((object.angle || 0) - 90) * Math.PI / 180) * 54,
+                  y: object.y + Math.sin(((object.angle || 0) - 90) * Math.PI / 180) * 54,
+                }
                 return (
-                  <g key={kind + '-' + object.id}>
+                  <g key={type + '-' + object.id}>
                     {points.length > 1 && (
-                      <>
-                        <polyline points={pointString} fill="none" stroke={color} strokeWidth="4" strokeDasharray="10 7" opacity=".95" markerEnd={markerEnd} vectorEffect="non-scaling-stroke" pointerEvents="none" />
-                        {object.path.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r="5" fill="var(--bg)" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" pointerEvents="none" />)}
-                      </>
+                      <polyline points={pointString} fill="none" stroke="var(--text-muted)" strokeWidth="3" strokeDasharray="9 7" markerEnd="url(#floorplan-arrow)" vectorEffect="non-scaling-stroke" pointerEvents="none" />
                     )}
-                    <g transform={'translate(' + object.x + ' ' + object.y + ')'} onPointerDown={event => beginDrag(kind, object, event)}>
-                      {kind === 'camera' && (
+                    {(object.path || []).map((point, index) => (
+                      <circle key={index} cx={point.x} cy={point.y} r="5" fill="var(--bg)" stroke="var(--text-muted)" strokeWidth="2" vectorEffect="non-scaling-stroke" pointerEvents="none" />
+                    ))}
+                    <g
+                      transform={'translate(' + object.x + ' ' + object.y + ')'}
+                      onPointerDown={event => beginObjectDrag(type, object, event)}
+                    >
+                      {type === 'camera' && (
                         <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
-                          <path d="M0 -18 L52 -34 L52 34 L0 18 Z" fill="rgba(37,99,235,.13)" stroke="#2563eb" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-                          <rect x="-18" y="-15" width="28" height="30" rx="4" fill="#2563eb" stroke="white" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                          <circle cx="-4" cy="0" r="5" fill="white" />
+                          <path d="M0 -18 L52 -31 L52 31 L0 18 Z" fill="var(--bg-subtle)" stroke="var(--text-muted)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+                          <rect x="-17" y="-14" width="27" height="28" rx="4" fill="var(--bg)" stroke="var(--text)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+                          <circle cx="-4" cy="0" r="4" fill="var(--text)" />
                         </g>
                       )}
-                      {kind === 'actor' && (
+                      {type === 'actor' && (
                         <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
-                          <circle cx="0" cy="-10" r="8" fill="#8b5cf6" stroke="white" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                          <path d="M0 0V18 M-13 7L0 1L13 7 M0 18L-10 31 M0 18L10 31" fill="none" stroke="#8b5cf6" strokeWidth="6" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+                          <circle cx="0" cy="-10" r="8" fill="var(--bg)" stroke="var(--text)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+                          <path d="M0 0V18 M-13 7L0 1L13 7 M0 18L-10 31 M0 18L10 31" fill="none" stroke="var(--text)" strokeWidth="5" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
                         </g>
                       )}
-                      {kind === 'light' && (
+                      {type === 'light' && (
                         <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
-                          <path d="M1 -11 L49 -28 L49 28 L1 11 Z" fill="rgba(245,158,11,.15)" stroke="#d97706" strokeWidth="1.5" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
-                          <circle cx="0" cy="0" r="13" fill="#d97706" stroke="white" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                          <circle cx="0" cy="0" r="4" fill="white" />
+                          <path d="M1 -11 L49 -27 L49 27 L1 11 Z" fill="var(--bg-subtle)" stroke="var(--text-muted)" strokeWidth="1.5" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
+                          <circle cx="0" cy="0" r="12" fill="var(--bg)" stroke="var(--text)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+                          <circle cx="0" cy="0" r="3.5" fill="var(--text)" />
                         </g>
                       )}
-                      {active && <circle cx="0" cy="0" r="31" fill="none" stroke={color} strokeWidth="2" strokeDasharray="5 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
-                      <text x="0" y={kind === 'actor' ? 47 : 39} textAnchor="middle" fontSize="16" fontWeight="600" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" pointerEvents="none">
-                        {kind === 'camera'
-                          ? (scene.shots.find(shot => shot.id === object.shotId)?.num || 'UNLINKED')
-                          : object.label}
-                      </text>
+                      {active && <circle cx="0" cy="0" r="34" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
+                      {type === 'camera' && (
+                        <text x="0" y="48" textAnchor="middle" fontSize="16" fontWeight="600" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" pointerEvents="none">
+                          {shot ? shot.num : '—'}
+                        </text>
+                      )}
                     </g>
+
+                    {active && (
+                      <g onPointerDown={event => beginRotate(type, object, event)}>
+                        <line x1={object.x} y1={object.y} x2={handlePoint.x} y2={handlePoint.y} stroke="var(--text-muted)" strokeWidth="1.5" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" pointerEvents="none" />
+                        <circle cx={handlePoint.x} cy={handlePoint.y} r="12" fill="var(--bg)" stroke="var(--text)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                        <circle cx={handlePoint.x} cy={handlePoint.y} r="3" fill="var(--text)" vectorEffect="non-scaling-stroke" pointerEvents="none" />
+                      </g>
+                    )}
                   </g>
                 )
               })}
@@ -561,13 +542,13 @@ export default function Floorplan({
                 <rect
                   x={Math.min(drawStart.x, previewPoint.x)} y={Math.min(drawStart.y, previewPoint.y)}
                   width={Math.abs(previewPoint.x - drawStart.x)} height={Math.abs(previewPoint.y - drawStart.y)}
-                  fill="rgba(37,99,235,.06)" stroke="#2563eb" strokeWidth="2" strokeDasharray="6 4"
+                  fill="var(--bg-hover)" stroke="var(--text-muted)" strokeWidth="2" strokeDasharray="6 4"
                   vectorEffect="non-scaling-stroke" pointerEvents="none"
                 />
               )}
               {drawStart && previewPoint && tool === 'wall' && (
                 <line x1={drawStart.x} y1={drawStart.y} x2={previewPoint.x} y2={previewPoint.y}
-                  stroke="#2563eb" strokeWidth="3" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />
+                  stroke="var(--text)" strokeWidth="3" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />
               )}
             </svg>
           </div>
@@ -578,44 +559,78 @@ export default function Floorplan({
             <>
               <div className="floorplan-inspector-head">
                 <span className={'floorplan-type-icon ' + selectedType}>
-                  {selectedType === 'actor' ? <PersonStanding size={21} /> : selectedType === 'camera' ? <Camera size={20} /> : selectedType === 'light' ? <Sun size={20} /> : <Square size={20} />}
+                  {selectedType === 'actor'
+                    ? <UserRound size={21} />
+                    : selectedType === 'camera'
+                      ? <Camera size={20} />
+                      : selectedType === 'light'
+                        ? <Lightbulb size={20} />
+                        : <Square size={20} />}
                 </span>
                 <div className="floorplan-inspector-title">
-                  <strong>{selectedType === 'camera' ? 'Camera' : selectedType === 'actor' ? 'Actor' : selectedType === 'light' ? 'Lighting' : selectedType === 'room' ? 'Room' : 'Wall'}</strong>
+                  <strong>{objectTypeLabel(selectedType)}</strong>
                   {selectedType === 'camera' && <span>{selectedShot ? 'Shot ' + selectedShot.num : 'Unlinked'}</span>}
                 </div>
                 <button className="floorplan-icon-button danger" onClick={deleteSelected} aria-label="Delete selected object" title="Delete selected object"><Trash2 size={17} /></button>
               </div>
 
-              {selectedType === 'camera' && (
-                <section className="floorplan-inspector-section">
-                  <label htmlFor="camera-linked-shot">Shot List link</label>
-                  <select
-                    id="camera-linked-shot"
-                    className="floorplan-field"
-                    value={selectedEntity.shotId || ''}
-                    onChange={event => changeCameraLink(selectedEntity, event.target.value)}
-                  >
-                    <option value="">Unlinked</option>
-                    {scene.shots.filter(shot => !layout.cameras.some(camera => camera.id !== selectedEntity.id && camera.shotId === shot.id)).map(shot => (
-                      <option key={shot.id} value={shot.id}>{shot.num} — {shot.subject || 'Untitled shot'}</option>
-                    ))}
-                  </select>
-                  {selectedShot && (
-                    <div className="floorplan-link-card">
-                      <span>Linked subject</span>
-                      <strong>{selectedShot.subject || 'Untitled shot'}</strong>
-                      <span>{selectedShot.camera || 'Camera body not set'}</span>
-                    </div>
-                  )}
-                </section>
+              {selectedType === 'actor' && (
+                <>
+                  <section className="floorplan-inspector-section">
+                    <label htmlFor="actor-name">Actor</label>
+                    <input id="actor-name" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
+                  </section>
+                  <section className="floorplan-inspector-section">
+                    <div className="floorplan-section-title">Path</div>
+                    <button className={'floorplan-path-button' + (tool === 'path' ? ' active' : '')} onClick={() => setTool(tool === 'path' ? 'select' : 'path')}>
+                      <Route size={17} /> {tool === 'path' ? 'Finish path' : 'Draw path'} <span>{selectedPath.length}</span>
+                    </button>
+                    {selectedPath.length > 0 && (
+                      <button className="floorplan-remove-path" onClick={() => updateSelected({ path: [] })}>Remove path</button>
+                    )}
+                  </section>
+                </>
               )}
 
-              {(selectedType === 'actor' || selectedType === 'light') && (
-                <section className="floorplan-inspector-section">
-                  <label htmlFor="object-label">Name</label>
-                  <input id="object-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
-                </section>
+              {selectedType === 'camera' && (
+                <>
+                  <section className="floorplan-inspector-section">
+                    <label htmlFor="camera-linked-shot">Shot List</label>
+                    <select
+                      id="camera-linked-shot"
+                      className="floorplan-field"
+                      value={selectedEntity.shotId || ''}
+                      onChange={event => changeCameraLink(selectedEntity, event.target.value)}
+                    >
+                      <option value="">Unlinked</option>
+                      {scene.shots.filter(shot => !layout.cameras.some(camera => camera.id !== selectedEntity.id && camera.shotId === shot.id)).map(shot => (
+                        <option key={shot.id} value={shot.id}>{shot.num} — {shot.subject || 'Untitled shot'}</option>
+                      ))}
+                    </select>
+                    {selectedShot ? (
+                      <div className="floorplan-shot-data">
+                        <div><span>Subject</span><strong>{selectedShot.subject || '—'}</strong></div>
+                        <div><span>Camera</span><strong>{selectedShot.camera || '—'}</strong></div>
+                        <div><span>Shot size</span><strong>{selectedShot.size || '—'}</strong></div>
+                        <div><span>Angle</span><strong>{selectedShot.angle || '—'}</strong></div>
+                        <div><span>Lens</span><strong>{selectedShot.lens || '—'}</strong></div>
+                        <div><span>Movement</span><strong>{(selectedShot.movements || []).join(', ') || '—'}</strong></div>
+                        <div><span>Equipment</span><strong>{(selectedShot.equipment || []).join(', ') || '—'}</strong></div>
+                      </div>
+                    ) : (
+                      <div className="floorplan-unlinked">Camera belum ditautkan ke shot.</div>
+                    )}
+                  </section>
+                  <section className="floorplan-inspector-section">
+                    <div className="floorplan-section-title">Path</div>
+                    <button className={'floorplan-path-button' + (tool === 'path' ? ' active' : '')} onClick={() => setTool(tool === 'path' ? 'select' : 'path')}>
+                      <Route size={17} /> {tool === 'path' ? 'Finish path' : 'Draw path'} <span>{selectedPath.length}</span>
+                    </button>
+                    {selectedPath.length > 0 && (
+                      <button className="floorplan-remove-path" onClick={() => updateSelected({ path: [] })}>Remove path</button>
+                    )}
+                  </section>
+                </>
               )}
 
               {selectedType === 'light' && (
@@ -627,49 +642,17 @@ export default function Floorplan({
                 </section>
               )}
 
-              {(selectedType === 'actor' || selectedType === 'camera' || selectedType === 'light') && (
-                <>
-                  <section className="floorplan-inspector-section">
-                    <label htmlFor="object-movement">Movement</label>
-                    <select id="object-movement" className="floorplan-field" value={selectedMovement} onChange={event => changeMovement(selectedEntity, event.target.value)}>
-                      {(selectedType === 'actor' ? ACTOR_MOVEMENTS : selectedType === 'light' ? LIGHT_MOVEMENTS : MOVEMENTS).map(movement => <option key={movement} value={movement}>{movement}</option>)}
-                    </select>
-                    <button className={'floorplan-path-button' + (tool === 'path' ? ' active' : '')} onClick={() => setTool(tool === 'path' ? 'select' : 'path')} disabled={selectedType === 'room' || selectedType === 'wall'}>
-                      <Route size={17} /> {tool === 'path' ? 'Finish path' : 'Draw movement path'} <span>{(selectedEntity.path || []).length}</span>
-                    </button>
-                    {(selectedEntity.path || []).length > 0 && (
-                      <button className="floorplan-remove-path" onClick={() => updateSelected({ path: [] })}>Remove path</button>
-                    )}
-                  </section>
-
-                  <section className="floorplan-inspector-section">
-                    <div className="floorplan-section-title">Position</div>
-                    <div className="floorplan-coordinates">
-                      <label>X<input type="number" min="0" max={MAP_WIDTH} value={Math.round(selectedEntity.x)} onChange={event => updateSelected({ x: clamp(event.target.value, 0, MAP_WIDTH) })} /></label>
-                      <label>Y<input type="number" min="0" max={MAP_HEIGHT} value={Math.round(selectedEntity.y)} onChange={event => updateSelected({ y: clamp(event.target.value, 0, MAP_HEIGHT) })} /></label>
-                    </div>
-                    <button className="floorplan-rotate-button" onClick={() => updateSelected({ angle: ((selectedEntity.angle || 0) + 15) % 360 })}>
-                      <RotateCw size={16} /> Rotate direction 15°
-                    </button>
-                  </section>
-                </>
-              )}
-
               {selectedType === 'room' && (
                 <section className="floorplan-inspector-section">
                   <label htmlFor="room-label">Room name</label>
                   <input id="room-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
-                  <div className="floorplan-coordinates">
-                    <label>X<input type="number" value={selectedEntity.x} onChange={event => updateSelected({ x: clamp(event.target.value, 0, MAP_WIDTH - selectedEntity.width) })} /></label>
-                    <label>Y<input type="number" value={selectedEntity.y} onChange={event => updateSelected({ y: clamp(event.target.value, 0, MAP_HEIGHT - selectedEntity.height) })} /></label>
-                  </div>
                 </section>
               )}
             </>
           ) : (
             <div className="floorplan-object-browser">
               <div className="floorplan-object-browser-head">
-                <strong>Objects</strong><span>{objectCounts}</span>
+                <strong>Objects</strong><span>{objectCount}</span>
               </div>
               {allObjects.length === 0 ? (
                 <div className="floorplan-empty-state"><Layers2 size={24} /><span>No objects yet</span></div>
@@ -677,10 +660,14 @@ export default function Floorplan({
                 allObjects.map(object => (
                   <button key={object.entityType + object.id} className="floorplan-object-row" onClick={() => setSelected({ type: object.entityType, id: object.id })}>
                     <span className={'floorplan-type-icon ' + object.entityType}>
-                      {object.entityType === 'actor' ? <PersonStanding size={18} /> : object.entityType === 'camera' ? <Camera size={18} /> : <Sun size={18} />}
+                      {object.entityType === 'actor'
+                        ? <UserRound size={18} />
+                        : object.entityType === 'camera'
+                          ? <Camera size={18} />
+                          : <Lightbulb size={18} />}
                     </span>
                     <span className="floorplan-object-row-name">{objectName(object.entityType, object)}</span>
-                    <span className="floorplan-object-row-type">{object.entityType === 'light' ? 'LIGHT' : object.entityType.toUpperCase()}</span>
+                    <span className="floorplan-object-row-type">{objectTypeLabel(object.entityType)}</span>
                   </button>
                 ))
               )}
