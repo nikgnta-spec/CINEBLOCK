@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
 import ProjectInfo from './components/ProjectInfo'
 import ShotList from './components/ShotList'
-import { Download } from 'lucide-react'
+import { Download, Upload, Plus, Trash2 } from 'lucide-react'
 import { loadAppState, saveAppState } from './storage'
 
 const TABS = [
@@ -90,13 +90,57 @@ const defaultShot = (num) => ({
   notes: '',
 })
 
+function createProjectRecord(id, project, scenes, activeSceneId) {
+  const safeId = id || crypto.randomUUID()
+  const safeTitle = project?.title?.trim() || 'Untitled Project'
+  return {
+    id: safeId,
+    name: safeTitle,
+    project,
+    scenes,
+    activeSceneId: activeSceneId || scenes[0]?.id || '',
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+function upsertProject(projects, record) {
+  const index = projects.findIndex(item => item.id === record.id)
+  if (index < 0) return [...projects, record]
+  return projects.map(item => item.id === record.id ? record : item)
+}
+
+function normalizeWorkspaceProjects(savedProjects) {
+  if (!Array.isArray(savedProjects)) return []
+
+  const seen = new Set()
+  return savedProjects
+    .filter(item => item && typeof item.id === 'string' && item.project && !seen.has(item.id) && seen.add(item.id))
+    .map(item => {
+      const normalizedProject = normalizeSavedProject(item.project)
+      const normalizedScenes = normalizeSavedScenes(item.scenes) || [defaultScene(1)]
+      return {
+        ...createProjectRecord(
+          item.id,
+          normalizedProject,
+          normalizedScenes,
+          item.activeSceneId || normalizedScenes[0]?.id || '',
+        ),
+        name: normalizedProject.title?.trim() || item.name || 'Untitled Project',
+        updatedAt: item.updatedAt || new Date().toISOString(),
+      }
+    })
+}
+
 export default function App() {
   const [tab, setTab] = useState('project')
   const [project, setProject] = useState(defaultProject)
   const [scenes, setScenes] = useState(() => [defaultScene(1)])
   const [activeSceneId, setActiveSceneId] = useState('')
+  const [projects, setProjects] = useState([])
+  const [activeProjectId, setActiveProjectId] = useState('')
   const [hydrated, setHydrated] = useState(false)
   const [saveStatus, setSaveStatus] = useState('loading')
+  const backupInputRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -105,24 +149,32 @@ export default function App() {
       .then(savedState => {
         if (cancelled) return
 
-        if (savedState?.project) {
-          setProject(normalizeSavedProject(savedState.project))
-        }
+        const restoredProject = normalizeSavedProject(savedState?.project)
+        const restoredScenes = normalizeSavedScenes(savedState?.scenes) || scenes
+        const restoredActiveSceneId = savedState?.activeSceneId || restoredScenes[0]?.id || ''
+        let restoredProjects = normalizeWorkspaceProjects(savedState?.projects)
+        let restoredProjectId = savedState?.activeProjectId || restoredProjects[0]?.id || crypto.randomUUID()
 
-        const restoredScenes = normalizeSavedScenes(savedState?.scenes)
-        if (restoredScenes) {
-          setScenes(restoredScenes)
-        }
+        // Migrate the original single-project save into the project library.
+        restoredProjects = upsertProject(
+          restoredProjects,
+          createProjectRecord(
+            restoredProjectId,
+            restoredProject,
+            restoredScenes,
+            restoredActiveSceneId,
+          ),
+        )
 
         if (savedState?.tab === 'shotlist' || savedState?.tab === 'project') {
           setTab(savedState.tab)
         }
 
-        setActiveSceneId(
-          savedState?.activeSceneId
-            || restoredScenes?.[0]?.id
-            || '',
-        )
+        setProject(restoredProject)
+        setScenes(restoredScenes)
+        setActiveSceneId(restoredActiveSceneId)
+        setProjects(restoredProjects)
+        setActiveProjectId(restoredProjectId)
         setSaveStatus('saved')
         setHydrated(true)
       })
@@ -137,15 +189,26 @@ export default function App() {
     return () => {
       cancelled = true
     }
+  // Initial scene state is deliberately used when no saved project exists.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
-    if (!hydrated) return undefined
+    if (!hydrated || !activeProjectId) return undefined
 
     setSaveStatus('saving')
     const timeout = window.setTimeout(async () => {
       try {
-        await saveAppState({ tab, project, scenes, activeSceneId })
+        const currentRecord = createProjectRecord(activeProjectId, project, scenes, activeSceneId)
+        const savedProjects = upsertProject(projects, currentRecord)
+        await saveAppState({
+          tab,
+          project,
+          scenes,
+          activeSceneId,
+          projects: savedProjects,
+          activeProjectId,
+        })
         setSaveStatus('saved')
       } catch (error) {
         console.error('CINEBLOCK could not save data:', error)
@@ -154,31 +217,188 @@ export default function App() {
     }, 250)
 
     return () => window.clearTimeout(timeout)
-  }, [hydrated, tab, project, scenes, activeSceneId])
+  }, [hydrated, tab, project, scenes, activeSceneId, projects, activeProjectId])
+
+  const snapshotCurrentProject = () => (
+    createProjectRecord(activeProjectId, project, scenes, activeSceneId)
+  )
+
+  const switchProject = (projectId) => {
+    if (!projectId || projectId === activeProjectId) return
+    const target = projects.find(item => item.id === projectId)
+    if (!target) return
+
+    setProjects(previous => upsertProject(previous, snapshotCurrentProject()))
+    const targetScenes = normalizeSavedScenes(target.scenes) || [defaultScene(1)]
+    setActiveProjectId(target.id)
+    setProject(normalizeSavedProject(target.project))
+    setScenes(targetScenes)
+    setActiveSceneId(target.activeSceneId || targetScenes[0]?.id || '')
+    setTab('project')
+  }
+
+  const createNewProject = () => {
+    const currentRecord = snapshotCurrentProject()
+    const newProject = { ...defaultProject, visualRefs: [...defaultProject.visualRefs] }
+    const newScenes = [defaultScene(1)]
+    const newRecord = createProjectRecord(crypto.randomUUID(), newProject, newScenes, newScenes[0].id)
+
+    setProjects(previous => [...upsertProject(previous, currentRecord), newRecord])
+    setActiveProjectId(newRecord.id)
+    setProject(newProject)
+    setScenes(newScenes)
+    setActiveSceneId(newScenes[0].id)
+    setTab('project')
+  }
+
+  const deleteCurrentProject = () => {
+    if (projects.length <= 1) {
+      window.alert('CINEBLOCK needs at least one project. Create another project before deleting this one.')
+      return
+    }
+    if (!window.confirm('Delete this project and all its scenes and shots from this browser? This cannot be undone.')) return
+
+    const remaining = projects.filter(item => item.id !== activeProjectId)
+    const target = remaining[0]
+    const targetScenes = normalizeSavedScenes(target.scenes) || [defaultScene(1)]
+    setProjects(remaining)
+    setActiveProjectId(target.id)
+    setProject(normalizeSavedProject(target.project))
+    setScenes(targetScenes)
+    setActiveSceneId(target.activeSceneId || targetScenes[0]?.id || '')
+    setTab('project')
+  }
+
+  const downloadBackup = () => {
+    const savedProjects = upsertProject(projects, snapshotCurrentProject())
+    const backup = {
+      app: 'CINEBLOCK',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      activeProjectId,
+      projects: savedProjects,
+    }
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `cineblock-backup-${new Date().toISOString().slice(0, 10)}.json`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  }
+
+  const importBackup = async (event) => {
+    const input = event.target
+    const file = input.files?.[0]
+    if (!file) return
+
+    try {
+      const parsed = JSON.parse(await file.text())
+      if (parsed?.app !== 'CINEBLOCK' || !Array.isArray(parsed.projects)) {
+        throw new Error('This file is not a valid CINEBLOCK backup.')
+      }
+      const importedProjects = normalizeWorkspaceProjects(parsed.projects)
+      if (!importedProjects.length) {
+        throw new Error('The backup does not contain any valid projects.')
+      }
+      if (!window.confirm('Import these projects? Matching project IDs will be replaced; other local projects will be kept.')) {
+        return
+      }
+
+      const currentRecord = snapshotCurrentProject()
+      let merged = upsertProject(projects, currentRecord)
+      for (const item of importedProjects) {
+        merged = upsertProject(merged, item)
+      }
+
+      const preferredId = importedProjects.some(item => item.id === parsed.activeProjectId)
+        ? parsed.activeProjectId
+        : activeProjectId
+      const target = merged.find(item => item.id === preferredId) || merged[0]
+      const targetScenes = normalizeSavedScenes(target.scenes) || [defaultScene(1)]
+
+      setProjects(merged)
+      setActiveProjectId(target.id)
+      setProject(normalizeSavedProject(target.project))
+      setScenes(targetScenes)
+      setActiveSceneId(target.activeSceneId || targetScenes[0]?.id || '')
+      setTab('project')
+    } catch (error) {
+      console.error('CINEBLOCK could not import backup:', error)
+      window.alert(error.message || 'The backup file could not be imported.')
+    } finally {
+      input.value = ''
+    }
+  }
 
   return (
     <div className="app">
       <div className="topbar">
         <div className="topbar-left">
           <span className="topbar-logo">CINEBLOCK</span>
-          <div className="topbar-project">
-            <span style={{ color: 'var(--text-muted)' }}>/</span>
-            <span>{project.title || 'Untitled Project'}</span>
-          </div>
+          <span style={{ color: 'var(--text-muted)' }}>/</span>
+          <select
+            className="project-switcher"
+            aria-label="Open project"
+            value={activeProjectId}
+            onChange={event => switchProject(event.target.value)}
+            disabled={!hydrated || projects.length === 0}
+          >
+            {projects.map(item => (
+              <option key={item.id} value={item.id}>
+                {item.id === activeProjectId
+                  ? (project.title.trim() || 'Untitled Project')
+                  : item.name}
+              </option>
+            ))}
+          </select>
+          <button className="btn btn-secondary" onClick={createNewProject} disabled={!hydrated}>
+            <Plus size={13} /> New Project
+          </button>
+          <button
+            className="btn btn-danger"
+            onClick={deleteCurrentProject}
+            disabled={!hydrated || projects.length <= 1}
+            title="Delete current project"
+          >
+            <Trash2 size={13} /> Delete
+          </button>
         </div>
         <div className="topbar-right">
           <span
             aria-live="polite"
-            title="Project, shot list, active tab, and active scene are saved on this device"
+            title="Projects, shot lists, active tab, and active scene are saved locally in this browser"
             style={{ fontSize: 11, color: 'var(--text-muted)' }}
           >
-            {saveStatus === 'saving'
-              ? 'Saving…'
-              : saveStatus === 'error'
-                ? 'Save failed'
-                : 'Saved locally'}
+            {saveStatus === 'loading'
+              ? 'Loading…'
+              : saveStatus === 'saving'
+                ? 'Saving…'
+                : saveStatus === 'error'
+                  ? 'Save failed'
+                  : 'Saved locally'}
           </span>
-          <button className="btn btn-secondary" style={{ fontSize: 12 }}>
+          <button className="btn btn-secondary" onClick={downloadBackup} disabled={!hydrated}>
+            <Download size={13} /> Backup
+          </button>
+          <button className="btn btn-secondary" onClick={() => backupInputRef.current?.click()} disabled={!hydrated}>
+            <Upload size={13} /> Import
+          </button>
+          <input
+            ref={backupInputRef}
+            type="file"
+            accept="application/json,.json"
+            style={{ display: 'none' }}
+            onChange={importBackup}
+          />
+          <button
+            className="btn btn-secondary"
+            style={{ fontSize: 12 }}
+            disabled
+            title="PDF export is planned as the final feature"
+          >
             <Download size={13} />
             Export PDF
           </button>
