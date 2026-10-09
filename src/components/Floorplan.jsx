@@ -523,7 +523,7 @@ export default function Floorplan({
                         </g>
                       )}
                       {kind === 'actor' && (
-                        <g pointerEvents="none">
+                        <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
                           <circle cx="0" cy="-10" r="8" fill="#8b5cf6" stroke="white" strokeWidth="2" vectorEffect="non-scaling-stroke" />
                           <path d="M0 0V18 M-13 7L0 1L13 7 M0 18L-10 31 M0 18L10 31" fill="none" stroke="#8b5cf6" strokeWidth="6" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
                         </g>
@@ -600,7 +600,7 @@ export default function Floorplan({
                 </section>
               )}
 
-              {(selectedType === 'actor' || selectedType === 'light' || selectedType === 'camera') && (
+              {(selectedType === 'actor' || selectedType === 'light') && (
                 <section className="floorplan-inspector-section">
                   <label htmlFor="object-label">Name</label>
                   <input id="object-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
