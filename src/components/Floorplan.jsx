@@ -1294,10 +1294,14 @@ export default function Floorplan({
                   <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Dimensions</div>
                     <div className="floorplan-size-grid">
-                      <label htmlFor="room-length">Length (X)</label>
-                      <input id="room-length" type="number" className="floorplan-field" min="40" max={Math.max(40, MAP_WIDTH - selectedEntity.x)} value={selectedEntity.width} onChange={event => updateSelected({ width: clamp(event.target.value, 40, Math.max(40, MAP_WIDTH - selectedEntity.x)) })} />
-                      <label htmlFor="room-width">Width (Y)</label>
-                      <input id="room-width" type="number" className="floorplan-field" min="40" max={Math.max(40, MAP_HEIGHT - selectedEntity.y)} value={selectedEntity.height} onChange={event => updateSelected({ height: clamp(event.target.value, 40, Math.max(40, MAP_HEIGHT - selectedEntity.y)) })} />
+                      <label className="floorplan-size-field" htmlFor="room-length">
+                        <span>Length (X)</span>
+                        <input id="room-length" type="number" className="floorplan-field" min="40" max={Math.max(40, MAP_WIDTH - selectedEntity.x)} value={selectedEntity.width} onChange={event => updateSelected({ width: clamp(event.target.value, 40, Math.max(40, MAP_WIDTH - selectedEntity.x)) })} />
+                      </label>
+                      <label className="floorplan-size-field" htmlFor="room-width">
+                        <span>Width (Y)</span>
+                        <input id="room-width" type="number" className="floorplan-field" min="40" max={Math.max(40, MAP_HEIGHT - selectedEntity.y)} value={selectedEntity.height} onChange={event => updateSelected({ height: clamp(event.target.value, 40, Math.max(40, MAP_HEIGHT - selectedEntity.y)) })} />
+                      </label>
                     </div>
                   </section>
                 </>
@@ -1320,10 +1324,14 @@ export default function Floorplan({
                   <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Dimensions</div>
                     <div className="floorplan-size-grid">
-                      <label htmlFor="fixture-length">Length</label>
-                      <input id="fixture-length" type="number" className="floorplan-field" min="12" max={Math.max(12, MAP_WIDTH - selectedEntity.x)} value={selectedEntity.width} onChange={event => updateSelected({ width: clamp(event.target.value, 12, Math.min(300, Math.max(12, MAP_WIDTH - selectedEntity.x))) })} />
-                      <label htmlFor="fixture-width">Width</label>
-                      <input id="fixture-width" type="number" className="floorplan-field" min="8" max={Math.max(8, MAP_HEIGHT - selectedEntity.y)} value={selectedEntity.height} onChange={event => updateSelected({ height: clamp(event.target.value, 8, Math.min(200, Math.max(8, MAP_HEIGHT - selectedEntity.y))) })} />
+                      <label className="floorplan-size-field" htmlFor="fixture-length">
+                        <span>Length</span>
+                        <input id="fixture-length" type="number" className="floorplan-field" min="12" max={Math.max(12, MAP_WIDTH - selectedEntity.x)} value={selectedEntity.width} onChange={event => updateSelected({ width: clamp(event.target.value, 12, Math.min(300, Math.max(12, MAP_WIDTH - selectedEntity.x))) })} />
+                      </label>
+                      <label className="floorplan-size-field" htmlFor="fixture-width">
+                        <span>Width</span>
+                        <input id="fixture-width" type="number" className="floorplan-field" min="8" max={Math.max(8, MAP_HEIGHT - selectedEntity.y)} value={selectedEntity.height} onChange={event => updateSelected({ height: clamp(event.target.value, 8, Math.min(200, Math.max(8, MAP_HEIGHT - selectedEntity.y))) })} />
+                      </label>
                     </div>
                   </section>
                 </>
@@ -1333,14 +1341,10 @@ export default function Floorplan({
                 <section className="floorplan-inspector-section">
                   <div className="floorplan-section-title">Wall</div>
                   <div className="floorplan-size-grid">
-                    <label htmlFor="wall-x1">Start X</label>
-                    <input id="wall-x1" type="number" className="floorplan-field" value={selectedEntity.x1} onChange={event => updateSelected({ x1: clamp(event.target.value, 0, MAP_WIDTH) })} />
-                    <label htmlFor="wall-y1">Start Y</label>
-                    <input id="wall-y1" type="number" className="floorplan-field" value={selectedEntity.y1} onChange={event => updateSelected({ y1: clamp(event.target.value, 0, MAP_HEIGHT) })} />
-                    <label htmlFor="wall-x2">End X</label>
-                    <input id="wall-x2" type="number" className="floorplan-field" value={selectedEntity.x2} onChange={event => updateSelected({ x2: clamp(event.target.value, 0, MAP_WIDTH) })} />
-                    <label htmlFor="wall-y2">End Y</label>
-                    <input id="wall-y2" type="number" className="floorplan-field" value={selectedEntity.y2} onChange={event => updateSelected({ y2: clamp(event.target.value, 0, MAP_HEIGHT) })} />
+                    <label className="floorplan-size-field" htmlFor="wall-x1"><span>Start X</span><input id="wall-x1" type="number" className="floorplan-field" value={selectedEntity.x1} onChange={event => updateSelected({ x1: clamp(event.target.value, 0, MAP_WIDTH) })} /></label>
+                    <label className="floorplan-size-field" htmlFor="wall-y1"><span>Start Y</span><input id="wall-y1" type="number" className="floorplan-field" value={selectedEntity.y1} onChange={event => updateSelected({ y1: clamp(event.target.value, 0, MAP_HEIGHT) })} /></label>
+                    <label className="floorplan-size-field" htmlFor="wall-x2"><span>End X</span><input id="wall-x2" type="number" className="floorplan-field" value={selectedEntity.x2} onChange={event => updateSelected({ x2: clamp(event.target.value, 0, MAP_WIDTH) })} /></label>
+                    <label className="floorplan-size-field" htmlFor="wall-y2"><span>End Y</span><input id="wall-y2" type="number" className="floorplan-field" value={selectedEntity.y2} onChange={event => updateSelected({ y2: clamp(event.target.value, 0, MAP_HEIGHT) })} /></label>
                   </div>
                 </section>
               )}
