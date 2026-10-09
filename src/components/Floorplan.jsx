@@ -836,7 +836,7 @@ export default function Floorplan({
   const changeCameraLink = (camera, nextShotId) => {
     const anotherCamera = layout.cameras.find(item => item.shotId === nextShotId && item.id !== camera.id)
     if (nextShotId && anotherCamera) {
-      window.alert('That shot already has a camera marker. Choose a different shot.')
+      window.alert('Shot tersebut sudah memiliki marker kamera. Pilih shot yang lain.')
       return
     }
     updateSelected({ shotId: nextShotId })
@@ -854,7 +854,7 @@ export default function Floorplan({
   }
 
   const clearLayout = () => {
-    if (!window.confirm('Clear this scene’s rooms, walls, props, actors, cameras and lighting?')) return
+    if (!window.confirm('Kosongkan room, wall, properti, aktor, kamera, dan lampu pada scene ini?')) return
     updateLayout(() => ({ ...EMPTY_LAYOUT }))
     setSelected(null)
     setSelectedWaypoint(null)
@@ -894,7 +894,7 @@ export default function Floorplan({
         <div className="floorplan-scene-control">
           <select
             className="floorplan-scene-select"
-            aria-label="Current scene"
+            aria-label="Scene aktif"
             value={scene.id}
             onChange={event => onActiveSceneChange(event.target.value)}
           >
@@ -904,48 +904,48 @@ export default function Floorplan({
               </option>
             ))}
           </select>
-          <button className="floorplan-icon-button" onClick={addScene} title="Add scene" aria-label="Add scene">
+          <button className="floorplan-icon-button" onClick={addScene} title="Tambah scene" aria-label="Tambah scene">
             <Plus size={18} />
           </button>
         </div>
       </header>
 
-      <div className="floorplan-main-tools" role="toolbar" aria-label="Floorplan tools">
+      <div className="floorplan-main-tools" role="toolbar" aria-label="Alat Floorplan">
         <div className="floorplan-tool-group">
-          <button className={'floorplan-tool-button' + (tool === 'select' ? ' active' : '')} onClick={() => setTool('select')} title="Select and move" aria-label="Select and move" aria-pressed={tool === 'select'}>
+          <button className={'floorplan-tool-button' + (tool === 'select' ? ' active' : '')} onClick={() => setTool('select')} title="Pilih dan pindahkan" aria-label="Pilih dan pindahkan" aria-pressed={tool === 'select'}>
             <MousePointer2 size={19} />
           </button>
-          <button className={'floorplan-tool-button' + (tool === 'path' ? ' active' : '')} onClick={() => setTool(tool === 'path' ? 'select' : 'path')} title="Draw path for selected actor or camera" aria-label="Draw movement path" aria-pressed={tool === 'path'} disabled={!selectedCanHavePath}>
-            <Route size={19} /><span>Path</span>
+          <button className={'floorplan-tool-button' + (tool === 'path' ? ' active' : '')} onClick={() => setTool(tool === 'path' ? 'select' : 'path')} title="Gambar jalur gerak aktor atau kamera terpilih" aria-label="Gambar jalur gerak" aria-pressed={tool === 'path'} disabled={!selectedCanHavePath}>
+            <Route size={19} /><span>Jalur</span>
           </button>
         </div>
         <span className="floorplan-tool-divider" />
-        <div className="floorplan-structure-group" role="group" aria-label="Structure">
-          <span className="floorplan-structure-label">Structure</span>
-          <button className={'floorplan-tool-button' + (tool === 'room' ? ' active' : '')} onClick={() => setTool('room')} title="Draw room by dragging" aria-label="Draw room" aria-pressed={tool === 'room'}>
-            <Square size={18} /><span>Room</span>
+        <div className="floorplan-structure-group" role="group" aria-label="Struktur">
+          <span className="floorplan-structure-label">Struktur</span>
+          <button className={'floorplan-tool-button' + (tool === 'room' ? ' active' : '')} onClick={() => setTool('room')} title="Gambar ruang dengan drag" aria-label="Gambar ruang" aria-pressed={tool === 'room'}>
+            <Square size={18} /><span>Ruang</span>
           </button>
-          <button className={'floorplan-tool-button' + (tool === 'wall' ? ' active' : '')} onClick={() => setTool('wall')} title="Add wall by dragging its endpoints" aria-label="Draw wall" aria-pressed={tool === 'wall'}>
-            <Minus size={19} /><span>Wall</span>
+          <button className={'floorplan-tool-button' + (tool === 'wall' ? ' active' : '')} onClick={() => setTool('wall')} title="Gambar dinding dengan menggeser kedua ujungnya" aria-label="Gambar dinding" aria-pressed={tool === 'wall'}>
+            <Minus size={19} /><span>Dinding</span>
           </button>
         </div>
         <span className="floorplan-tool-divider" />
         <div className="floorplan-tool-group">
-          <button className="floorplan-tool-button" onClick={() => addObject('actor')} title="Add actor" aria-label="Add actor">
-            <FloorplanObjectIcon type="actor" size={22} /><span>Actor</span>
+          <button className="floorplan-tool-button" onClick={() => addObject('actor')} title="Tambah aktor" aria-label="Tambah aktor">
+            <FloorplanObjectIcon type="actor" size={22} /><span>Aktor</span>
           </button>
-          <button className="floorplan-tool-button" onClick={() => addObject('camera')} title="Add camera and link a shot" aria-label="Add camera">
+          <button className="floorplan-tool-button" onClick={() => addObject('camera')} title="Tambah kamera dan hubungkan ke shot" aria-label="Tambah kamera">
             <FloorplanObjectIcon type="camera" size={22} /><span>Camera</span>
           </button>
-          <button className="floorplan-tool-button" onClick={() => addObject('prop')} title="Add prop or furniture" aria-label="Add prop">
-            <FloorplanObjectIcon type="prop" size={22} /><span>Props</span>
+          <button className="floorplan-tool-button" onClick={() => addObject('prop')} title="Tambah properti atau furnitur" aria-label="Tambah properti">
+            <FloorplanObjectIcon type="prop" size={22} /><span>Properti</span>
           </button>
-          <button className="floorplan-tool-button" onClick={() => addObject('light')} title="Add lighting" aria-label="Add lighting">
-            <FloorplanObjectIcon type="light" size={22} /><span>Lighting</span>
+          <button className="floorplan-tool-button" onClick={() => addObject('light')} title="Tambah lampu" aria-label="Tambah lampu">
+            <FloorplanObjectIcon type="light" size={22} /><span>Lampu</span>
           </button>
         </div>
         <span className="floorplan-tool-spacer" />
-        <button className="floorplan-icon-button floorplan-clear-button" onClick={clearLayout} title="Clear current scene" aria-label="Clear current scene">
+        <button className="floorplan-icon-button floorplan-clear-button" onClick={clearLayout} title="Kosongkan layout scene ini" aria-label="Kosongkan layout scene ini">
           <Trash2 size={17} />
         </button>
       </div>
@@ -959,7 +959,7 @@ export default function Floorplan({
               viewBox={'0 0 ' + MAP_WIDTH + ' ' + MAP_HEIGHT}
               preserveAspectRatio="none"
               role="img"
-              aria-label="Top-down floorplan canvas"
+              aria-label="Kanvas Floorplan tampak atas"
               onPointerDown={handleCanvasPointerDown}
               onClick={handleCanvasClick}
               onPointerMove={handleCanvasPointerMove}
@@ -1439,19 +1439,19 @@ export default function Floorplan({
                   <strong>{objectTypeLabel(selectedType)}</strong>
                   {selectedType === 'camera' && <span>{selectedShot ? 'Shot ' + selectedShot.num : 'Unlinked'}</span>}
                 </div>
-                <button className="floorplan-icon-button danger" onClick={deleteSelected} aria-label="Delete selected object" title="Delete selected object"><Trash2 size={17} /></button>
+                <button className="floorplan-icon-button danger" onClick={deleteSelected} aria-label="Hapus objek terpilih" title="Hapus objek terpilih"><Trash2 size={17} /></button>
               </div>
 
               {selectedType === 'actor' && (
                 <>
                   <section className="floorplan-inspector-section">
-                    <label htmlFor="actor-name">Actor</label>
+                    <label htmlFor="actor-name">Aktor</label>
                     <input id="actor-name" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
                   </section>
                   <section className="floorplan-inspector-section">
-                    <div className="floorplan-section-title">Path</div>
+                    <div className="floorplan-section-title">Jalur gerak</div>
                     <button className={'floorplan-path-button' + (tool === 'path' ? ' active' : '')} onClick={() => setTool(tool === 'path' ? 'select' : 'path')}>
-                      <Route size={17} /> {tool === 'path' ? 'Finish path' : 'Draw path'} <span>{selectedPath.length}</span>
+                      <Route size={17} /> {tool === 'path' ? 'Selesai menggambar' : 'Gambar jalur'} <span>{selectedPath.length}</span>
                     </button>
                     {selectedWaypoint?.type === selectedType && selectedWaypoint?.id === selectedEntity.id && (
                       <button className="floorplan-remove-point" onClick={deleteSelectedWaypoint}>
@@ -1459,7 +1459,7 @@ export default function Floorplan({
                       </button>
                     )}
                     {selectedPath.length > 0 && (
-                      <button className="floorplan-remove-path" onClick={() => updateSelected({ path: [] })}>Remove entire path</button>
+                      <button className="floorplan-remove-path" onClick={() => updateSelected({ path: [] })}>Hapus seluruh jalur</button>
                     )}
                   </section>
                 </>
@@ -1468,14 +1468,14 @@ export default function Floorplan({
               {selectedType === 'camera' && (
                 <>
                   <section className="floorplan-inspector-section">
-                    <label htmlFor="camera-linked-shot">Shot List link</label>
+                    <label htmlFor="camera-linked-shot">Tautan Shot List</label>
                     <select
                       id="camera-linked-shot"
                       className="floorplan-field"
                       value={selectedEntity.shotId || ''}
                       onChange={event => changeCameraLink(selectedEntity, event.target.value)}
                     >
-                      <option value="">Unlinked</option>
+                      <option value="">Belum ditautkan</option>
                       {scene.shots.filter(shot => !layout.cameras.some(camera => camera.id !== selectedEntity.id && camera.shotId === shot.id)).map(shot => (
                         <option key={shot.id} value={shot.id}>{shot.num} — {shot.subject || 'Untitled shot'}</option>
                       ))}
@@ -1484,32 +1484,32 @@ export default function Floorplan({
                   {selectedShot ? (
                     <>
                       <section className="floorplan-inspector-section floorplan-camera-fields">
-                        <label htmlFor="camera-subject">Subject</label>
+                        <label htmlFor="camera-subject">Subjek</label>
                         <input
                           id="camera-subject"
                           className="floorplan-field"
                           value={selectedShot.subject || ''}
                           maxLength={1000}
                           onChange={event => updateLinkedShot('subject', event.target.value)}
-                          placeholder="Shot subject"
+                          placeholder="Subjek shot"
                         />
-                        <label htmlFor="camera-body">Camera</label>
+                        <label htmlFor="camera-body">Kamera</label>
                         <input
                           id="camera-body"
                           className="floorplan-field"
                           value={selectedShot.camera || ''}
                           maxLength={200}
                           onChange={event => updateLinkedShot('camera', event.target.value)}
-                          placeholder="Camera body"
+                          placeholder="Body kamera"
                         />
-                        <label htmlFor="camera-shot-size">Shot size</label>
+                        <label htmlFor="camera-shot-size">Ukuran shot</label>
                         <select
                           id="camera-shot-size"
                           className="floorplan-field"
                           value={selectedShot.size || ''}
                           onChange={event => updateLinkedShot('size', event.target.value)}
                         >
-                          <option value="">Select shot size</option>
+                          <option value="">Pilih ukuran shot</option>
                           {SHOT_SIZES.map(option => <option key={option} value={option}>{option}</option>)}
                         </select>
                         <label htmlFor="camera-angle">Angle</label>
@@ -1519,7 +1519,7 @@ export default function Floorplan({
                           value={selectedShot.angle || ''}
                           onChange={event => updateLinkedShot('angle', event.target.value)}
                         >
-                          <option value="">Select angle</option>
+                          <option value="">Pilih angle</option>
                           {SHOT_ANGLES.map(option => <option key={option} value={option}>{option}</option>)}
                         </select>
                         <label htmlFor="camera-lens">Lens</label>
@@ -1530,7 +1530,7 @@ export default function Floorplan({
                           value={selectedShot.lens || ''}
                           maxLength={100}
                           onChange={event => updateLinkedShot('lens', event.target.value)}
-                          placeholder="Choose or type focal length"
+                          placeholder="Pilih atau ketik panjang fokus"
                         />
                         <datalist id="floorplan-lens-options">
                           {SHOT_LENSES.map(option => <option key={option} value={option} />)}
@@ -1551,11 +1551,11 @@ export default function Floorplan({
                         </div>
                         <select
                           className="floorplan-field"
-                          aria-label="Add camera movement"
+                          aria-label="Tambah camera movement"
                           value=""
                           onChange={event => addShotListItem('movements', event.target.value)}
                         >
-                          <option value="">+ Add movement</option>
+                          <option value="">+ Tambah movement</option>
                           {SHOT_MOVEMENTS.filter(movement => !(selectedShot.movements || []).includes(movement)).map(movement => (
                             <option key={movement} value={movement}>{movement}</option>
                           ))}
@@ -1587,11 +1587,11 @@ export default function Floorplan({
                         </div>
                         <select
                           className="floorplan-field"
-                          aria-label="Add camera equipment"
+                          aria-label="Tambah equipment kamera"
                           value=""
                           onChange={event => addShotListItem('equipment', event.target.value)}
                         >
-                          <option value="">+ Add equipment</option>
+                          <option value="">+ Tambah equipment</option>
                           {SHOT_EQUIPMENT.filter(item => !(selectedShot.equipment || []).includes(item)).map(item => (
                             <option key={item} value={item}>{item}</option>
                           ))}
@@ -1600,9 +1600,9 @@ export default function Floorplan({
 
                       {selectedCameraCanHavePath && (
                         <section className="floorplan-inspector-section">
-                          <label>Movement path (optional)</label>
+                          <label>Jalur gerak (opsional)</label>
                           <button className={'floorplan-path-button' + (tool === 'path' ? ' active' : '')} onClick={() => setTool(tool === 'path' ? 'select' : 'path')}>
-                            <Route size={17} /> {tool === 'path' ? 'Finish path' : 'Draw path'} <span>{selectedPath.length}</span>
+                            <Route size={17} /> {tool === 'path' ? 'Selesai menggambar' : 'Gambar jalur'} <span>{selectedPath.length}</span>
                           </button>
                           {selectedWaypoint?.type === selectedType && selectedWaypoint?.id === selectedEntity.id && (
                             <button className="floorplan-remove-point" onClick={deleteSelectedWaypoint}>
@@ -1610,7 +1610,7 @@ export default function Floorplan({
                             </button>
                           )}
                           {selectedPath.length > 0 && (
-                            <button className="floorplan-remove-path" onClick={() => updateSelected({ path: [] })}>Remove entire path</button>
+                            <button className="floorplan-remove-path" onClick={() => updateSelected({ path: [] })}>Hapus seluruh jalur</button>
                           )}
                         </section>
                       )}
@@ -1618,13 +1618,13 @@ export default function Floorplan({
                   ) : (
                     <div className="floorplan-inspector-section floorplan-unlinked">
                       <strong>Camera belum ditautkan ke shot.</strong>
-                      <span>Pilih shot di atas untuk mengedit data bersama dengan Shot List.</span>
+                      <span>Pilih shot di atas untuk menyunting data bersama di Shot List.</span>
                     </div>
                   )}
                 </>
               )}{selectedType === 'light' && (
                 <section className="floorplan-inspector-section">
-                  <label htmlFor="light-type">Lighting type</label>
+                  <label htmlFor="light-type">Tipe lampu</label>
                   <select id="light-type" className="floorplan-field" value={selectedEntity.lightType || 'Key'} onChange={event => updateSelected({ lightType: event.target.value })}>
                     {LIGHT_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
                   </select>
@@ -1634,27 +1634,27 @@ export default function Floorplan({
               {selectedType === 'room' && (
                 <>
                   <section className="floorplan-inspector-section">
-                    <label htmlFor="room-label">Room name</label>
+                    <label htmlFor="room-label">Nama ruang</label>
                     <input id="room-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
                   </section>
                   <section className="floorplan-inspector-section">
-                    <div className="floorplan-section-title">Dimensions</div>
+                    <div className="floorplan-section-title">Dimensi</div>
                     <div className="floorplan-dimension-summary">
-                      <div><span>Length</span><strong>{formatMeters(selectedEntity.width)}</strong></div>
-                      <div><span>Width</span><strong>{formatMeters(selectedEntity.height)}</strong></div>
+                      <div><span>Panjang</span><strong>{formatMeters(selectedEntity.width)}</strong></div>
+                      <div><span>Lebar</span><strong>{formatMeters(selectedEntity.height)}</strong></div>
                     </div>
                   </section>
                   <section className="floorplan-inspector-section">
-                    <div className="floorplan-section-title">Openings</div>
+                    <div className="floorplan-section-title">Bukaan</div>
                     <div className="floorplan-opening-actions">
-                      <button className="floorplan-opening-add" onClick={() => addOpening('door')}><FloorplanObjectIcon type="door" size={18} /> Add door</button>
-                      <button className="floorplan-opening-add" onClick={() => addOpening('window')}><FloorplanObjectIcon type="window" size={18} /> Add window</button>
+                      <button className="floorplan-opening-add" onClick={() => addOpening('door')}><FloorplanObjectIcon type="door" size={18} /> Tambah pintu</button>
+                      <button className="floorplan-opening-add" onClick={() => addOpening('window')}><FloorplanObjectIcon type="window" size={18} /> Tambah jendela</button>
                     </div>
                     {(selectedEntity.openings || []).map(opening => (
                       <div className="floorplan-opening-row" key={opening.id}>
                         <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Door' : 'Window'}</span>
-                        <span className="floorplan-opening-hint">Drag to move</span>
-                        <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} title="Remove opening" aria-label="Remove opening"><X size={15} /></button>
+                        <span className="floorplan-opening-hint">Geser untuk memindahkan</span>
+                        <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
                       </div>
                     ))}
                   </section>
@@ -1664,23 +1664,23 @@ export default function Floorplan({
               {selectedType === 'wall' && (
                 <>
                   <section className="floorplan-inspector-section">
-                    <div className="floorplan-section-title">Dimensions</div>
+                    <div className="floorplan-section-title">Dimensi</div>
                     <div className="floorplan-dimension-summary">
-                      <div><span>Length</span><strong>{formatMeters(getWallMetrics(selectedEntity).length)}</strong></div>
-                      <div><span>Width</span><strong>{formatMeters(Number(selectedEntity.thickness) || 6)}</strong></div>
+                      <div><span>Panjang</span><strong>{formatMeters(getWallMetrics(selectedEntity).length)}</strong></div>
+                      <div><span>Lebar</span><strong>{formatMeters(Number(selectedEntity.thickness) || 6)}</strong></div>
                     </div>
                   </section>
                   <section className="floorplan-inspector-section">
-                    <div className="floorplan-section-title">Openings</div>
+                    <div className="floorplan-section-title">Bukaan</div>
                     <div className="floorplan-opening-actions">
-                      <button className="floorplan-opening-add" onClick={() => addOpening('door')}><FloorplanObjectIcon type="door" size={18} /> Add door</button>
-                      <button className="floorplan-opening-add" onClick={() => addOpening('window')}><FloorplanObjectIcon type="window" size={18} /> Add window</button>
+                      <button className="floorplan-opening-add" onClick={() => addOpening('door')}><FloorplanObjectIcon type="door" size={18} /> Tambah pintu</button>
+                      <button className="floorplan-opening-add" onClick={() => addOpening('window')}><FloorplanObjectIcon type="window" size={18} /> Tambah jendela</button>
                     </div>
                     {(selectedEntity.openings || []).map(opening => (
                       <div className="floorplan-opening-row" key={opening.id}>
                         <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Door' : 'Window'}</span>
-                        <span className="floorplan-opening-hint">Drag on canvas to move</span>
-                        <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} title="Remove opening" aria-label="Remove opening"><X size={15} /></button>
+                        <span className="floorplan-opening-hint">Geser di kanvas untuk memindahkan</span>
+                        <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
                       </div>
                     ))}
                   </section>
@@ -1689,7 +1689,7 @@ export default function Floorplan({
 
               {selectedType === 'prop' && (
                 <section className="floorplan-inspector-section">
-                  <label htmlFor="prop-type">Prop type</label>
+                  <label htmlFor="prop-type">Tipe properti</label>
                   <select id="prop-type" className="floorplan-field" value={selectedEntity.propType || 'Custom'} onChange={event => updateSelected({ propType: event.target.value, label: event.target.value })}>
                     {PROP_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
                   </select>
@@ -1699,10 +1699,10 @@ export default function Floorplan({
           ) : (
             <div className="floorplan-object-browser">
               <div className="floorplan-object-browser-head">
-                <strong>Objects</strong><span>{objectCount}</span>
+                <strong>Objek</strong><span>{objectCount}</span>
               </div>
               {allObjects.length === 0 ? (
-                <div className="floorplan-empty-state"><Layers2 size={24} /><span>No objects yet</span></div>
+                <div className="floorplan-empty-state"><Layers2 size={24} /><span>Belum ada objek</span></div>
               ) : (
                 allObjects.map(object => (
                   <button key={object.entityType + object.id} className="floorplan-object-row" onClick={() => setSelected({ type: object.entityType, id: object.id })}>

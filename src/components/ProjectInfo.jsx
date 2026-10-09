@@ -57,7 +57,7 @@ export default function ProjectInfo({ project, onChange }) {
       })
     } catch (error) {
       console.error('CINEBLOCK could not load visual reference:', error)
-      window.alert('The selected image could not be loaded. Please try another image.')
+      window.alert('Gambar tidak dapat dibuka. Silakan pilih gambar lain.')
     } finally {
       input.value = ''
     }
@@ -97,50 +97,50 @@ export default function ProjectInfo({ project, onChange }) {
   return (
     <div className="project-info">
       <div className="section-header">
-        <div className="section-title">Project Information</div>
-        <div className="section-desc">General details about the project</div>
+        <div className="section-title">Informasi Proyek</div>
+        <div className="section-desc">Informasi umum tentang proyek</div>
       </div>
 
       <div className="form-grid">
-        <Field label="Title" value={project.title} onChange={v => set('title', v)} placeholder="e.g. NEPTU" />
-        <Field label="Director" value={project.director} onChange={v => set('director', v)} placeholder="e.g. Robert Armand" />
-        <Field label="Director of Photography" value={project.dop} onChange={v => set('dop', v)} placeholder="e.g. Nikolas Genta" />
-        <Field label="Production Company" value={project.production} onChange={v => set('production', v)} placeholder="e.g. Pitulungan Bahana Sinema" />
-        <Field label="Genre" value={project.genre} onChange={v => set('genre', v)} placeholder="e.g. Drama Psikologi" />
-        <Field label="Duration" value={project.duration} onChange={v => set('duration', v)} placeholder="e.g. 30 menit" />
-        <Field label="Format" value={project.format} onChange={v => set('format', v)} placeholder="e.g. UHD 4K" />
-        <Field label="Aspect Ratio" value={project.aspectRatio} onChange={v => set('aspectRatio', v)} placeholder="e.g. 2.39:1" />
-        <Field label="Camera" value={project.camera} onChange={v => set('camera', v)} placeholder="e.g. Canon C50" />
-        <Field label="Lens System" value={project.lensSystem} onChange={v => set('lensSystem', v)} placeholder="e.g. Canon EF" />
+        <Field label="Judul Proyek" value={project.title} onChange={v => set('title', v)} placeholder="mis. NEPTU" />
+        <Field label="Sutradara" value={project.director} onChange={v => set('director', v)} placeholder="mis. Robert Armand" />
+        <Field label="Penata Kamera (DOP)" value={project.dop} onChange={v => set('dop', v)} placeholder="mis. Nikolas Genta" />
+        <Field label="Rumah Produksi" value={project.production} onChange={v => set('production', v)} placeholder="mis. Pitulungan Bahana Sinema" />
+        <Field label="Genre" value={project.genre} onChange={v => set('genre', v)} placeholder="mis. Drama Psikologi" />
+        <Field label="Durasi" value={project.duration} onChange={v => set('duration', v)} placeholder="e.g. 30 menit" />
+        <Field label="Format Gambar" value={project.format} onChange={v => set('format', v)} placeholder="mis. UHD 4K" />
+        <Field label="Rasio Aspek" value={project.aspectRatio} onChange={v => set('aspectRatio', v)} placeholder="mis. 2.39:1" />
+        <Field label="Kamera Utama" value={project.camera} onChange={v => set('camera', v)} placeholder="mis. Sony FX3" />
+        <Field label="Sistem Lensa" value={project.lensSystem} onChange={v => set('lensSystem', v)} placeholder="mis. Sony E-mount" />
       </div>
 
       <div className="divider" />
 
       <div className="section-header">
-        <div className="section-title">Visual Approach</div>
-        <div className="section-desc">General cinematography and lighting direction</div>
+        <div className="section-title">Pendekatan Visual</div>
+        <div className="section-desc">Arahan sinematografi dan pencahayaan</div>
       </div>
 
       <div className="form-grid full">
         <FieldArea
-          label="General Visual Approach"
+          label="Arahan Visual Umum"
           value={project.visualApproach}
           onChange={v => set('visualApproach', v)}
-          placeholder="Describe the visual language, camera style, and movement approach..."
+          placeholder="Jelaskan bahasa visual, gaya kamera, dan pendekatan movement..."
         />
         <FieldArea
-          label="General Lighting Approach"
+          label="Arahan Pencahayaan Umum"
           value={project.lightingApproach}
           onChange={v => set('lightingApproach', v)}
-          placeholder="Describe the lighting philosophy, mood, and key references..."
+          placeholder="Jelaskan pendekatan pencahayaan, mood, dan referensi utama..."
         />
       </div>
 
       <div className="divider" />
 
       <div className="section-header">
-        <div className="section-title">Visual References</div>
-        <div className="section-desc">Look & mood references — click to upload</div>
+        <div className="section-title">Referensi Visual</div>
+        <div className="section-desc">Referensi look & mood — klik untuk mengunggah</div>
       </div>
 
       <div className="visual-refs">
@@ -150,7 +150,7 @@ export default function ProjectInfo({ project, onChange }) {
               className="visual-ref-card"
               role={ref ? 'group' : 'button'}
               tabIndex={ref ? -1 : 0}
-              aria-label={ref ? `Visual reference ${i + 1}` : `Add visual reference ${i + 1}`}
+              aria-label={ref ? `Referensi visual ${i + 1}` : `Tambah referensi visual ${i + 1}`}
               onClick={() => !ref && fileRefs.current[i]?.click()}
               onKeyDown={event => {
                 if (!ref && (event.key === 'Enter' || event.key === ' ')) {
@@ -161,12 +161,12 @@ export default function ProjectInfo({ project, onChange }) {
             >
               {ref ? (
                 <>
-                  <img src={ref} alt={project.visualRefLabels?.[i] || `Reference ${i + 1}`} />
+                  <img src={ref} alt={project.visualRefLabels?.[i] || `Referensi ${i + 1}`} />
                   <button
                     className="visual-ref-remove"
                     onClick={e => { e.stopPropagation(); removeRef(i) }}
-                    aria-label={`Remove visual reference ${i + 1}`}
-                    title="Remove reference"
+                    aria-label={`Hapus referensi visual ${i + 1}`}
+                    title="Hapus referensi"
                   >
                     <X size={10} />
                   </button>
@@ -174,7 +174,7 @@ export default function ProjectInfo({ project, onChange }) {
               ) : (
                 <div className="add-icon">
                   <Plus size={16} strokeWidth={1.5} />
-                  <span>Add Reference</span>
+                  <span>Tambah Referensi</span>
                 </div>
               )}
               <input
@@ -190,9 +190,9 @@ export default function ProjectInfo({ project, onChange }) {
                 className="visual-ref-caption"
                 value={project.visualRefLabels?.[i] || ''}
                 onChange={event => setRefLabel(i, event.target.value)}
-                placeholder={`Reference ${i + 1} label`}
+                placeholder={`Label referensi ${i + 1}`}
                 maxLength={100}
-                aria-label={`Label for visual reference ${i + 1}`}
+                aria-label={`Label referensi visual ${i + 1}`}
               />
               <div className="visual-ref-order">
                 <button
@@ -200,8 +200,8 @@ export default function ProjectInfo({ project, onChange }) {
                   style={{ padding: 4 }}
                   onClick={() => moveRef(i, -1)}
                   disabled={i === 0}
-                  title="Move reference left"
-                  aria-label="Move reference left"
+                  title="Geser referensi ke kiri"
+                  aria-label="Geser referensi ke kiri"
                 >
                   <ChevronLeft size={13} />
                 </button>
@@ -210,8 +210,8 @@ export default function ProjectInfo({ project, onChange }) {
                   style={{ padding: 4 }}
                   onClick={() => moveRef(i, 1)}
                   disabled={i === project.visualRefs.length - 1}
-                  title="Move reference right"
-                  aria-label="Move reference right"
+                  title="Geser referensi ke kanan"
+                  aria-label="Geser referensi ke kanan"
                 >
                   <ChevronRight size={13} />
                 </button>

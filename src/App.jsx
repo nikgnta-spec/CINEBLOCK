@@ -4,13 +4,13 @@ import ProjectInfo from './components/ProjectInfo'
 import ShotList from './components/ShotList'
 import Floorplan from './components/Floorplan'
 import PrintReport from './components/PrintReport'
-import { Download, Upload, Plus, Trash2, X, FileText, PanelsTopLeft, RectangleHorizontal, RectangleVertical } from 'lucide-react'
+import { Download, Upload, Plus, Trash2, X, FileText, PanelsTopLeft, RectangleHorizontal, RectangleVertical, MoreHorizontal } from 'lucide-react'
 import { loadAppState, saveAppState } from './storage'
 
 const TABS = [
   { id: 'floorplan', label: 'Floorplan' },
   { id: 'shotlist', label: 'Shot List' },
-  { id: 'project', label: 'Project Info' },
+  { id: 'project', label: 'Info Proyek' },
 ]
 
 const defaultProject = {
@@ -174,7 +174,7 @@ const defaultShot = (num) => ({
 
 function createProjectRecord(id, project, scenes, activeSceneId, floorplans = {}) {
   const safeId = id || crypto.randomUUID()
-  const safeTitle = project?.title?.trim() || 'Untitled Project'
+  const safeTitle = project?.title?.trim() || 'Proyek tanpa judul'
   return {
     id: safeId,
     name: safeTitle,
@@ -402,7 +402,7 @@ function normalizeWorkspaceProjects(savedProjects) {
           item.activeSceneId || normalizedScenes[0]?.id || '',
           normalizedFloorplans,
         ),
-        name: normalizedProject.title?.trim() || item.name || 'Untitled Project',
+        name: normalizedProject.title?.trim() || item.name || 'Proyek tanpa judul',
         updatedAt: item.updatedAt || new Date().toISOString(),
       }
     })
@@ -572,10 +572,10 @@ export default function App() {
 
   const deleteCurrentProject = () => {
     if (projects.length <= 1) {
-      window.alert('CINEBLOCK needs at least one project. Create another project before deleting this one.')
+      window.alert('CINEBLOCK harus memiliki minimal satu proyek. Buat proyek lain sebelum menghapus proyek ini.')
       return
     }
-    if (!window.confirm('Delete this project and all its scenes and shots from this browser? This cannot be undone.')) return
+    if (!window.confirm('Hapus proyek ini beserta semua scene dan shot-nya dari browser ini? Tindakan ini tidak dapat dibatalkan.')) return
 
     const remaining = projects.filter(item => item.id !== activeProjectId)
     const target = remaining[0]
@@ -621,13 +621,13 @@ export default function App() {
     try {
       const parsed = JSON.parse(await file.text())
       if (parsed?.app !== 'CINEBLOCK' || !Array.isArray(parsed.projects)) {
-        throw new Error('This file is not a valid CINEBLOCK backup.')
+        throw new Error('File ini bukan backup CINEBLOCK yang valid.')
       }
       const importedProjects = normalizeWorkspaceProjects(parsed.projects)
       if (!importedProjects.length) {
-        throw new Error('The backup does not contain any valid projects.')
+        throw new Error('Backup ini tidak berisi proyek yang valid.')
       }
-      if (!window.confirm('Import these projects? Matching project IDs will be replaced; other local projects will be kept.')) {
+      if (!window.confirm('Impor proyek ini? Proyek dengan ID yang sama akan diganti; proyek lokal lainnya tetap disimpan.')) {
         return
       }
 
@@ -656,7 +656,7 @@ export default function App() {
       setTab('floorplan')
     } catch (error) {
       console.error('CINEBLOCK could not import backup:', error)
-      window.alert(error.message || 'The backup file could not be imported.')
+      window.alert(error.message || 'File backup tidak dapat diimpor.')
     } finally {
       input.value = ''
     }
@@ -670,7 +670,7 @@ export default function App() {
           <span style={{ color: 'var(--text-muted)' }}>/</span>
           <select
             className="project-switcher"
-            aria-label="Open project"
+            aria-label="Buka proyek"
             value={activeProjectId}
             onChange={event => switchProject(event.target.value)}
             disabled={!hydrated || projects.length === 0}
@@ -678,42 +678,41 @@ export default function App() {
             {projects.map(item => (
               <option key={item.id} value={item.id}>
                 {item.id === activeProjectId
-                  ? (project.title.trim() || 'Untitled Project')
+                  ? (project.title.trim() || 'Proyek tanpa judul')
                   : item.name}
               </option>
             ))}
           </select>
           <button className="btn btn-secondary" onClick={createNewProject} disabled={!hydrated}>
-            <Plus size={13} /> New Project
+            <Plus size={14} /> Proyek Baru
           </button>
-          <button
-            className="btn btn-danger"
-            onClick={deleteCurrentProject}
-            disabled={!hydrated || projects.length <= 1}
-            title="Delete current project"
-          >
-            <Trash2 size={13} /> Delete
-          </button>
+          <details className="project-actions-menu">
+            <summary className="project-actions-trigger" aria-label="Menu pengelolaan proyek" title="Menu pengelolaan proyek"><MoreHorizontal size={17} /></summary>
+            <div className="project-actions-popover">
+              <button className="project-actions-delete" onClick={deleteCurrentProject} disabled={!hydrated || projects.length <= 1} title="Hapus proyek aktif"><Trash2 size={14} /> Hapus Proyek</button>
+            </div>
+          </details>
         </div>
         <div className="topbar-right">
           <span
+            className={`save-status${saveStatus === 'saving' || saveStatus === 'loading' ? ' is-saving' : saveStatus === 'error' ? ' is-error' : ''}`}
             aria-live="polite"
-            title="Projects, shot lists, active tab, and active scene are saved locally in this browser"
+            title="Proyek, Shot List, tab aktif, dan scene aktif disimpan di browser ini"
             style={{ fontSize: 11, color: 'var(--text-muted)' }}
           >
             {saveStatus === 'loading'
-              ? 'Loading…'
+              ? 'Memuat…'
               : saveStatus === 'saving'
-                ? 'Saving…'
+                ? 'Menyimpan…'
                 : saveStatus === 'error'
-                  ? 'Save failed'
-                  : 'Saved locally'}
+                  ? 'Gagal menyimpan'
+                  : 'Tersimpan di perangkat ini'}
           </span>
           <button className="btn btn-secondary" onClick={downloadBackup} disabled={!hydrated}>
             <Download size={13} /> Backup
           </button>
           <button className="btn btn-secondary" onClick={() => backupInputRef.current?.click()} disabled={!hydrated}>
-            <Upload size={13} /> Import
+            <Upload size={14} /> Impor
           </button>
           <input
             ref={backupInputRef}
@@ -723,11 +722,10 @@ export default function App() {
             onChange={importBackup}
           />
           <button
-            className="btn btn-secondary"
-            style={{ fontSize: 12 }}
+            className="btn btn-primary"
             onClick={() => setExportDialogOpen(true)}
             disabled={!hydrated}
-            title="Choose the report sections and page orientation for PDF export."
+            title="Pilih bagian laporan dan orientasi halaman untuk PDF."
           >
             <Download size={13} />
             Export PDF
@@ -745,8 +743,8 @@ export default function App() {
           <section className="export-dialog" role="dialog" aria-modal="true" aria-labelledby="export-dialog-title">
             <header className="export-dialog-header">
               <div>
-                <h2 id="export-dialog-title">Export PDF</h2>
-                <p>Choose what to include and the page orientation.</p>
+                <h2 id="export-dialog-title">Ekspor PDF</h2>
+                <p>Pilih konten laporan dan orientasi halaman.</p>
               </div>
               <button className="export-dialog-close" type="button" onClick={() => setExportDialogOpen(false)} aria-label="Close export dialog">
                 <X size={18} />
@@ -754,45 +752,45 @@ export default function App() {
             </header>
 
             <fieldset className="export-choice-group">
-              <legend>Content</legend>
+              <legend>Konten laporan</legend>
               <label className={'export-choice-card' + (exportMode === 'shotlist' ? ' selected' : '')}>
                 <input type="radio" name="export-content" value="shotlist" checked={exportMode === 'shotlist'} onChange={() => setExportMode('shotlist')} />
                 <span className="export-choice-icon"><FileText size={20} /></span>
-                <span className="export-choice-copy"><strong>Shot List</strong><small>Project information and every scene's shot details.</small></span>
+                <span className="export-choice-copy"><strong>Shot List</strong><small>Info proyek dan detail shot dari setiap scene.</small></span>
               </label>
               <label className={'export-choice-card' + (exportMode === 'floorplan' ? ' selected' : '')}>
                 <input type="radio" name="export-content" value="floorplan" checked={exportMode === 'floorplan'} onChange={() => setExportMode('floorplan')} />
                 <span className="export-choice-icon"><PanelsTopLeft size={20} /></span>
-                <span className="export-choice-copy"><strong>Floorplan</strong><small>Floorplan pages for each scene.</small></span>
+                <span className="export-choice-copy"><strong>Floorplan</strong><small>Denah untuk setiap scene.</small></span>
               </label>
               <label className={'export-choice-card' + (exportMode === 'full' ? ' selected' : '')}>
                 <input type="radio" name="export-content" value="full" checked={exportMode === 'full'} onChange={() => setExportMode('full')} />
                 <span className="export-choice-icon"><FileText size={20} /></span>
-                <span className="export-choice-copy"><strong>Full Report</strong><small>Project information, Shot List, and Floorplan.</small></span>
+                <span className="export-choice-copy"><strong>Laporan Lengkap</strong><small>Info proyek, Shot List, dan Floorplan.</small></span>
               </label>
             </fieldset>
 
             <fieldset className="export-choice-group export-orientation-group">
-              <legend>Page orientation</legend>
+              <legend>Orientasi halaman</legend>
               <label className={'export-orientation-card' + (exportOrientation === 'portrait' ? ' selected' : '')}>
                 <input type="radio" name="export-orientation" value="portrait" checked={exportOrientation === 'portrait'} onChange={() => setExportOrientation('portrait')} />
                 <RectangleVertical size={23} />
-                <span><strong>Portrait</strong><small>Vertical page</small></span>
+                <span><strong>Portrait</strong><small>Tegak</small></span>
               </label>
               <label className={'export-orientation-card' + (exportOrientation === 'landscape' ? ' selected' : '')}>
                 <input type="radio" name="export-orientation" value="landscape" checked={exportOrientation === 'landscape'} onChange={() => setExportOrientation('landscape')} />
                 <RectangleHorizontal size={27} />
-                <span><strong>Landscape</strong><small>Horizontal page</small></span>
+                <span><strong>Landscape</strong><small>Mendatar</small></span>
               </label>
             </fieldset>
 
             <footer className="export-dialog-footer">
-              <button className="btn btn-secondary" type="button" onClick={() => setExportDialogOpen(false)}>Cancel</button>
+              <button className="btn btn-secondary" type="button" onClick={() => setExportDialogOpen(false)}>Batal</button>
               <button className="btn btn-primary" type="button" onClick={() => {
                 setExportDialogOpen(false)
                 setPrintRequest(true)
               }}>
-                <Download size={14} /> Export PDF
+                <Download size={14} /> Ekspor PDF
               </button>
             </footer>
           </section>
@@ -813,7 +811,7 @@ export default function App() {
 
       <div className="content">
         {!hydrated ? (
-          <div className="app-loading" role="status">Loading saved project…</div>
+          <div className="app-loading" role="status">Memuat data proyek…</div>
         ) : (
           <>
             {tab === 'project' && (
