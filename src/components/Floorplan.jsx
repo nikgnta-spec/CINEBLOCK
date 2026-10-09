@@ -585,10 +585,10 @@ export default function Floorplan({
                 return (
                   <g key={type + '-' + object.id}>
                     {points.length > 1 && (
-                      <polyline points={pointString} fill="none" stroke="var(--text-muted)" strokeWidth="3" strokeDasharray="9 7" markerEnd="url(#floorplan-arrow)" vectorEffect="non-scaling-stroke" pointerEvents="none" />
+                      <polyline points={pointString} fill="none" stroke={active ? 'var(--text)' : 'var(--text-muted)'} strokeOpacity={active ? 0.95 : 0.3} strokeWidth={active ? 3 : 2} strokeDasharray={active ? '9 6' : '5 9'} markerEnd="url(#floorplan-arrow)" vectorEffect="non-scaling-stroke" pointerEvents="none" />
                     )}
                     {(object.path || []).map((point, index) => (
-                      <circle key={index} cx={point.x} cy={point.y} r="5" fill="var(--bg)" stroke="var(--text-muted)" strokeWidth="2" vectorEffect="non-scaling-stroke" pointerEvents="none" />
+                      <circle key={index} cx={point.x} cy={point.y} r={active ? 5 : 3} fill="var(--bg)" stroke={active ? 'var(--text)' : 'var(--text-muted)'} strokeOpacity={active ? 1 : 0.3} strokeWidth="2" vectorEffect="non-scaling-stroke" pointerEvents="none" />
                     ))}
                     <g
                       transform={'translate(' + object.x + ' ' + object.y + ')'}
