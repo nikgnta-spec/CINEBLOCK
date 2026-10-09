@@ -436,7 +436,7 @@ export default function App() {
   const [hydrated, setHydrated] = useState(false)
   const [saveStatus, setSaveStatus] = useState('loading')
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
-  const [exportMode, setExportMode] = useState('full')
+  const [exportMode, setExportMode] = useState('shotlist-table')
   const [exportOrientation, setExportOrientation] = useState('portrait')
   const [printRequest, setPrintRequest] = useState(false)
   const printStartedRef = useRef(false)
@@ -488,7 +488,7 @@ export default function App() {
       pageStyle.id = 'cineblock-print-page-settings'
       document.head.appendChild(pageStyle)
     }
-    pageStyle.textContent = `@page { size: A4 ${exportOrientation}; margin: 12mm 12mm 14mm; }`
+    pageStyle.textContent = `@page { size: A4 ${exportOrientation}; margin: 12mm; }\n@media print { html, body, #root, .app, .print-report { box-sizing: border-box !important; max-width: 100% !important; } }`
 
     window.print()
     setPrintRequest(false)
@@ -802,7 +802,7 @@ export default function App() {
             <header className="export-dialog-header">
               <div>
                 <h2 id="export-dialog-title">Ekspor PDF</h2>
-                <p>Pilih konten laporan dan orientasi halaman.</p>
+                <p>Pilih format konten dan orientasi halaman. Format tabel tidak menyertakan Status atau Storyboard.</p>
               </div>
               <button className="export-dialog-close" type="button" onClick={() => setExportDialogOpen(false)} aria-label="Tutup dialog ekspor">
                 <X size={18} />
@@ -810,21 +810,26 @@ export default function App() {
             </header>
 
             <fieldset className="export-choice-group">
-              <legend>Konten laporan</legend>
-              <label className={'export-choice-card' + (exportMode === 'shotlist' ? ' selected' : '')}>
-                <input type="radio" name="export-content" value="shotlist" checked={exportMode === 'shotlist'} onChange={() => setExportMode('shotlist')} />
+              <legend>Format ekspor</legend>
+              <label className={'export-choice-card' + (exportMode === 'shotlist-table' ? ' selected' : '')}>
+                <input type="radio" name="export-content" value="shotlist-table" checked={exportMode === 'shotlist-table'} onChange={() => { setExportMode('shotlist-table'); setExportOrientation('landscape') }} />
                 <span className="export-choice-icon"><FileText size={20} /></span>
-                <span className="export-choice-copy"><strong>Shot List</strong><small>Info proyek dan detail shot dari setiap scene.</small></span>
+                <span className="export-choice-copy"><strong>Shot List — Tabel</strong><small>Tabel detail shot tanpa kolom Status, Storyboard, atau Aksi. Disarankan Landscape.</small></span>
+              </label>
+              <label className={'export-choice-card' + (exportMode === 'storyboard' ? ' selected' : '')}>
+                <input type="radio" name="export-content" value="storyboard" checked={exportMode === 'storyboard'} onChange={() => { setExportMode('storyboard'); setExportOrientation('landscape') }} />
+                <span className="export-choice-icon"><PanelsTopLeft size={20} /></span>
+                <span className="export-choice-copy"><strong>Storyboard</strong><small>Susunan visual per shot dengan gambar storyboard dan informasi shot.</small></span>
               </label>
               <label className={'export-choice-card' + (exportMode === 'floorplan' ? ' selected' : '')}>
-                <input type="radio" name="export-content" value="floorplan" checked={exportMode === 'floorplan'} onChange={() => setExportMode('floorplan')} />
+                <input type="radio" name="export-content" value="floorplan" checked={exportMode === 'floorplan'} onChange={() => { setExportMode('floorplan'); setExportOrientation('portrait') }} />
                 <span className="export-choice-icon"><PanelsTopLeft size={20} /></span>
                 <span className="export-choice-copy"><strong>Floorplan</strong><small>Denah untuk setiap scene.</small></span>
               </label>
               <label className={'export-choice-card' + (exportMode === 'full' ? ' selected' : '')}>
-                <input type="radio" name="export-content" value="full" checked={exportMode === 'full'} onChange={() => setExportMode('full')} />
+                <input type="radio" name="export-content" value="full" checked={exportMode === 'full'} onChange={() => { setExportMode('full'); setExportOrientation('portrait') }} />
                 <span className="export-choice-icon"><FileText size={20} /></span>
-                <span className="export-choice-copy"><strong>Laporan Lengkap</strong><small>Info proyek, Shot List, dan Floorplan.</small></span>
+                <span className="export-choice-copy"><strong>Laporan Lengkap</strong><small>Info proyek, Shot List dalam format tabel, dan Floorplan.</small></span>
               </label>
             </fieldset>
 

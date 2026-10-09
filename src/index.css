@@ -1261,3 +1261,126 @@ button:focus-visible,
 .storyboard-control.is-compact .storyboard-remove-button { width:24px; height:28px; }
 .shot-row.status-done .shot-num { color:var(--success); }
 .shot-row.status-skip .shot-num { color:var(--danger); }
+
+
+/* PDF export refinements: page-safe content, clean table export and storyboard sheets. */
+@media print {
+  html, body, #root, .app, .print-report {
+    box-sizing: border-box !important;
+    max-width: 100% !important;
+  }
+  html, body, #root { overflow: visible !important; }
+  .app { width: auto !important; min-width: 0 !important; }
+  .app > .print-report {
+    width: auto !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+    overflow-wrap: anywhere;
+  }
+  .print-report, .print-report * { box-sizing: border-box; }
+  .print-cover, .print-shot-list-section, .print-plan-page {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .print-cover h1, .print-cover p, .print-project-meta strong,
+  .print-shot-heading span, .print-shot-fields strong, .print-shot-notes {
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+  .print-mode-shotlist-table .print-shot-list-section,
+  .print-mode-storyboard .print-shot-list-section { break-before: auto !important; }
+  .print-mode-shotlist-table .print-plan-page,
+  .print-mode-storyboard .print-plan-page { display: none !important; }
+  .print-mode-floorplan .print-cover,
+  .print-mode-floorplan .print-shot-list-section { display: none !important; }
+  .print-mode-floorplan .print-plan-page { break-before: auto !important; }
+
+  .print-shot-table {
+    width: 100%;
+    max-width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    border-spacing: 0;
+    font-size: 6.5pt;
+    line-height: 1.25;
+    color: #111827;
+  }
+  .print-shot-table .col-shot { width: 4%; }
+  .print-shot-table .col-subject { width: 12%; }
+  .print-shot-table .col-size { width: 7%; }
+  .print-shot-table .col-camera { width: 7%; }
+  .print-shot-table .col-angle { width: 7%; }
+  .print-shot-table .col-lens { width: 5%; }
+  .print-shot-table .col-movement { width: 8%; }
+  .print-shot-table .col-equipment { width: 10%; }
+  .print-shot-table .col-sound { width: 6%; }
+  .print-shot-table .col-take { width: 5%; }
+  .print-shot-table .col-script { width: 5%; }
+  .print-shot-table .col-setup { width: 5%; }
+  .print-shot-table .col-time { width: 7%; }
+  .print-shot-table .col-notes { width: 12%; }
+  .print-shot-table th, .print-shot-table td {
+    border: 1px solid #d1d5db;
+    padding: 4px 3px;
+    text-align: left;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    white-space: pre-wrap;
+  }
+  .print-shot-table th {
+    background: #eef2f7 !important;
+    color: #111827;
+    font-size: 6pt;
+    text-transform: uppercase;
+    letter-spacing: .01em;
+  }
+  .print-shot-table thead { display: table-header-group; }
+  .print-shot-table tr { break-inside: avoid; page-break-inside: avoid; }
+  .print-shot-table .print-table-shot-number { font-weight: 700; white-space: nowrap; }
+  .print-shot-table .print-table-subject { font-weight: 600; }
+  .print-shot-table .print-empty-row { color: #6b7280; font-style: italic; }
+
+  .print-storyboard-section .print-scene-shots { break-inside: auto; }
+  .print-storyboard-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    align-items: start;
+  }
+  .print-storyboard-card {
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid #cbd5e1;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-storyboard-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .print-storyboard-card-header > strong { flex: 0 0 auto; font-size: 8pt; }
+  .print-storyboard-card-header > span { min-width: 0; flex: 1 1 50%; font-size: 8pt; font-weight: 650; overflow-wrap: anywhere; }
+  .print-storyboard-status { padding: 2px 4px; border: 1px solid #cbd5e1; border-radius: 3px; color: #475569; font-size: 6pt; white-space: nowrap; }
+  .print-storyboard-status.status-done { border-color: #15803d; color: #166534; }
+  .print-storyboard-status.status-skip { border-color: #b91c1c; color: #991b1b; }
+  .print-storyboard-image { display: flex; align-items: center; justify-content: center; height: 42mm; margin: 0 0 7px; border: 1px solid #e5e7eb; overflow: hidden; }
+  .print-storyboard-image img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+  .print-storyboard-placeholder { display: flex; align-items: center; justify-content: center; height: 42mm; margin-bottom: 7px; border: 1px dashed #cbd5e1; color: #64748b; font-size: 8pt; text-align: center; }
+  .print-storyboard-details { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px 8px; }
+  .print-storyboard-details > span { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+  .print-storyboard-details small { color: #64748b; font-size: 6pt; text-transform: uppercase; }
+  .print-storyboard-details strong { font-size: 7pt; font-weight: 500; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .print-storyboard-notes { margin: 6px 0 0; padding-top: 5px; border-top: 1px solid #e5e7eb; font-size: 7pt; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .print-orientation-landscape .print-storyboard-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .print-orientation-portrait .print-storyboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

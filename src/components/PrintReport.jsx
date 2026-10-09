@@ -262,110 +262,165 @@ export default function PrintReport({ project, scenes, floorplans, mode = 'full'
     label: project.visualRefLabels?.[index] || 'Reference ' + (index + 1),
   })).filter(reference => typeof reference.src === 'string' && reference.src.length > 0)
 
+  const includeCover = mode === 'full'
+  const tableMode = mode === 'shotlist-table' || mode === 'full'
+  const storyboardMode = mode === 'storyboard'
+  const includeShotList = tableMode || storyboardMode
+  const includeFloorplans = mode === 'floorplan' || mode === 'full'
+
   return (
     <main className={'print-report print-mode-' + mode + ' print-orientation-' + orientation}>
-      {mode !== 'floorplan' && (
-      <section className="print-cover">
-        <div className="print-brand-row">
-          <strong className="print-brand">CINEBLOCK</strong>
-          <span>PRODUCTION PLANNING REPORT</span>
-        </div>
-        <p className="print-section-kicker">PROJECT INFORMATION</p>
-        <h1>{display(project.title) === '—' ? 'Untitled Project' : project.title}</h1>
-        <div className="print-project-meta">
-          <div><span>Director</span><strong>{display(project.director)}</strong></div>
-          <div><span>Director of Photography</span><strong>{display(project.dop)}</strong></div>
-          <div><span>Production Company</span><strong>{display(project.production)}</strong></div>
-          <div><span>Genre</span><strong>{display(project.genre)}</strong></div>
-          <div><span>Duration</span><strong>{display(project.duration)}</strong></div>
-          <div><span>Format</span><strong>{display(project.format)}</strong></div>
-          <div><span>Aspect Ratio</span><strong>{display(project.aspectRatio)}</strong></div>
-          <div><span>Camera</span><strong>{display(project.camera)}</strong></div>
-          <div><span>Lens System</span><strong>{display(project.lensSystem)}</strong></div>
-          <div><span>Scenes</span><strong>{scenes.length}</strong></div>
-          <div><span>Total Shots</span><strong>{scenes.reduce((total, scene) => total + (scene.shots || []).length, 0)}</strong></div>
-        </div>
-        {project.visualApproach && (
-          <div className="print-copy-block">
-            <h2>General Visual Approach</h2>
-            <p>{project.visualApproach}</p>
+      {includeCover && (
+        <section className="print-cover">
+          <div className="print-brand-row">
+            <strong className="print-brand">CINEBLOCK</strong>
+            <span>PRODUCTION PLANNING REPORT</span>
           </div>
-        )}
-        {project.lightingApproach && (
-          <div className="print-copy-block">
-            <h2>General Lighting Approach</h2>
-            <p>{project.lightingApproach}</p>
+          <p className="print-section-kicker">PROJECT INFORMATION</p>
+          <h1>{display(project.title) === '—' ? 'Untitled Project' : project.title}</h1>
+          <div className="print-project-meta">
+            <div><span>Director</span><strong>{display(project.director)}</strong></div>
+            <div><span>Director of Photography</span><strong>{display(project.dop)}</strong></div>
+            <div><span>Production Company</span><strong>{display(project.production)}</strong></div>
+            <div><span>Genre</span><strong>{display(project.genre)}</strong></div>
+            <div><span>Duration</span><strong>{display(project.duration)}</strong></div>
+            <div><span>Format</span><strong>{display(project.format)}</strong></div>
+            <div><span>Aspect Ratio</span><strong>{display(project.aspectRatio)}</strong></div>
+            <div><span>Camera</span><strong>{display(project.camera)}</strong></div>
+            <div><span>Lens System</span><strong>{display(project.lensSystem)}</strong></div>
+            <div><span>Scenes</span><strong>{scenes.length}</strong></div>
+            <div><span>Total Shots</span><strong>{scenes.reduce((total, scene) => total + (scene.shots || []).length, 0)}</strong></div>
           </div>
-        )}
-        {references.length > 0 && (
-          <div className="print-references">
-            <h2>Visual References</h2>
-            <div className="print-reference-grid">
-              {references.map(reference => (
-                <figure key={reference.label + reference.src.slice(0, 32)}>
-                  <img src={reference.src} alt={reference.label} />
-                  <figcaption>{reference.label}</figcaption>
-                </figure>
-              ))}
+          {project.visualApproach && (
+            <div className="print-copy-block">
+              <h2>General Visual Approach</h2>
+              <p>{project.visualApproach}</p>
             </div>
-          </div>
-        )}
-        <div className="print-cover-footer">Generated with CINEBLOCK</div>
-      </section>
-      )}
-
-      {mode !== 'floorplan' && (
-      <section className="print-shot-list-section">
-        <div className="print-section-kicker">SHOT LIST</div>
-        <h2>Scenes & Camera Coverage</h2>
-        {scenes.map((scene, index) => (
-          <section className="print-scene-shots" key={scene.id}>
-            <div className="print-scene-heading">
-              <div>
-                <h3>{String(index + 1).padStart(2, '0')} · {scene.name || 'Scene'}</h3>
-                <p>{scene.intExt || 'INT'} · {display(scene.location)} · {scene.dayNight || 'DAY'}</p>
+          )}
+          {project.lightingApproach && (
+            <div className="print-copy-block">
+              <h2>General Lighting Approach</h2>
+              <p>{project.lightingApproach}</p>
+            </div>
+          )}
+          {references.length > 0 && (
+            <div className="print-references">
+              <h2>Visual References</h2>
+              <div className="print-reference-grid">
+                {references.map(reference => (
+                  <figure key={reference.label + reference.src.slice(0, 32)}>
+                    <img src={reference.src} alt={reference.label} />
+                    <figcaption>{reference.label}</figcaption>
+                  </figure>
+                ))}
               </div>
-              <span>{(scene.shots || []).length} shot{(scene.shots || []).length === 1 ? '' : 's'}</span>
             </div>
-            {(scene.shots || []).length === 0 ? (
-              <p className="print-muted">No shots added.</p>
-            ) : (
-              (scene.shots || []).map((shot, shotIndex) => (
-                <article className="print-shot-card" key={shot.id || shotIndex}>
-                  <div className="print-shot-heading">
-                    <strong>#{shot.num || String(shotIndex + 1).padStart(3, '0')}</strong>
-                    <span>{display(shot.subject)}</span>
-                  </div>
-                  <div className="print-shot-fields">
-                    <div><span>Size</span><strong>{display(shot.size)}</strong></div>
-                    <div><span>Camera</span><strong>{display(shot.camera)}</strong></div>
-                    <div><span>Angle</span><strong>{display(shot.angle)}</strong></div>
-                    <div><span>Status</span><strong>{shot.status === 'done' ? 'Done' : shot.status === 'skip' ? 'Skip' : 'Planned'}</strong></div>
-                    <div><span>Lens</span><strong>{display(shot.lens)}</strong></div>
-                    <div><span>Movement</span><strong>{display(shot.movements)}</strong></div>
-                    <div><span>Equipment</span><strong>{display(shot.equipment)}</strong></div>
-                    <div><span>Sound</span><strong>{display(shot.sound)}</strong></div>
-                    <div><span>Take</span><strong>{display(shot.take)}</strong></div>
-                    <div><span>Script</span><strong>{display(shot.script)}</strong></div>
-                    <div><span>Setup</span><strong>{display(shot.setup)}</strong></div>
-                    <div><span>Est. Shoot</span><strong>{display(shot.estShoot)}</strong></div>
-                  </div>
-                  {shot.storyboardImage && (
-                    <figure className="print-storyboard">
-                      <img src={shot.storyboardImage} alt={'Storyboard shot ' + (shot.num || shotIndex + 1)} />
-                      <figcaption>Storyboard · {shot.num || String(shotIndex + 1).padStart(3, '0')}</figcaption>
-                    </figure>
-                  )}
-                  {shot.notes && <p className="print-shot-notes"><strong>Notes:</strong> {shot.notes}</p>}
-                </article>
-              ))
-            )}
-          </section>
-        ))}
-      </section>
+          )}
+          <div className="print-cover-footer">Generated with CINEBLOCK</div>
+        </section>
       )}
 
-      {mode !== 'shotlist' && scenes.map(scene => (
+      {includeShotList && (
+        <section className={'print-shot-list-section' + (tableMode ? ' print-table-section' : ' print-storyboard-section')}>
+          <div className="print-section-kicker">{storyboardMode ? 'STORYBOARD' : 'SHOT LIST'}</div>
+          <h2>{storyboardMode ? 'Storyboard & Camera Coverage' : 'Shot List'}</h2>
+          {scenes.map((scene, index) => (
+            <section className="print-scene-shots" key={scene.id}>
+              <div className="print-scene-heading">
+                <div>
+                  <h3>{String(index + 1).padStart(2, '0')} · {scene.name || 'Scene'}</h3>
+                  <p>{scene.intExt || 'INT'} · {display(scene.location)} · {scene.dayNight || 'DAY'}</p>
+                </div>
+                <span>{(scene.shots || []).length} shot{(scene.shots || []).length === 1 ? '' : 's'}</span>
+              </div>
+
+              {tableMode ? (
+                <table className="print-shot-table">
+                  <colgroup>
+                    <col className="col-shot" />
+                    <col className="col-subject" />
+                    <col className="col-size" />
+                    <col className="col-camera" />
+                    <col className="col-angle" />
+                    <col className="col-lens" />
+                    <col className="col-movement" />
+                    <col className="col-equipment" />
+                    <col className="col-sound" />
+                    <col className="col-take" />
+                    <col className="col-script" />
+                    <col className="col-setup" />
+                    <col className="col-time" />
+                    <col className="col-notes" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th>Shot</th><th>Subjek</th><th>Size</th><th>Kamera</th><th>Angle</th><th>Lens</th>
+                      <th>Movement</th><th>Equipment</th><th>Audio</th><th>Take</th><th>Script</th>
+                      <th>Setup</th><th>Est. Shoot</th><th>Catatan</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(scene.shots || []).length === 0 ? (
+                      <tr><td colSpan={14} className="print-empty-row">Belum ada shot di scene ini.</td></tr>
+                    ) : (scene.shots || []).map((shot, shotIndex) => (
+                      <tr key={shot.id || shotIndex}>
+                        <td className="print-table-shot-number">{shot.num || String(shotIndex + 1).padStart(3, '0')}</td>
+                        <td className="print-table-subject">{display(shot.subject)}</td>
+                        <td>{display(shot.size)}</td>
+                        <td>{display(shot.camera)}</td>
+                        <td>{display(shot.angle)}</td>
+                        <td>{display(shot.lens)}</td>
+                        <td>{display(shot.movements)}</td>
+                        <td>{display(shot.equipment)}</td>
+                        <td>{display(shot.sound)}</td>
+                        <td>{display(shot.take)}</td>
+                        <td>{display(shot.script)}</td>
+                        <td>{display(shot.setup)}</td>
+                        <td>{display(shot.estShoot)}</td>
+                        <td>{display(shot.notes)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="print-storyboard-grid">
+                  {(scene.shots || []).length === 0 ? (
+                    <p className="print-muted">Belum ada shot di scene ini.</p>
+                  ) : (scene.shots || []).map((shot, shotIndex) => (
+                    <article className="print-storyboard-card" key={shot.id || shotIndex}>
+                      <header className="print-storyboard-card-header">
+                        <strong>#{shot.num || String(shotIndex + 1).padStart(3, '0')}</strong>
+                        <span>{display(shot.subject)}</span>
+                        <small className={'print-storyboard-status status-' + (['done', 'skip'].includes(shot.status) ? shot.status : 'planned')}>
+                          {shot.status === 'done' ? 'Done' : shot.status === 'skip' ? 'Skip' : 'Planned'}
+                        </small>
+                      </header>
+                      {shot.storyboardImage ? (
+                        <figure className="print-storyboard-image">
+                          <img src={shot.storyboardImage} alt={'Storyboard shot ' + (shot.num || shotIndex + 1)} />
+                        </figure>
+                      ) : (
+                        <div className="print-storyboard-placeholder">Storyboard belum ditambahkan</div>
+                      )}
+                      <div className="print-storyboard-details">
+                        <span><small>Size</small><strong>{display(shot.size)}</strong></span>
+                        <span><small>Camera</small><strong>{display(shot.camera)}</strong></span>
+                        <span><small>Angle</small><strong>{display(shot.angle)}</strong></span>
+                        <span><small>Lens</small><strong>{display(shot.lens)}</strong></span>
+                        <span><small>Movement</small><strong>{display(shot.movements)}</strong></span>
+                        <span><small>Equipment</small><strong>{display(shot.equipment)}</strong></span>
+                      </div>
+                      {shot.notes && <p className="print-storyboard-notes">{shot.notes}</p>}
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          ))}
+        </section>
+      )}
+
+      {includeFloorplans && scenes.map(scene => (
         <PrintFloorplan key={'plan-' + scene.id} scene={scene} layout={floorplans?.[scene.id] || {}} />
       ))}
 
