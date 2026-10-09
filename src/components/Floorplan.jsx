@@ -929,55 +929,145 @@ export default function Floorplan({
               <rect width={MAP_WIDTH} height={MAP_HEIGHT} fill="var(--bg)" />
               <rect width={MAP_WIDTH} height={MAP_HEIGHT} fill="url(#floorplan-grid-large)" />
 
-              {layout.rooms.map(room => (
-                <g key={room.id} data-floorplan-object="true" onPointerDown={event => beginObjectDrag('room', room, event)} onClick={event => event.stopPropagation()}>
-                  <rect
-                    x={room.x} y={room.y} width={room.width} height={room.height}
-                    fill={selected?.type === 'room' && selected.id === room.id ? 'var(--bg-hover)' : 'var(--bg-subtle)'}
-                    stroke={selected?.type === 'room' && selected.id === room.id ? 'var(--text)' : 'var(--border-strong)'}
-                    strokeWidth={selected?.type === 'room' && selected.id === room.id ? 3.5 : 2.5}
-                    vectorEffect="non-scaling-stroke"
-                  />
-                  <text x={room.x + 12} y={room.y + 28} fill="var(--text)" fontSize="18" fontWeight="600" pointerEvents="none">
-                    {room.label || 'Room'}
-                  </text>
-                  {selected?.type === 'room' && selected.id === room.id && RESIZE_HANDLES.map(handle => (
+              {layout.rooms.map(room => {
+                const openings = room.openings || []
+                const active = selected?.type === 'room' && selected.id === room.id
+                const edgeDefs = [
+                  { side: 'top', x: room.x, y: room.y, length: room.width, horizontal: true },
+                  { side: 'right', x: room.x + room.width, y: room.y, length: room.height, horizontal: false },
+                  { side: 'bottom', x: room.x, y: room.y + room.height, length: room.width, horizontal: true },
+                  { side: 'left', x: room.x, y: room.y, length: room.height, horizontal: false },
+                ]
+                return (
+                  <g key={room.id} data-floorplan-object="true" onPointerDown={event => beginObjectDrag('room', room, event)} onClick={event => event.stopPropagation()}>
                     <rect
-                      key={handle.key}
-                      x={(handle.sx < 0 ? room.x : room.x + room.width) - 5}
-                      y={(handle.sy < 0 ? room.y : room.y + room.height) - 5}
-                      width="10"
-                      height="10"
-                      rx="1.5"
-                      fill="var(--bg)"
-                      stroke="var(--text)"
-                      strokeWidth="1.8"
-                      vectorEffect="non-scaling-stroke"
-                      style={{ cursor: handle.cursor }}
-                      onPointerDown={event => beginResize('room', room, handle.sx, handle.sy, event)}
+                      x={room.x} y={room.y} width={room.width} height={room.height}
+                      fill={active ? 'var(--bg-hover)' : 'var(--bg-subtle)'}
+                      stroke="none"
                     />
-                  ))}
-                </g>
-              ))}
+                    {edgeDefs.flatMap(edge => {
+                      const edgeOpenings = openings.filter(opening => (opening.side || 'bottom') === edge.side)
+                      return getOpeningSegments(edge.length, edgeOpenings).map((segment, index) => (
+                        <line
+                          key={edge.side + '-' + index}
+                          x1={edge.horizontal ? room.x + segment.start : edge.x}
+                          y1={edge.horizontal ? edge.y : room.y + segment.start}
+                          x2={edge.horizontal ? room.x + segment.end : edge.x}
+                          y2={edge.horizontal ? edge.y : room.y + segment.end}
+                          stroke={active ? 'var(--text)' : 'var(--border-strong)'}
+                          strokeWidth={active ? 3.5 : 2.5}
+                          vectorEffect="non-scaling-stroke"
+                          pointerEvents="none"
+                        />
+                      ))
+                    })}
+                    <text x={room.x + 12} y={room.y + 28} fill="var(--text)" fontSize="18" fontWeight="600" pointerEvents="none">
+                      {room.label || 'Room'}
+                    </text>
+                    {openings.map(opening => {
+                      const placement = getRoomOpeningPlacement(room, opening)
+                      const openingWidth = Math.min(Number(opening.width) || 48, placement.length)
+                      return (
+                        <g
+                          key={opening.id}
+                          transform={'translate(' + placement.x + ' ' + placement.y + ') rotate(' + placement.angle + ')'}
+                          data-floorplan-object="true"
+                          style={{ cursor: 'grab' }}
+                          onPointerDown={event => beginOpeningDrag('room', room, opening, event)}
+                          onClick={event => event.stopPropagation()}
+                        >
+                          {opening.type === 'door' ? (
+                            <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+                              <path d={'M ' + (-openingWidth / 2) + ' 0 V ' + (-openingWidth)} />
+                              <path d={'M ' + (-openingWidth / 2) + ' ' + (-openingWidth) + ' A ' + openingWidth + ' ' + openingWidth + ' 0 0 1 ' + (openingWidth / 2) + ' 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
+                            </g>
+                          ) : (
+                            <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+                              <path d={'M ' + (-openingWidth / 2) + ' -4 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 0 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 4 H ' + (openingWidth / 2)} />
+                              <path d={'M ' + (-openingWidth / 2) + ' -7 V 7 M ' + (openingWidth / 2) + ' -7 V 7'} />
+                            </g>
+                          )}
+                        </g>
+                      )
+                    })}
+                    {active && RESIZE_HANDLES.map(handle => (
+                      <rect
+                        key={handle.key}
+                        x={(handle.sx < 0 ? room.x : room.x + room.width) - 5}
+                        y={(handle.sy < 0 ? room.y : room.y + room.height) - 5}
+                        width="10"
+                        height="10"
+                        rx="1.5"
+                        fill="var(--bg)"
+                        stroke="var(--text)"
+                        strokeWidth="1.8"
+                        vectorEffect="non-scaling-stroke"
+                        style={{ cursor: handle.cursor }}
+                        onPointerDown={event => beginResize('room', room, handle.sx, handle.sy, event)}
+                      />
+                    ))}
+                  </g>
+                )
+              })}
 
-              {layout.walls.map(wall => (
-                <g key={wall.id} data-floorplan-object="true" onPointerDown={event => beginObjectDrag('wall', wall, event)} onClick={event => event.stopPropagation()}>
-                  <line
-                    x1={wall.x1} y1={wall.y1} x2={wall.x2} y2={wall.y2}
-                    stroke={selected?.type === 'wall' && selected.id === wall.id ? 'var(--text)' : 'var(--border-strong)'}
-                    strokeWidth={selected?.type === 'wall' && selected.id === wall.id ? (wall.thickness || 6) + 2 : (wall.thickness || 6)}
-                    strokeLinecap="square" vectorEffect="non-scaling-stroke"
-                  />
-                  <line x1={wall.x1} y1={wall.y1} x2={wall.x2} y2={wall.y2}
-                    stroke="transparent" strokeWidth="20" vectorEffect="non-scaling-stroke" />
-                  {selected?.type === 'wall' && selected.id === wall.id && (
-                    <>
-                      <circle cx={wall.x1} cy={wall.y1} r="6" fill="var(--bg)" stroke="var(--text)" strokeWidth="2" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerDown={event => beginWallEndpointDrag(wall, 'start', event)} />
-                      <circle cx={wall.x2} cy={wall.y2} r="6" fill="var(--bg)" stroke="var(--text)" strokeWidth="2" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerDown={event => beginWallEndpointDrag(wall, 'end', event)} />
-                    </>
-                  )}
-                </g>
-              ))}
+              {layout.walls.map(wall => {
+                const metrics = getWallMetrics(wall)
+                const length = metrics.length
+                const openings = wall.openings || []
+                const active = selected?.type === 'wall' && selected.id === wall.id
+                const wallAngle = metrics.angle
+                return (
+                  <g key={wall.id} data-floorplan-object="true" onPointerDown={event => beginObjectDrag('wall', wall, event)} onClick={event => event.stopPropagation()}>
+                    {getOpeningSegments(length, openings).map((segment, index) => (
+                      <line
+                        key={'wall-segment-' + index}
+                        x1={wall.x1 + metrics.ux * segment.start}
+                        y1={wall.y1 + metrics.uy * segment.start}
+                        x2={wall.x1 + metrics.ux * segment.end}
+                        y2={wall.y1 + metrics.uy * segment.end}
+                        stroke={active ? 'var(--text)' : 'var(--border-strong)'}
+                        strokeWidth={active ? (wall.thickness || 6) + 2 : (wall.thickness || 6)}
+                        strokeLinecap="square"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    ))}
+                    <line x1={wall.x1} y1={wall.y1} x2={wall.x2} y2={wall.y2}
+                      stroke="transparent" strokeWidth="20" vectorEffect="non-scaling-stroke" />
+                    {openings.map(opening => {
+                      const center = clamp(opening.offset, 0, 1) * length
+                      const openingWidth = Math.min(Number(opening.width) || 48, length)
+                      return (
+                        <g
+                          key={opening.id}
+                          transform={'translate(' + (wall.x1 + metrics.ux * center) + ' ' + (wall.y1 + metrics.uy * center) + ') rotate(' + wallAngle + ')'}
+                          data-floorplan-object="true"
+                          style={{ cursor: 'grab' }}
+                          onPointerDown={event => beginOpeningDrag('wall', wall, opening, event)}
+                          onClick={event => event.stopPropagation()}
+                        >
+                          {opening.type === 'door' ? (
+                            <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+                              <path d={'M ' + (-openingWidth / 2) + ' 0 V ' + (-openingWidth)} />
+                              <path d={'M ' + (-openingWidth / 2) + ' ' + (-openingWidth) + ' A ' + openingWidth + ' ' + openingWidth + ' 0 0 1 ' + (openingWidth / 2) + ' 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
+                            </g>
+                          ) : (
+                            <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+                              <path d={'M ' + (-openingWidth / 2) + ' -4 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 0 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 4 H ' + (openingWidth / 2)} />
+                              <path d={'M ' + (-openingWidth / 2) + ' -7 V 7 M ' + (openingWidth / 2) + ' -7 V 7'} />
+                            </g>
+                          )}
+                        </g>
+                      )
+                    })}
+                    {active && (
+                      <>
+                        <circle cx={wall.x1} cy={wall.y1} r="6" fill="var(--bg)" stroke="var(--text)" strokeWidth="2" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerDown={event => beginWallEndpointDrag(wall, 'start', event)} />
+                        <circle cx={wall.x2} cy={wall.y2} r="6" fill="var(--bg)" stroke="var(--text)" strokeWidth="2" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerDown={event => beginWallEndpointDrag(wall, 'end', event)} />
+                      </>
+                    )}
+                  </g>
+                )
+              })}
 
               {layout.lights.map(light => (
                 <g
@@ -998,8 +1088,6 @@ export default function Floorplan({
               ))}
 
               {[
-                ...layout.doors.map(item => ({ ...item, _kind: 'door' })),
-                ...layout.windows.map(item => ({ ...item, _kind: 'window' })),
                 ...layout.props.map(item => ({ ...item, _kind: 'prop' })),
                 ...layout.actors.map(item => ({ ...item, _kind: 'actor' })),
                 ...layout.cameras.map(item => ({ ...item, _kind: 'camera' })),
