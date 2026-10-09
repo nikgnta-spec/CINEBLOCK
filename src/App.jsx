@@ -24,6 +24,7 @@ const defaultProject = {
   visualApproach: '',
   lightingApproach: '',
   visualRefs: [null, null, null, null, null, null],
+  visualRefLabels: ['', '', '', '', '', ''],
 }
 
 function normalizeSavedProject(savedProject) {
@@ -43,6 +44,10 @@ function normalizeSavedProject(savedProject) {
           ? null
           : reference
       },
+    ),
+    visualRefLabels: Array.from(
+      { length: Math.max(6, savedProject?.visualRefLabels?.length || 0) },
+      (_, index) => savedProject?.visualRefLabels?.[index] || '',
     ),
   }
 }
