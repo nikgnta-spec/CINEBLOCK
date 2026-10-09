@@ -26,15 +26,11 @@ const padNum = number => String(number).padStart(2, '0')
 const normalizeAngle = angle => ((angle % 360) + 360) % 360
 
 function FloorplanObjectIcon({ type, size = 20 }) {
-  if (type === 'light') {
-    return <img className="floorplan-lamp-symbol" src="/assets/lamp-icon.png" width={size} height={size} alt="" draggable="false" />
-  }
-
   return (
     <svg
       width={size}
       height={size}
-      viewBox={type === 'camera' ? '-36 -25 72 50' : '-50 -42 100 84'}
+      viewBox={type === 'camera' ? '-36 -25 72 50' : type === 'light' ? '-22 -22 44 44' : '-50 -42 100 84'}
       fill="none"
       stroke="currentColor"
       strokeWidth="3.5"
@@ -50,10 +46,16 @@ function FloorplanObjectIcon({ type, size = 20 }) {
           <path d="M-18 0 C-12 -5 -7 6 0 6 C7 6 12 -5 18 0" />
           <path d="M-25 12 C-28 15 -28 19 -25 23 M25 12 C28 15 28 19 25 23" />
         </g>
-      ) : (
+      ) : type === 'camera' ? (
         <g>
           <path d="M9 -9 L33 -20 L33 20 L9 9 Z" />
           <rect x="-29" y="-15" width="40" height="30" rx="6" />
+        </g>
+      ) : (
+        <g transform="rotate(90)">
+          <path d="M-12 -9 L2 -12 L12 -8 L12 8 L2 12 L-12 9 Z" />
+          <circle cx="6" cy="0" r="4" />
+          <path d="M-12 -5 L-17 -8 M-12 5 L-17 8" />
         </g>
       )}
     </svg>
@@ -123,6 +125,19 @@ function fovSectorPath(fovDegrees) {
   const y2 = FOV_RADIUS * Math.sin(halfAngle)
   return 'M ' + FOV_START_X + ' 0 L ' + x1.toFixed(2) + ' ' + y1.toFixed(2)
     + ' A ' + FOV_RADIUS + ' ' + FOV_RADIUS + ' 0 0 1 ' + x2.toFixed(2) + ' ' + y2.toFixed(2) + ' Z'
+}
+
+const LIGHT_CONE_RADIUS = 220
+const LIGHT_CONE_ANGLE = 56
+
+function lightConeSectorPath() {
+  const halfAngle = (LIGHT_CONE_ANGLE / 2) * Math.PI / 180
+  const x1 = LIGHT_CONE_RADIUS * Math.cos(-halfAngle)
+  const y1 = LIGHT_CONE_RADIUS * Math.sin(-halfAngle)
+  const x2 = LIGHT_CONE_RADIUS * Math.cos(halfAngle)
+  const y2 = LIGHT_CONE_RADIUS * Math.sin(halfAngle)
+  return 'M 14 0 L ' + x1.toFixed(2) + ' ' + y1.toFixed(2)
+    + ' A ' + LIGHT_CONE_RADIUS + ' ' + LIGHT_CONE_RADIUS + ' 0 0 1 ' + x2.toFixed(2) + ' ' + y2.toFixed(2) + ' Z'
 }
 
 function formatFov(focalRange) {
@@ -743,6 +758,24 @@ export default function Floorplan({
                 </g>
               ))}
 
+              {layout.lights.map(light => (
+                <g
+                  key={'light-cone-' + light.id}
+                  transform={'translate(' + light.x + ' ' + light.y + ') rotate(' + (90 + (light.angle || 0)) + ')'}
+                  pointerEvents="none"
+                >
+                  <path
+                    d={lightConeSectorPath()}
+                    fill="var(--text-muted)"
+                    fillOpacity={selected?.type === 'light' && selected.id === light.id ? 0.16 : 0.09}
+                    stroke="var(--text-muted)"
+                    strokeOpacity={selected?.type === 'light' && selected.id === light.id ? 0.7 : 0.4}
+                    strokeWidth={selected?.type === 'light' && selected.id === light.id ? 1.6 : 1.2}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </g>
+              ))}
+
               {[
                 ...layout.actors.map(item => ({ ...item, _kind: 'actor' })),
                 ...layout.cameras.map(item => ({ ...item, _kind: 'camera' })),
@@ -895,8 +928,10 @@ export default function Floorplan({
                         </text>
                       )}
                       {type === 'light' && (
-                        <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
-                          <image className="floorplan-lamp-symbol" href="/assets/lamp-icon.png" x="-19" y="-19" width="38" height="38" preserveAspectRatio="xMidYMid meet" />
+                        <g transform={'rotate(' + (90 + (object.angle || 0)) + ')'} pointerEvents="none" fill="var(--bg)" stroke="var(--text)" strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+                          <path d="M-12 -9 L2 -12 L12 -8 L12 8 L2 12 L-12 9 Z" />
+                          <circle cx="6" cy="0" r="4" fill="var(--text)" stroke="none" />
+                          <path d="M-12 -5 L-17 -8 M-12 5 L-17 8" fill="none" strokeLinecap="round" />
                         </g>
                       )}
                       {active && <circle cx="0" cy="0" r="34" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
