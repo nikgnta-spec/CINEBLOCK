@@ -21,6 +21,12 @@ const MAP_WIDTH = 1000
 const MAP_HEIGHT = 650
 const EMPTY_LAYOUT = { rooms: [], walls: [], doors: [], windows: [], props: [], actors: [], cameras: [], lights: [] }
 const PROP_TYPES = ['Table', 'Chair', 'Sofa', 'Bed', 'Desk', 'Cabinet', 'Counter', 'Custom']
+const RESIZE_HANDLES = [
+  { key: 'nw', sx: -1, sy: -1, cursor: 'nwse-resize' },
+  { key: 'ne', sx: 1, sy: -1, cursor: 'nesw-resize' },
+  { key: 'sw', sx: -1, sy: 1, cursor: 'nesw-resize' },
+  { key: 'se', sx: 1, sy: 1, cursor: 'nwse-resize' },
+]
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0))
 const makeId = () => crypto.randomUUID()
 const padNum = number => String(number).padStart(2, '0')
@@ -353,6 +359,39 @@ export default function Floorplan({
     setTool('select')
   }
 
+  const beginResize = (type, item, sx, sy, event) => {
+    event.stopPropagation()
+    event.preventDefault()
+    const point = getPoint(event)
+    dragRef.current = {
+      mode: 'resize',
+      type,
+      id: item.id,
+      signX: sx,
+      signY: sy,
+      start: point,
+      original: { ...item },
+    }
+    svgRef.current?.setPointerCapture?.(event.pointerId)
+    setSelected({ type, id: item.id })
+    setSelectedWaypoint(null)
+    setTool('select')
+  }
+
+  const beginWallEndpointDrag = (wall, endpoint, event) => {
+    event.stopPropagation()
+    event.preventDefault()
+    dragRef.current = {
+      mode: 'wall-endpoint',
+      id: wall.id,
+      endpoint,
+    }
+    svgRef.current?.setPointerCapture?.(event.pointerId)
+    setSelected({ type: 'wall', id: wall.id })
+    setSelectedWaypoint(null)
+    setTool('select')
+  }
+
   const beginObjectDrag = (type, item, event) => {
     event.stopPropagation()
     if (tool === 'room' || tool === 'wall') return
@@ -473,6 +512,68 @@ export default function Floorplan({
     }
     const drag = dragRef.current
     if (!drag) return
+
+    if (drag.mode === 'wall-endpoint') {
+      const endpointPatch = drag.endpoint === 'start'
+        ? { x1: Math.round(point.x), y1: Math.round(point.y) }
+        : { x2: Math.round(point.x), y2: Math.round(point.y) }
+      updateLayout(previous => ({
+        ...previous,
+        walls: previous.walls.map(wall => wall.id === drag.id ? { ...wall, ...endpointPatch } : wall),
+      }))
+      return
+    }
+
+    if (drag.mode === 'resize') {
+      const original = drag.original
+      const dx = point.x - drag.start.x
+      const dy = point.y - drag.start.y
+      if (drag.type === 'room') {
+        const nextWidth = Math.round(clamp(
+          original.width + dx * drag.signX,
+          40,
+          drag.signX < 0 ? Math.min(MAP_WIDTH, original.x + original.width) : Math.max(40, MAP_WIDTH - original.x),
+        ))
+        const nextHeight = Math.round(clamp(
+          original.height + dy * drag.signY,
+          40,
+          drag.signY < 0 ? Math.min(MAP_HEIGHT, original.y + original.height) : Math.max(40, MAP_HEIGHT - original.y),
+        ))
+        const nextRoom = {
+          ...original,
+          width: nextWidth,
+          height: nextHeight,
+          x: Math.round(drag.signX < 0 ? original.x + original.width - nextWidth : original.x),
+          y: Math.round(drag.signY < 0 ? original.y + original.height - nextHeight : original.y),
+        }
+        updateLayout(previous => ({
+          ...previous,
+          rooms: previous.rooms.map(room => room.id === drag.id ? nextRoom : room),
+        }))
+      } else {
+        const angle = (Number(original.angle) || 0) * Math.PI / 180
+        const localDx = dx * Math.cos(angle) + dy * Math.sin(angle)
+        const localDy = -dx * Math.sin(angle) + dy * Math.cos(angle)
+        const minWidth = 12
+        const minHeight = 8
+        const nextWidth = Math.round(clamp(original.width + localDx * drag.signX, minWidth, 300))
+        const nextHeight = Math.round(clamp(original.height + localDy * drag.signY, minHeight, 200))
+        const shiftX = (nextWidth - original.width) * drag.signX / 2
+        const shiftY = (nextHeight - original.height) * drag.signY / 2
+        const nextItem = {
+          ...original,
+          width: nextWidth,
+          height: nextHeight,
+          x: Math.round(clamp(original.x + shiftX * Math.cos(angle) - shiftY * Math.sin(angle), 0, MAP_WIDTH)),
+          y: Math.round(clamp(original.y + shiftX * Math.sin(angle) + shiftY * Math.cos(angle), 0, MAP_HEIGHT)),
+        }
+        updateLayout(previous => ({
+          ...previous,
+          [drag.type + 's']: previous[drag.type + 's'].map(item => item.id === drag.id ? nextItem : item),
+        }))
+      }
+      return
+    }
 
     if (drag.mode === 'waypoint') {
       const waypoint = {
@@ -686,16 +787,6 @@ export default function Floorplan({
             <Plus size={18} />
           </button>
         </div>
-        <div className="floorplan-top-meta">
-          <span>{layout.rooms.length} Room{layout.rooms.length === 1 ? '' : 's'}</span>
-          <span>{layout.walls.length} Wall{layout.walls.length === 1 ? '' : 's'}</span>
-          <span>{layout.doors.length} Door{layout.doors.length === 1 ? '' : 's'}</span>
-          <span>{layout.windows.length} Window{layout.windows.length === 1 ? '' : 's'}</span>
-          <span>{layout.props.length} Props</span>
-          <span>{layout.actors.length} Actor{layout.actors.length === 1 ? '' : 's'}</span>
-          <span>{layout.cameras.length} Camera{layout.cameras.length === 1 ? '' : 's'}</span>
-          <span>{layout.lights.length} Lighting</span>
-        </div>
       </header>
 
       <div className="floorplan-main-tools" role="toolbar" aria-label="Floorplan tools">
@@ -703,14 +794,24 @@ export default function Floorplan({
           <button className={'floorplan-tool-button' + (tool === 'select' ? ' active' : '')} onClick={() => setTool('select')} title="Select and move" aria-label="Select and move" aria-pressed={tool === 'select'}>
             <MousePointer2 size={19} />
           </button>
-          <button className={'floorplan-tool-button' + (tool === 'room' ? ' active' : '')} onClick={() => setTool('room')} title="Draw room" aria-label="Draw room" aria-pressed={tool === 'room'}>
-            <Square size={19} />
-          </button>
-          <button className={'floorplan-tool-button' + (tool === 'wall' ? ' active' : '')} onClick={() => setTool('wall')} title="Draw wall" aria-label="Draw wall" aria-pressed={tool === 'wall'}>
-            <Minus size={19} />
-          </button>
           <button className={'floorplan-tool-button' + (tool === 'path' ? ' active' : '')} onClick={() => setTool(tool === 'path' ? 'select' : 'path')} title="Draw path for selected actor or camera" aria-label="Draw movement path" aria-pressed={tool === 'path'} disabled={!selectedCanHavePath}>
-            <Route size={19} />
+            <Route size={19} /><span>Path</span>
+          </button>
+        </div>
+        <span className="floorplan-tool-divider" />
+        <div className="floorplan-structure-group" role="group" aria-label="Structure">
+          <span className="floorplan-structure-label">Structure</span>
+          <button className={'floorplan-tool-button' + (tool === 'room' ? ' active' : '')} onClick={() => setTool('room')} title="Draw room by dragging" aria-label="Draw room" aria-pressed={tool === 'room'}>
+            <Square size={18} /><span>Room</span>
+          </button>
+          <button className={'floorplan-tool-button' + (tool === 'wall' ? ' active' : '')} onClick={() => setTool('wall')} title="Add wall by dragging its endpoints" aria-label="Draw wall" aria-pressed={tool === 'wall'}>
+            <Minus size={19} /><span>Wall</span>
+          </button>
+          <button className="floorplan-tool-button" onClick={() => addObject('door')} title="Add door" aria-label="Add door">
+            <FloorplanObjectIcon type="door" size={20} /><span>Door</span>
+          </button>
+          <button className="floorplan-tool-button" onClick={() => addObject('window')} title="Add window" aria-label="Add window">
+            <FloorplanObjectIcon type="window" size={20} /><span>Window</span>
           </button>
         </div>
         <span className="floorplan-tool-divider" />
@@ -720,12 +821,6 @@ export default function Floorplan({
           </button>
           <button className="floorplan-tool-button" onClick={() => addObject('camera')} title="Add camera and link a shot" aria-label="Add camera">
             <FloorplanObjectIcon type="camera" size={22} /><span>Camera</span>
-          </button>
-          <button className="floorplan-tool-button" onClick={() => addObject('door')} title="Add door" aria-label="Add door">
-            <FloorplanObjectIcon type="door" size={22} /><span>Door</span>
-          </button>
-          <button className="floorplan-tool-button" onClick={() => addObject('window')} title="Add window" aria-label="Add window">
-            <FloorplanObjectIcon type="window" size={22} /><span>Window</span>
           </button>
           <button className="floorplan-tool-button" onClick={() => addObject('prop')} title="Add prop or furniture" aria-label="Add prop">
             <FloorplanObjectIcon type="prop" size={22} /><span>Props</span>
@@ -783,6 +878,22 @@ export default function Floorplan({
                   <text x={room.x + 12} y={room.y + 28} fill="var(--text)" fontSize="18" fontWeight="600" pointerEvents="none">
                     {room.label || 'Room'}
                   </text>
+                  {selected?.type === 'room' && selected.id === room.id && RESIZE_HANDLES.map(handle => (
+                    <rect
+                      key={handle.key}
+                      x={(handle.sx < 0 ? room.x : room.x + room.width) - 5}
+                      y={(handle.sy < 0 ? room.y : room.y + room.height) - 5}
+                      width="10"
+                      height="10"
+                      rx="1.5"
+                      fill="var(--bg)"
+                      stroke="var(--text)"
+                      strokeWidth="1.8"
+                      vectorEffect="non-scaling-stroke"
+                      style={{ cursor: handle.cursor }}
+                      onPointerDown={event => beginResize('room', room, handle.sx, handle.sy, event)}
+                    />
+                  ))}
                 </g>
               ))}
 
@@ -796,6 +907,12 @@ export default function Floorplan({
                   />
                   <line x1={wall.x1} y1={wall.y1} x2={wall.x2} y2={wall.y2}
                     stroke="transparent" strokeWidth="20" vectorEffect="non-scaling-stroke" />
+                  {selected?.type === 'wall' && selected.id === wall.id && (
+                    <>
+                      <circle cx={wall.x1} cy={wall.y1} r="6" fill="var(--bg)" stroke="var(--text)" strokeWidth="2" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerDown={event => beginWallEndpointDrag(wall, 'start', event)} />
+                      <circle cx={wall.x2} cy={wall.y2} r="6" fill="var(--bg)" stroke="var(--text)" strokeWidth="2" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerDown={event => beginWallEndpointDrag(wall, 'end', event)} />
+                    </>
+                  )}
                 </g>
               ))}
 
@@ -1059,6 +1176,26 @@ export default function Floorplan({
                       )}
                     </g>
 
+                    {active && ['door', 'window', 'prop'].includes(type) && (
+                      <g transform={'translate(' + object.x + ' ' + object.y + ') rotate(' + (object.angle || 0) + ')'}>
+                        {RESIZE_HANDLES.map(handle => (
+                          <rect
+                            key={handle.key}
+                            x={handle.sx * object.width / 2 - 5}
+                            y={handle.sy * object.height / 2 - 5}
+                            width="10"
+                            height="10"
+                            rx="1.5"
+                            fill="var(--bg)"
+                            stroke="var(--text)"
+                            strokeWidth="1.8"
+                            vectorEffect="non-scaling-stroke"
+                            style={{ cursor: handle.cursor }}
+                            onPointerDown={event => beginResize(type, object, handle.sx, handle.sy, event)}
+                          />
+                        ))}
+                      </g>
+                    )}
                     {active && (
                       <g onPointerDown={event => beginRotate(type, object, event)} style={{ cursor: 'grab' }}>
                         <line x1={object.x} y1={object.y} x2={handlePoint.x} y2={handlePoint.y} stroke="var(--text-muted)" strokeWidth="1.5" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" pointerEvents="none" />
