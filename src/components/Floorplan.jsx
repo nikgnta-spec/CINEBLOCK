@@ -582,9 +582,11 @@ export default function Floorplan({
       .map(camera => ({ camera, shot: scene.shots.find(shot => shot.id === camera.shotId) }))
       .filter(entry => entry.shot)
     removedShots.forEach(({ camera, shot }) => {
+      const previousRecord = autoCreatedShotsByCameraRef.current.get(camera.id)
       autoCreatedShotsByCameraRef.current.set(camera.id, {
         sceneId: scene.id,
         shot: { ...shot },
+        autoCreated: Boolean(previousRecord?.autoCreated),
         deletedShot: true,
       })
     })
@@ -1346,9 +1348,11 @@ export default function Floorplan({
     if (linkedShotId) {
       const linkedShot = scene.shots.find(shot => shot.id === linkedShotId)
       if (linkedShot) {
+        const previousRecord = autoCreatedShotsByCameraRef.current.get(selected.id)
         autoCreatedShotsByCameraRef.current.set(selected.id, {
           sceneId: scene.id,
           shot: { ...linkedShot },
+          autoCreated: Boolean(previousRecord?.autoCreated),
           deletedShot: true,
         })
       }
