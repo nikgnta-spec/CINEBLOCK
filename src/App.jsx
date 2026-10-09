@@ -36,7 +36,13 @@ function normalizeSavedProject(savedProject) {
     ...(savedProject || {}),
     visualRefs: Array.from(
       { length: Math.max(6, refs.length) },
-      (_, index) => refs[index] ?? null,
+      (_, index) => {
+        const reference = refs[index] ?? null
+        // Blob URLs do not survive refreshes; discard stale links from older saves.
+        return typeof reference === 'string' && reference.startsWith('blob:')
+          ? null
+          : reference
+      },
     ),
   }
 }
