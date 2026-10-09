@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Camera, Lightbulb,
+  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2,
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
 import {
