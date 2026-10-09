@@ -500,7 +500,7 @@ export default function Floorplan({
                         </g>
                       )}
                       {type === 'actor' && (
-                        <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
+                        <g transform={'rotate(' + (object.angle || 0) + ') scale(0.68)'} pointerEvents="none">
                           <g fill="none" stroke="var(--text)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
                             <path d="M-22 -6 C-30 -10 -37 -6 -40 2 C-43 12 -36 22 -27 23 C-21 31 -10 34 0 34 C10 34 21 31 27 23 C36 22 43 12 40 2 C37 -6 30 -10 22 -6" />
                             <path d="M0 -31 C-17 -31 -22 -17 -21 -6 C-20 5 -15 13 -8 15 C-5 16 -4 20 0 21 C4 20 5 16 8 15 C15 13 20 5 21 -6 C22 -17 17 -31 0 -31 Z" />
