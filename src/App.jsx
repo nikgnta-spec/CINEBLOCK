@@ -211,7 +211,7 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
     const coords = (value, max) => normalizeFloorplanCoordinate(value, max)
 
     result[scene.id] = {
-      rooms: (Array.isArray(raw.rooms) ? raw.rooms : []).slice(0, 200).map((item, index) => ({
+      rooms: (Array.isArray(raw.rooms) ? raw.rooms : []).filter(item => item && typeof item === 'object').slice(0, 200).map((item, index) => ({
         id: safeId(item),
         x: coords(item.x, 1000),
         y: coords(item.y, 650),
@@ -219,7 +219,7 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
         height: Math.max(12, Math.min(650, Number(item.height) || 80)),
         label: safeLabel(item.label, 'Room ' + String(index + 1).padStart(2, '0')),
       })),
-      walls: (Array.isArray(raw.walls) ? raw.walls : []).slice(0, 500).map(item => ({
+      walls: (Array.isArray(raw.walls) ? raw.walls : []).filter(item => item && typeof item === 'object').slice(0, 500).map(item => ({
         id: safeId(item),
         x1: coords(item.x1, 1000),
         y1: coords(item.y1, 650),
@@ -241,7 +241,7 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
             y: coords(point?.y, 650),
           })),
         })),
-      lights: (Array.isArray(raw.lights) ? raw.lights : []).slice(0, 200).map((item, index) => ({
+      lights: (Array.isArray(raw.lights) ? raw.lights : []).filter(item => item && typeof item === 'object').slice(0, 200).map((item, index) => ({
         id: safeId(item),
         x: coords(item.x, 1000),
         y: coords(item.y, 650),
