@@ -288,6 +288,7 @@ function renumberShots(shots) {
 
 export default function Floorplan({
   scenes,
+  isActive = true,
   onChange,
   activeSceneId,
   onActiveSceneChange,
@@ -1312,6 +1313,7 @@ export default function Floorplan({
   }
 
   useEffect(() => {
+    if (!isActive) return undefined
     const handleWaypointDeleteKey = event => {
       if (!selectedWaypoint || !['Delete', 'Backspace'].includes(event.key)) return
       const target = event.target
@@ -1323,7 +1325,7 @@ export default function Floorplan({
     }
     window.addEventListener('keydown', handleWaypointDeleteKey)
     return () => window.removeEventListener('keydown', handleWaypointDeleteKey)
-  }, [selectedWaypoint, selected, layout])
+  }, [isActive, selectedWaypoint, selected, layout])
 
   const changeCameraLink = (camera, nextShotId) => {
     const anotherCamera = layout.cameras.find(item => item.shotId === nextShotId && item.id !== camera.id)
@@ -1372,6 +1374,7 @@ export default function Floorplan({
   }
 
   useEffect(() => {
+    if (!isActive) return undefined
     const handleFloorplanShortcut = event => {
       const target = event.target
       if (target instanceof HTMLElement && (
@@ -1424,7 +1427,7 @@ export default function Floorplan({
     }
     window.addEventListener('keydown', handleFloorplanShortcut)
     return () => window.removeEventListener('keydown', handleFloorplanShortcut)
-  }, [addObject, deleteSelected, deleteSelectedItems, deleteSelectedWaypoint, redoLayout, selected, selectedItems, selectedWaypoint, undoLayout])
+  }, [isActive, addObject, deleteSelected, deleteSelectedItems, deleteSelectedWaypoint, redoLayout, selected, selectedItems, selectedWaypoint, undoLayout])
 
   const clearLayout = () => {
     if (!window.confirm('Kosongkan room, wall, properti, aktor, kamera, dan lampu pada scene ini?')) return
