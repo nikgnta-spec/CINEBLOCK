@@ -967,19 +967,11 @@ export default function Floorplan({
               onPointerCancel={handleCanvasPointerUp}
             >
               <defs>
-                <pattern id="floorplan-grid-small" width="25" height="25" patternUnits="userSpaceOnUse">
-                  <path d="M25 0H0V25" fill="none" stroke="var(--border)" strokeWidth="1" />
-                </pattern>
-                <pattern id="floorplan-grid-large" width="100" height="100" patternUnits="userSpaceOnUse">
-                  <rect width="100" height="100" fill="url(#floorplan-grid-small)" />
-                  <path d="M100 0H0V100" fill="none" stroke="var(--border-strong)" strokeWidth="1.2" />
-                </pattern>
                 <marker id="floorplan-arrow" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
                   <path d="M0,0 L6,3.5 L0,7 Z" fill="var(--text-muted)" />
                 </marker>
               </defs>
               <rect width={MAP_WIDTH} height={MAP_HEIGHT} fill="var(--bg)" />
-              <rect width={MAP_WIDTH} height={MAP_HEIGHT} fill="url(#floorplan-grid-large)" />
 
               {layout.rooms.map(room => {
                 const openings = room.openings || []
