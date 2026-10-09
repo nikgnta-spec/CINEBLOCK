@@ -1155,3 +1155,31 @@ button:focus-visible,
   .theme-toggle { width:44px; min-width:44px; height:44px; min-height:44px; }
   .floorplan-shortcut-key { display:none; }
 }
+
+
+/* Stage 3B — Floorplan undo/redo, multiselect, and drag-select. */
+.floorplan-history-tools { gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-subtle); }
+.floorplan-history-button { min-width: 42px; padding: 0 9px; gap: 6px; }
+.floorplan-history-button:disabled { opacity: .34; cursor: not-allowed; }
+.floorplan-history-button:disabled:hover { color: var(--text-muted); background: transparent; border-color: transparent; }
+.floorplan-selection-actions { display:inline-flex; align-items:center; gap:6px; flex:0 0 auto; padding:4px 6px 4px 10px; border:1px solid var(--accent-border); border-radius:8px; background:var(--accent-bg); color:var(--text); font-size:12px; white-space:nowrap; }
+.floorplan-selection-actions > span { font-weight:600; }
+.floorplan-selection-delete, .floorplan-selection-clear { display:inline-flex; align-items:center; justify-content:center; gap:5px; min-height:32px; padding:5px 8px; border:1px solid transparent; border-radius:5px; color:var(--text); font-size:12px; font-weight:600; }
+.floorplan-selection-delete { color:var(--danger); }
+.floorplan-selection-delete:hover { background:color-mix(in srgb, var(--danger) 10%, transparent); border-color:color-mix(in srgb, var(--danger) 32%, transparent); }
+.floorplan-selection-clear:hover { background:var(--bg-hover); border-color:var(--border); }
+.floorplan-object-row.is-selected { background:var(--accent-bg); box-shadow:inset 3px 0 0 var(--accent); }
+.floorplan-object-row.is-selected .floorplan-object-row-name { color:var(--text); font-weight:600; }
+.floorplan-canvas { user-select:none; }
+@media (max-width: 900px) {
+  .floorplan-history-button span { display:none; }
+  .floorplan-history-button { min-width:40px; padding-inline:8px; }
+  .floorplan-selection-actions { padding:3px; gap:3px; }
+  .floorplan-selection-actions > span { padding-inline:5px; }
+  .floorplan-selection-delete { font-size:11px; }
+}
+@media (max-width: 680px) {
+  .floorplan-main-tools { padding:6px 8px; gap:7px; }
+  .floorplan-history-tools { order:0; }
+  .floorplan-selection-actions { max-width:100%; }
+}

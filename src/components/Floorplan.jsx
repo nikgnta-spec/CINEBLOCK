@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2,
+  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Undo2, Redo2,
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
 import {
@@ -21,6 +21,14 @@ const CAMERA_PATH_MOVEMENTS = new Set([
 const MAP_WIDTH = 1000
 const MAP_HEIGHT = 650
 const EMPTY_LAYOUT = { rooms: [], walls: [], props: [], actors: [], cameras: [], lights: [] }
+
+function cloneLayoutSnapshot(layout) {
+  return JSON.parse(JSON.stringify(layout || EMPTY_LAYOUT))
+}
+
+function sameLayoutSnapshot(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right)
+}
 
 function getFittedViewBox(layout) {
   const points = []
@@ -296,13 +304,22 @@ export default function Floorplan({
   const normalizedSceneLayoutsRef = useRef(new Set())
   const [tool, setTool] = useState('select')
   const [selected, setSelected] = useState(null)
+  const [selectedItems, setSelectedItems] = useState([])
   const [selectedWaypoint, setSelectedWaypoint] = useState(null)
+  const [selectionBox, setSelectionBox] = useState(null)
   const [drawStart, setDrawStart] = useState(null)
   const [previewPoint, setPreviewPoint] = useState(null)
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: MAP_WIDTH, height: MAP_HEIGHT })
+  const [historyRevision, setHistoryRevision] = useState(0)
+  const selectionRef = useRef([])
+  const layoutRef = useRef(null)
+  const dragHistoryBeforeRef = useRef(null)
+  const historyActionRef = useRef(false)
+  const historyRef = useRef({ sceneId: null, past: [], future: [], lastLayout: null })
 
   const scene = scenes.find(item => item.id === activeSceneId) || scenes[0]
   const layout = scene ? (floorplans?.[scene.id] || EMPTY_LAYOUT) : EMPTY_LAYOUT
+  layoutRef.current = layout
   const allObjects = [
     ...layout.rooms.map(item => ({ ...item, entityType: 'room' })),
     ...layout.walls.map(item => ({ ...item, entityType: 'wall' })),
@@ -315,6 +332,8 @@ export default function Floorplan({
     ? (layout[selected.type + 's'] || []).find(item => item.id === selected.id) || null
     : null
   const selectedType = selectedEntity ? selected.type : null
+  const canUndo = historyRevision >= 0 && historyRef.current.sceneId === scene?.id && historyRef.current.past.length > 0
+  const canRedo = historyRevision >= 0 && historyRef.current.sceneId === scene?.id && historyRef.current.future.length > 0
   const selectedShot = selectedType === 'camera'
     ? scene?.shots.find(shot => shot.id === selectedEntity.shotId) || null
     : null
@@ -324,13 +343,53 @@ export default function Floorplan({
 
   useEffect(() => {
     setSelected(null)
+    setSelectedItems([])
+    selectionRef.current = []
     setSelectedWaypoint(null)
+    setSelectionBox(null)
     setTool('select')
     dragRef.current = null
+    dragHistoryBeforeRef.current = null
+    historyActionRef.current = false
+    historyRef.current = {
+      sceneId: scene?.id || null,
+      past: [],
+      future: [],
+      lastLayout: cloneLayoutSnapshot(layout),
+    }
+    setHistoryRevision(value => value + 1)
     setDrawStart(null)
     setPreviewPoint(null)
     setViewBox(getFittedViewBox(layout))
   }, [scene?.id])
+
+  useEffect(() => {
+    if (!scene) return
+    const snapshot = cloneLayoutSnapshot(layout)
+    let history = historyRef.current
+    if (!history || history.sceneId !== scene.id) {
+      historyRef.current = { sceneId: scene.id, past: [], future: [], lastLayout: snapshot }
+      setHistoryRevision(value => value + 1)
+      return
+    }
+    if (historyActionRef.current) {
+      historyActionRef.current = false
+      history.lastLayout = snapshot
+      setHistoryRevision(value => value + 1)
+      return
+    }
+    if (dragRef.current && dragHistoryBeforeRef.current) {
+      history.lastLayout = snapshot
+      return
+    }
+    if (!sameLayoutSnapshot(snapshot, history.lastLayout)) {
+      history.past.push(cloneLayoutSnapshot(history.lastLayout))
+      if (history.past.length > 50) history.past.shift()
+      history.future = []
+      history.lastLayout = snapshot
+      setHistoryRevision(value => value + 1)
+    }
+  }, [scene?.id, layout])
 
   useEffect(() => {
     if (!scene || !selected) return
@@ -343,8 +402,13 @@ export default function Floorplan({
   useEffect(() => {
     if (!scene || !selectedShotId) return
     const linkedCamera = layout.cameras.find(camera => camera.shotId === selectedShotId)
-    setSelected(linkedCamera ? { type: 'camera', id: linkedCamera.id } : null)
-    setSelectedWaypoint(null)
+    if (!linkedCamera) {
+      if (selectionRef.current.length <= 1) applyEntitySelection([])
+      return
+    }
+    setSelected({ type: 'camera', id: linkedCamera.id })
+    const cameraInGroup = selectionRef.current.some(item => item.type === 'camera' && item.id === linkedCamera.id)
+    if (selectionRef.current.length <= 1 || !cameraInGroup) applyEntitySelection([{ type: 'camera', id: linkedCamera.id }])
   }, [scene?.id, selectedShotId, layout.cameras])
 
   useEffect(() => {
@@ -371,6 +435,93 @@ export default function Floorplan({
       const currentLayout = previous?.[scene.id] || EMPTY_LAYOUT
       return { ...previous, [scene.id]: updater(currentLayout) }
     })
+  }
+
+  const applyEntitySelection = (items, primary = null) => {
+    const unique = []
+    items.forEach(item => {
+      if (item && !unique.some(existing => existing.type === item.type && existing.id === item.id)) unique.push(item)
+    })
+    selectionRef.current = unique
+    setSelectedItems(unique)
+    const nextPrimary = primary && unique.some(item => item.type === primary.type && item.id === primary.id)
+      ? primary
+      : unique[unique.length - 1] || null
+    setSelected(nextPrimary)
+    setSelectedWaypoint(null)
+  }
+
+  const beginDragHistory = () => {
+    dragHistoryBeforeRef.current = cloneLayoutSnapshot(layoutRef.current)
+  }
+
+  const finishDragHistory = () => {
+    const before = dragHistoryBeforeRef.current
+    const after = cloneLayoutSnapshot(layoutRef.current)
+    dragHistoryBeforeRef.current = null
+    const history = historyRef.current
+    if (!before || !history || history.sceneId !== scene?.id) return
+    if (sameLayoutSnapshot(before, after)) {
+      history.lastLayout = after
+      return
+    }
+    history.past.push(cloneLayoutSnapshot(before))
+    if (history.past.length > 50) history.past.shift()
+    history.future = []
+    history.lastLayout = after
+    setHistoryRevision(value => value + 1)
+  }
+
+  const undoLayout = () => {
+    const history = historyRef.current
+    if (!scene || history.sceneId !== scene.id || !history.past.length) return
+    const current = cloneLayoutSnapshot(layoutRef.current)
+    const previous = history.past.pop()
+    history.future.push(current)
+    history.lastLayout = cloneLayoutSnapshot(previous)
+    historyActionRef.current = true
+    setHistoryRevision(value => value + 1)
+    updateLayout(() => cloneLayoutSnapshot(previous))
+    applyEntitySelection([])
+  }
+
+  const redoLayout = () => {
+    const history = historyRef.current
+    if (!scene || history.sceneId !== scene.id || !history.future.length) return
+    const current = cloneLayoutSnapshot(layoutRef.current)
+    const next = history.future.pop()
+    history.past.push(current)
+    if (history.past.length > 50) history.past.shift()
+    history.lastLayout = cloneLayoutSnapshot(next)
+    historyActionRef.current = true
+    setHistoryRevision(value => value + 1)
+    updateLayout(() => cloneLayoutSnapshot(next))
+    applyEntitySelection([])
+  }
+
+  const deleteSelectedItems = () => {
+    const selection = [...selectionRef.current]
+    if (selection.length < 2) return
+    updateLayout(previous => {
+      const next = { ...previous }
+      for (const type of ['rooms', 'walls', 'props', 'actors', 'cameras', 'lights']) {
+        const selectedIds = new Set(selection.filter(item => item.type + 's' === type).map(item => item.id))
+        if (selectedIds.size) next[type] = previous[type].filter(item => !selectedIds.has(item.id))
+      }
+      return next
+    })
+    applyEntitySelection([])
+    onSelectedShotIdChange?.('')
+    setTool('select')
+  }
+
+  const toggleEntitySelection = (type, id) => {
+    const current = selectionRef.current
+    const exists = current.some(item => item.type === type && item.id === id)
+    const next = exists
+      ? current.filter(item => item.type !== type || item.id !== id)
+      : [...current, { type, id }]
+    applyEntitySelection(next, exists ? null : { type, id })
   }
 
   useEffect(() => {
@@ -483,6 +634,7 @@ export default function Floorplan({
     event.stopPropagation()
     event.preventDefault()
     const point = getPoint(event)
+    beginDragHistory()
     dragRef.current = {
       mode: 'resize',
       type,
@@ -502,6 +654,7 @@ export default function Floorplan({
     if (tool === 'pan') return
     event.stopPropagation()
     event.preventDefault()
+    beginDragHistory()
     dragRef.current = {
       mode: 'wall-endpoint',
       id: wall.id,
@@ -514,17 +667,42 @@ export default function Floorplan({
   }
 
   const beginObjectDrag = (type, item, event) => {
-    if (tool === 'pan') return
-    if (type === 'camera') onSelectedShotIdChange?.(item.shotId || '')
-    else onSelectedShotIdChange?.('')
     event.stopPropagation()
+    if (tool === 'pan') return
+
+    if (event.shiftKey) {
+      toggleEntitySelection(type, item.id)
+      if (type === 'camera') onSelectedShotIdChange?.(item.shotId || '')
+      return
+    }
+
+    const currentSelection = selectionRef.current
+    const alreadySelected = currentSelection.some(entry => entry.type === type && entry.id === item.id)
+    if (alreadySelected && currentSelection.length > 1) {
+      setSelected({ type, id: item.id })
+      setSelectedWaypoint(null)
+    } else {
+      applyEntitySelection([{ type, id: item.id }], { type, id: item.id })
+    }
+
+    if (type === 'camera') onSelectedShotIdChange?.(item.shotId || '')
+    else if (!alreadySelected || currentSelection.length <= 1) onSelectedShotIdChange?.('')
     if (tool === 'room' || tool === 'wall') return
     if (tool === 'path') setTool('select')
     const point = getPoint(event)
-    dragRef.current = { mode: 'move', type, id: item.id, start: point, original: item }
+
+    if (alreadySelected && currentSelection.length > 1) {
+      const items = currentSelection.map(entry => ({
+        ...entry,
+        original: (layout[entry.type + 's'] || []).find(candidate => candidate.id === entry.id),
+      })).filter(entry => entry.original)
+      beginDragHistory()
+      dragRef.current = { mode: 'multi-move', start: point, items }
+    } else {
+      beginDragHistory()
+      dragRef.current = { mode: 'move', type, id: item.id, start: point, original: item }
+    }
     svgRef.current?.setPointerCapture?.(event.pointerId)
-    setSelected({ type, id: item.id })
-    setSelectedWaypoint(null)
   }
 
   const beginWaypointDrag = (type, item, pathIndex, event) => {
@@ -533,6 +711,8 @@ export default function Floorplan({
     const point = getPoint(event)
     const waypoint = (item.path || [])[pathIndex]
     if (!waypoint) return
+    applyEntitySelection([{ type, id: item.id }], { type, id: item.id })
+    beginDragHistory()
     dragRef.current = {
       mode: 'waypoint',
       type,
@@ -551,6 +731,8 @@ export default function Floorplan({
     if (tool === 'pan') return
     event.stopPropagation()
     const point = getPoint(event)
+    applyEntitySelection([{ type, id: item.id }], { type, id: item.id })
+    beginDragHistory()
     dragRef.current = {
       mode: 'rotate',
       type,
@@ -634,6 +816,8 @@ export default function Floorplan({
     if (tool === 'pan') return
     event.stopPropagation()
     event.preventDefault()
+    applyEntitySelection([{ type: hostType, id: host.id }], { type: hostType, id: host.id })
+    beginDragHistory()
     dragRef.current = { mode: 'opening', type: hostType, id: host.id, openingId: opening.id }
     svgRef.current?.setPointerCapture?.(event.pointerId)
     setSelected({ type: hostType, id: host.id })
@@ -661,8 +845,10 @@ export default function Floorplan({
       return
     }
     if (tool === 'select') {
-      setSelected(null)
-      setSelectedWaypoint(null)
+      const start = point
+      dragRef.current = { mode: 'selection-box', start, current: start, additive: event.shiftKey }
+      setSelectionBox({ x: start.x, y: start.y, width: 0, height: 0, additive: event.shiftKey })
+      svgRef.current?.setPointerCapture?.(event.pointerId)
     }
   }
 
@@ -692,6 +878,17 @@ export default function Floorplan({
       return
     }
     const point = getPoint(event)
+    if (drag?.mode === 'selection-box') {
+      drag.current = point
+      setSelectionBox({
+        x: Math.min(drag.start.x, point.x),
+        y: Math.min(drag.start.y, point.y),
+        width: Math.abs(point.x - drag.start.x),
+        height: Math.abs(point.y - drag.start.y),
+        additive: drag.additive,
+      })
+      return
+    }
     if (drawStart) {
       setPreviewPoint(point)
       return
@@ -757,6 +954,41 @@ export default function Floorplan({
         ...previous,
         walls: previous.walls.map(wall => wall.id === drag.id ? { ...wall, ...endpointPatch } : wall),
       }))
+      return
+    }
+
+    if (drag.mode === 'multi-move') {
+      const dx = point.x - drag.start.x
+      const dy = point.y - drag.start.y
+      updateLayout(previous => {
+        const next = { ...previous }
+        for (const collection of ['rooms', 'walls', 'props', 'actors', 'cameras', 'lights']) {
+          const selectedById = new Map(drag.items.filter(entry => entry.type + 's' === collection).map(entry => [entry.id, entry.original]))
+          if (!selectedById.size) continue
+          next[collection] = previous[collection].map(item => {
+            const original = selectedById.get(item.id)
+            if (!original) return item
+            if (collection === 'rooms') return {
+              ...item,
+              x: Math.round(clamp(original.x + dx, 0, MAP_WIDTH - item.width)),
+              y: Math.round(clamp(original.y + dy, 0, MAP_HEIGHT - item.height)),
+            }
+            if (collection === 'walls') return {
+              ...item,
+              x1: Math.round(clamp(original.x1 + dx, 0, MAP_WIDTH)),
+              y1: Math.round(clamp(original.y1 + dy, 0, MAP_HEIGHT)),
+              x2: Math.round(clamp(original.x2 + dx, 0, MAP_WIDTH)),
+              y2: Math.round(clamp(original.y2 + dy, 0, MAP_HEIGHT)),
+            }
+            return {
+              ...item,
+              x: Math.round(clamp(original.x + dx, 0, MAP_WIDTH)),
+              y: Math.round(clamp(original.y + dy, 0, MAP_HEIGHT)),
+            }
+          })
+        }
+        return next
+      })
       return
     }
 
@@ -875,6 +1107,34 @@ export default function Floorplan({
   }
 
   const handleCanvasPointerUp = () => {
+    const completedDrag = dragRef.current
+    if (completedDrag?.mode === 'selection-box') {
+      const end = completedDrag.current || completedDrag.start
+      const bounds = {
+        left: Math.min(completedDrag.start.x, end.x),
+        top: Math.min(completedDrag.start.y, end.y),
+        right: Math.max(completedDrag.start.x, end.x),
+        bottom: Math.max(completedDrag.start.y, end.y),
+      }
+      const draggedDistance = Math.hypot(end.x - completedDrag.start.x, end.y - completedDrag.start.y)
+      setSelectionBox(null)
+      dragRef.current = null
+      if (draggedDistance < 4) {
+        if (!completedDrag.additive) applyEntitySelection([])
+        return
+      }
+      const hits = allObjects.filter(object => {
+        const type = object.entityType
+        const x = type === 'room' ? object.x + object.width / 2
+          : type === 'wall' ? (object.x1 + object.x2) / 2 : object.x
+        const y = type === 'room' ? object.y + object.height / 2
+          : type === 'wall' ? (object.y1 + object.y2) / 2 : object.y
+        return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom
+      }).map(object => ({ type: object.entityType, id: object.id }))
+      const combined = completedDrag.additive ? [...selectionRef.current, ...hits] : hits
+      applyEntitySelection(combined, hits[hits.length - 1] || null)
+      return
+    }
     if (drawStart && previewPoint) {
       const width = Math.abs(previewPoint.x - drawStart.x)
       const height = Math.abs(previewPoint.y - drawStart.y)
@@ -905,6 +1165,9 @@ export default function Floorplan({
     }
     setDrawStart(null)
     setPreviewPoint(null)
+    if (completedDrag && ['move', 'multi-move', 'resize', 'wall-endpoint', 'waypoint', 'rotate', 'opening'].includes(completedDrag.mode)) {
+      finishDragHistory()
+    }
     dragRef.current = null
   }
 
@@ -966,8 +1229,8 @@ export default function Floorplan({
       ...previous,
       [selected.type + 's']: previous[selected.type + 's'].filter(item => item.id !== selected.id),
     }))
-    setSelected(null)
-    setSelectedWaypoint(null)
+    applyEntitySelection([])
+    onSelectedShotIdChange?.('')
     setTool('select')
   }
 
@@ -977,9 +1240,34 @@ export default function Floorplan({
       if (target instanceof HTMLElement && (
         target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
       )) return
-      if (event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return
+      if (event.altKey || event.defaultPrevented) return
 
       const key = event.key.toLowerCase()
+      if ((event.ctrlKey || event.metaKey) && key === 'z') {
+        event.preventDefault()
+        if (event.shiftKey) redoLayout()
+        else undoLayout()
+        return
+      }
+      if ((event.ctrlKey || event.metaKey) && key === 'y') {
+        event.preventDefault()
+        redoLayout()
+        return
+      }
+      if (event.ctrlKey || event.metaKey) return
+      if (['delete', 'backspace'].includes(key)) {
+        if (selectedWaypoint) {
+          event.preventDefault()
+          deleteSelectedWaypoint()
+        } else if (selectionRef.current.length > 1) {
+          event.preventDefault()
+          deleteSelectedItems()
+        } else if (selected) {
+          event.preventDefault()
+          deleteSelected()
+        }
+        return
+      }
       if (key === 'v') {
         event.preventDefault()
         setTool('select')
@@ -996,24 +1284,16 @@ export default function Floorplan({
         addObject('light')
         return
       }
-      if (['delete', 'backspace'].includes(key)) {
-        if (selectedWaypoint) {
-          event.preventDefault()
-          deleteSelectedWaypoint()
-        } else if (selected) {
-          event.preventDefault()
-          deleteSelected()
-        }
-      }
     }
     window.addEventListener('keydown', handleFloorplanShortcut)
     return () => window.removeEventListener('keydown', handleFloorplanShortcut)
-  }, [addObject, deleteSelected, deleteSelectedWaypoint, selected, selectedWaypoint])
+  }, [addObject, deleteSelected, deleteSelectedItems, deleteSelectedWaypoint, redoLayout, selected, selectedItems, selectedWaypoint, undoLayout])
 
   const clearLayout = () => {
     if (!window.confirm('Kosongkan room, wall, properti, aktor, kamera, dan lampu pada scene ini?')) return
     updateLayout(() => ({ ...EMPTY_LAYOUT }))
-    setSelected(null)
+    applyEntitySelection([])
+    onSelectedShotIdChange?.('')
     setSelectedWaypoint(null)
     setTool('select')
   }
@@ -1051,6 +1331,15 @@ export default function Floorplan({
       </header>
 
       <div className="floorplan-main-tools" role="toolbar" aria-label="Alat Floorplan">
+        <div className="floorplan-tool-group floorplan-history-tools" aria-label="Riwayat aksi">
+          <button type="button" className="floorplan-tool-button floorplan-history-button" onClick={undoLayout} disabled={!canUndo} title="Urungkan (Ctrl+Z)" aria-label="Urungkan aksi" aria-keyshortcuts="Control+Z Meta+Z">
+            <Undo2 size={17} /><span>Urungkan</span>
+          </button>
+          <button type="button" className="floorplan-tool-button floorplan-history-button" onClick={redoLayout} disabled={!canRedo} title="Ulangi (Ctrl+Shift+Z)" aria-label="Ulangi aksi" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z">
+            <Redo2 size={17} /><span>Ulangi</span>
+          </button>
+        </div>
+        <span className="floorplan-tool-divider" />
         <div className="floorplan-tool-group">
           <button className={'floorplan-tool-button' + (tool === 'select' ? ' active' : '')} onClick={() => setTool('select')} title="Pilih dan pindahkan (V)" aria-label="Pilih dan pindahkan (V)" aria-pressed={tool === 'select'}>
             <MousePointer2 size={19} /><kbd className="floorplan-shortcut-key">V</kbd>
@@ -1088,6 +1377,13 @@ export default function Floorplan({
           </button>
         </div>
         <span className="floorplan-tool-spacer" />
+        {selectedItems.length > 1 && (
+          <div className="floorplan-selection-actions" role="group" aria-label="Aksi beberapa objek terpilih">
+            <span>{selectedItems.length} objek dipilih</span>
+            <button type="button" className="floorplan-selection-delete" onClick={deleteSelectedItems}><Trash2 size={14} /> Hapus pilihan</button>
+            <button type="button" className="floorplan-selection-clear" onClick={() => applyEntitySelection([])} title="Batalkan pilihan" aria-label="Batalkan pilihan"><X size={14} /></button>
+          </div>
+        )}
         <button className="floorplan-icon-button floorplan-clear-button" onClick={clearLayout} title="Kosongkan layout scene ini" aria-label="Kosongkan layout scene ini">
           <Trash2 size={17} />
         </button>
@@ -1119,6 +1415,7 @@ export default function Floorplan({
               {layout.rooms.map(room => {
                 const openings = room.openings || []
                 const active = selected?.type === 'room' && selected.id === room.id
+                const groupSelected = selectedItems.some(entry => entry.type === 'room' && entry.id === room.id)
                 const edgeDefs = [
                   { side: 'top', x: room.x, y: room.y, length: room.width, horizontal: true },
                   { side: 'right', x: room.x + room.width, y: room.y, length: room.height, horizontal: false },
@@ -1132,6 +1429,7 @@ export default function Floorplan({
                       fill={active ? 'var(--bg-hover)' : 'var(--bg-subtle)'}
                       stroke="none"
                     />
+                    {groupSelected && !active && <rect x={room.x} y={room.y} width={room.width} height={room.height} fill="none" stroke="var(--accent)" strokeWidth="2" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
                     {edgeDefs.flatMap(edge => {
                       const edgeOpenings = openings.filter(opening => (opening.side || 'bottom') === edge.side)
                       return getOpeningSegments(edge.length, edgeOpenings).map((segment, index) => (
@@ -1202,6 +1500,7 @@ export default function Floorplan({
                 const length = metrics.length
                 const openings = wall.openings || []
                 const active = selected?.type === 'wall' && selected.id === wall.id
+                const groupSelected = selectedItems.some(entry => entry.type === 'wall' && entry.id === wall.id)
                 const wallAngle = metrics.angle
                 return (
                   <g key={wall.id} data-floorplan-object="true" onPointerDown={event => beginObjectDrag('wall', wall, event)} onClick={event => event.stopPropagation()}>
@@ -1212,8 +1511,8 @@ export default function Floorplan({
                         y1={wall.y1 + metrics.uy * segment.start}
                         x2={wall.x1 + metrics.ux * segment.end}
                         y2={wall.y1 + metrics.uy * segment.end}
-                        stroke={active ? 'var(--text)' : 'var(--border-strong)'}
-                        strokeWidth={active ? (wall.thickness || 6) + 2 : (wall.thickness || 6)}
+                        stroke={active ? 'var(--text)' : groupSelected ? 'var(--accent)' : 'var(--border-strong)'}
+                        strokeWidth={active ? (wall.thickness || 6) + 2 : groupSelected ? (wall.thickness || 6) + 1 : (wall.thickness || 6)}
                         strokeLinecap="square"
                         vectorEffect="non-scaling-stroke"
                       />
@@ -1282,6 +1581,7 @@ export default function Floorplan({
               ].map(object => {
                 const type = object._kind
                 const active = selected?.type === type && selected.id === object.id
+                const groupSelected = selectedItems.some(entry => entry.type === type && entry.id === object.id)
                 const shot = type === 'camera' ? scene.shots.find(item => item.id === object.shotId) : null
                 const focalRange = type === 'camera' ? parseFocalLengthRange(shot?.lens) : null
                 const cameraFov = focalRange ? {
@@ -1347,6 +1647,16 @@ export default function Floorplan({
                         fill="transparent"
                         pointerEvents="all"
                       />
+                      {groupSelected && !active && (
+                        <rect
+                          x={['door', 'window', 'prop'].includes(type) ? -(Number(object.width) || 48) / 2 - 5 : type === 'actor' ? -41 : type === 'camera' ? -41 : -30}
+                          y={['door', 'window', 'prop'].includes(type) ? -(Number(object.height) || 32) / 2 - 5 : type === 'actor' ? -35 : type === 'camera' ? -30 : -29}
+                          width={['door', 'window', 'prop'].includes(type) ? Math.max(48, Number(object.width) || 48) + 10 : type === 'actor' ? 82 : type === 'camera' ? 84 : 60}
+                          height={['door', 'window', 'prop'].includes(type) ? Math.max(38, Number(object.height) || 32) + 10 : type === 'actor' ? 90 : type === 'camera' ? 88 : 72}
+                          rx="4" fill="none" stroke="var(--accent)" strokeWidth="2" strokeDasharray="5 4"
+                          vectorEffect="non-scaling-stroke" pointerEvents="none"
+                        />
+                      )}
                       {type === 'camera' && cameraFov && (
                         <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
                           <path
@@ -1556,6 +1866,21 @@ export default function Floorplan({
               {drawStart && previewPoint && tool === 'wall' && (
                 <line x1={drawStart.x} y1={drawStart.y} x2={previewPoint.x} y2={previewPoint.y}
                   stroke="var(--text)" strokeWidth="3" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />
+              )}
+              {selectionBox && (
+                <rect
+                  x={selectionBox.x}
+                  y={selectionBox.y}
+                  width={selectionBox.width}
+                  height={selectionBox.height}
+                  fill="var(--accent)"
+                  fillOpacity="0.10"
+                  stroke="var(--accent)"
+                  strokeWidth="1.5"
+                  strokeDasharray="5 4"
+                  vectorEffect="non-scaling-stroke"
+                  pointerEvents="none"
+                />
               )}
             </svg>
             <div className="floorplan-view-controls" role="group" aria-label="Kontrol tampilan denah">
@@ -1847,7 +2172,7 @@ export default function Floorplan({
                 <div className="floorplan-empty-state"><Layers2 size={24} /><span>Belum ada objek</span></div>
               ) : (
                 allObjects.map(object => (
-                  <button key={object.entityType + object.id} className="floorplan-object-row" onClick={() => { setSelected({ type: object.entityType, id: object.id }); onSelectedShotIdChange?.(object.entityType === 'camera' ? (object.shotId || '') : '') }}>
+                  <button key={object.entityType + object.id} className={'floorplan-object-row' + (selectedItems.some(entry => entry.type === object.entityType && entry.id === object.id) ? ' is-selected' : '')} onClick={() => { applyEntitySelection([{ type: object.entityType, id: object.id }], { type: object.entityType, id: object.id }); onSelectedShotIdChange?.(object.entityType === 'camera' ? (object.shotId || '') : '') }}>
                     <span className={'floorplan-type-icon ' + object.entityType}>
                       <FloorplanObjectIcon type={object.entityType} size={22} />
                     </span>
