@@ -209,6 +209,25 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
     const safeId = item => typeof item?.id === 'string' && item.id ? item.id.slice(0, 100) : crypto.randomUUID()
     const safeLabel = (value, fallback) => typeof value === 'string' ? value.slice(0, 80) : fallback
     const coords = (value, max) => normalizeFloorplanCoordinate(value, max)
+    const normalizeOpenings = (openings, allowSide = false) => (Array.isArray(openings) ? openings : [])
+      .filter(opening => opening && typeof opening === 'object')
+      .slice(0, 100)
+      .map(opening => ({
+        id: safeId(opening),
+        type: opening.type === 'window' ? 'window' : 'door',
+        offset: Math.max(0.02, Math.min(0.98, Number.isFinite(Number(opening.offset)) ? Number(opening.offset) : 0.5)),
+        width: Math.max(12, Math.min(300, Number(opening.width) || (opening.type === 'window' ? 58 : 48))),
+        ...(allowSide ? { side: ['top', 'right', 'bottom', 'left'].includes(opening.side) ? opening.side : 'bottom' } : {}),
+      }))
+    const projectToSegment = (point, x1, y1, x2, y2) => {
+      const dx = x2 - x1
+      const dy = y2 - y1
+      const lengthSquared = dx * dx + dy * dy
+      const offset = lengthSquared ? Math.max(0, Math.min(1, ((point.x - x1) * dx + (point.y - y1) * dy) / lengthSquared)) : 0
+      const x = x1 + dx * offset
+      const y = y1 + dy * offset
+      return { offset, x, y, distance: Math.hypot(point.x - x, point.y - y) }
+    }
 
     result[scene.id] = {
       rooms: (Array.isArray(raw.rooms) ? raw.rooms : []).filter(item => item && typeof item === 'object').slice(0, 200).map((item, index) => ({
@@ -218,6 +237,7 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
         width: Math.max(12, Math.min(1000, Number(item.width) || 100)),
         height: Math.max(12, Math.min(650, Number(item.height) || 80)),
         label: safeLabel(item.label, 'Room ' + String(index + 1).padStart(2, '0')),
+        openings: normalizeOpenings(item.openings, true),
       })),
       walls: (Array.isArray(raw.walls) ? raw.walls : []).filter(item => item && typeof item === 'object').slice(0, 500).map(item => ({
         id: safeId(item),
@@ -225,6 +245,8 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
         y1: coords(item.y1, 650),
         x2: coords(item.x2, 1000),
         y2: coords(item.y2, 650),
+        thickness: Math.max(2, Math.min(20, Number(item.thickness) || 6)),
+        openings: normalizeOpenings(item.openings),
       })),
       doors: (Array.isArray(raw.doors) ? raw.doors : []).filter(item => item && typeof item === 'object').slice(0, 200).map((item, index) => ({
         id: safeId(item),
@@ -295,6 +317,67 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
           y: coords(point?.y, 650),
         })),
       })),
+    }
+
+    // Migrate old standalone door/window markers to openings on the nearest room edge or wall.
+    const normalized = result[scene.id]
+    const legacyOpenings = [
+      ...(Array.isArray(raw.doors) ? raw.doors : []).filter(item => item && typeof item === 'object').map((item, index) => ({
+        id: safeId(item), type: 'door', x: coords(item.x, 1000), y: coords(item.y, 650),
+        angle: coords(item.angle, 360), width: Math.max(12, Math.min(300, Number(item.width) || 52)),
+      })),
+      ...(Array.isArray(raw.windows) ? raw.windows : []).filter(item => item && typeof item === 'object').map(item => ({
+        id: safeId(item), type: 'window', x: coords(item.x, 1000), y: coords(item.y, 650),
+        angle: coords(item.angle, 360), width: Math.max(12, Math.min(300, Number(item.width) || 58)),
+      })),
+    ]
+    delete normalized.doors
+    delete normalized.windows
+
+    for (const opening of legacyOpenings) {
+      const point = { x: opening.x, y: opening.y }
+      let best = null
+      for (const wall of normalized.walls) {
+        const projection = projectToSegment(point, wall.x1, wall.y1, wall.x2, wall.y2)
+        if (!best || projection.distance < best.distance) {
+          best = { kind: 'wall', id: wall.id, offset: projection.offset, distance: projection.distance }
+        }
+      }
+      for (const room of normalized.rooms) {
+        const edges = [
+          { side: 'top', x1: room.x, y1: room.y, x2: room.x + room.width, y2: room.y },
+          { side: 'right', x1: room.x + room.width, y1: room.y, x2: room.x + room.width, y2: room.y + room.height },
+          { side: 'bottom', x1: room.x, y1: room.y + room.height, x2: room.x + room.width, y2: room.y + room.height },
+          { side: 'left', x1: room.x, y1: room.y, x2: room.x, y2: room.y + room.height },
+        ]
+        for (const edge of edges) {
+          const projection = projectToSegment(point, edge.x1, edge.y1, edge.x2, edge.y2)
+          if (!best || projection.distance < best.distance) {
+            best = { kind: 'room', id: room.id, side: edge.side, offset: projection.offset, distance: projection.distance }
+          }
+        }
+      }
+      const embedded = { id: opening.id, type: opening.type, offset: best ? best.offset : 0.5, width: opening.width }
+      if (best?.kind === 'room') {
+        const room = normalized.rooms.find(item => item.id === best.id)
+        room.openings = [...(room.openings || []), { ...embedded, side: best.side }]
+      } else if (best?.kind === 'wall') {
+        const wall = normalized.walls.find(item => item.id === best.id)
+        wall.openings = [...(wall.openings || []), embedded]
+      } else {
+        const angle = (opening.angle || 0) * Math.PI / 180
+        const halfLength = Math.max(70, opening.width)
+        const wall = {
+          id: crypto.randomUUID(),
+          x1: coords(point.x - Math.cos(angle) * halfLength, 1000),
+          y1: coords(point.y - Math.sin(angle) * halfLength, 650),
+          x2: coords(point.x + Math.cos(angle) * halfLength, 1000),
+          y2: coords(point.y + Math.sin(angle) * halfLength, 650),
+          thickness: 6,
+          openings: [{ ...embedded, offset: 0.5 }],
+        }
+        normalized.walls.push(wall)
+      }
     }
   }
   return result
