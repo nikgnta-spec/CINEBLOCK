@@ -1448,7 +1448,7 @@ button:focus-visible,
     overflow-wrap: anywhere !important;
     word-break: normal !important;
   }
-  .print-shot-table tr { break-inside: auto !important; page-break-inside: auto !important; }
+  .print-shot-table tr { break-inside: avoid !important; page-break-inside: avoid !important; }
   .print-mode-shotlist-table .print-plan-page,
   .print-mode-storyboard .print-plan-page { display: none !important; }
   .print-mode-floorplan .print-cover,
@@ -1460,4 +1460,97 @@ button:focus-visible,
     min-width: 0 !important;
   }
   .print-storyboard-image img { max-width: 100% !important; max-height: 100% !important; }
+}
+
+
+/* Final pagination pass: keep scene titles, table rows, cards and floorplans intact where possible. */
+@media print {
+  .print-scene-heading {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: avoid-page !important;
+    page-break-after: avoid !important;
+  }
+
+  /* Keep a scene on one page if it fits; allow long scenes to continue safely. */
+  .print-mode-shotlist-table .print-scene-shots,
+  .print-mode-full .print-scene-shots {
+    break-inside: avoid-page !important;
+    page-break-inside: avoid !important;
+  }
+  .print-shot-table {
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+  .print-shot-table thead {
+    display: table-header-group !important;
+  }
+  .print-shot-table tbody {
+    display: table-row-group !important;
+  }
+  .print-shot-table tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .print-shot-table th,
+  .print-shot-table td {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  /* Keep each storyboard shot together and never crop the actual image content. */
+  .print-storyboard-card {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .print-storyboard-image {
+    height: 42mm !important;
+    max-height: 42mm !important;
+    overflow: hidden !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .print-storyboard-image img {
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    max-height: 40mm !important;
+    object-fit: contain !important;
+  }
+  .print-storyboard-placeholder {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  .print-reference-grid figure,
+  .print-reference-grid img {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    object-fit: contain !important;
+  }
+
+  /* One floorplan per sheet so its labels and camera fields remain readable. */
+  .print-mode-floorplan .print-plan-page {
+    break-before: auto !important;
+    page-break-before: auto !important;
+    break-inside: avoid-page !important;
+    page-break-inside: avoid !important;
+  }
+  .print-mode-floorplan .print-plan-page + .print-plan-page {
+    break-before: page !important;
+    page-break-before: always !important;
+  }
+  .print-mode-full .print-plan-page {
+    break-before: page !important;
+    page-break-before: always !important;
+    break-inside: avoid-page !important;
+    page-break-inside: avoid !important;
+  }
+  .print-plan-svg {
+    width: 100% !important;
+    height: auto !important;
+    max-width: 100% !important;
+    object-fit: contain !important;
+  }
 }
