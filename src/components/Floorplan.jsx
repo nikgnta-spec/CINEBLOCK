@@ -475,9 +475,11 @@ export default function Floorplan({
                 const shot = type === 'camera' ? scene.shots.find(item => item.id === object.shotId) : null
                 const points = [{ x: object.x, y: object.y }, ...(object.path || [])]
                 const pointString = points.map(point => point.x + ',' + point.y).join(' ')
+                const handleBaseAngle = type === 'actor' ? -90 : 0
+                const handleRadians = (handleBaseAngle + (object.angle || 0)) * Math.PI / 180
                 const handlePoint = {
-                  x: object.x + Math.cos(((object.angle || 0) - 90) * Math.PI / 180) * 54,
-                  y: object.y + Math.sin(((object.angle || 0) - 90) * Math.PI / 180) * 54,
+                  x: object.x + Math.cos(handleRadians) * 44,
+                  y: object.y + Math.sin(handleRadians) * 44,
                 }
                 return (
                   <g key={type + '-' + object.id}>
@@ -494,9 +496,8 @@ export default function Floorplan({
                     >
                       {type === 'camera' && (
                         <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
-                          <path d="M0 -18 L52 -31 L52 31 L0 18 Z" fill="var(--bg-subtle)" stroke="var(--text-muted)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-                          <rect x="-17" y="-14" width="27" height="28" rx="4" fill="var(--bg)" stroke="var(--text)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
-                          <circle cx="-4" cy="0" r="4" fill="var(--text)" />
+                          <path d="M9 -9 L33 -20 L33 20 L9 9 Z" fill="var(--bg)" stroke="var(--text)" strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                          <rect x="-29" y="-15" width="40" height="30" rx="6" fill="var(--bg)" stroke="var(--text)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
                         </g>
                       )}
                       {type === 'actor' && (
