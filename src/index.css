@@ -994,3 +994,30 @@ button:focus-visible,
   .floorplan-view-control-button { min-width: 38px; height: 38px; }
   .floorplan-fit-button span { display: none; }
 }
+
+
+/* Stage 2 — Shot List field legibility and usable horizontal table scrolling. */
+.scene-slugline { display:flex; align-items:center; gap:7px; min-width:0; flex-wrap:wrap; }
+.scene-slugline-separator { color:var(--text-placeholder); font-size:12px; user-select:none; }
+.scene-slugline-field { width:auto; max-width:100px; padding:4px 5px; color:var(--text); border:1px solid transparent; border-radius:5px; font-size:12px; }
+.scene-slugline-field:hover, .scene-slugline-field:focus { border-color:var(--border-strong); }
+.scene-location-field { width:150px; max-width:180px; min-width:70px; padding:4px 6px; border:1px solid transparent; border-bottom-color:var(--border); border-radius:4px 4px 0 0; outline:none; background:transparent; color:var(--text); font-size:12px; }
+.scene-location-field::placeholder { color:var(--text-placeholder); opacity:1; }
+.scene-location-field:hover, .scene-location-field:focus { border-color:var(--accent); background:var(--bg-subtle); }
+.shot-table { width:max-content; min-width:100%; table-layout:auto; }
+.shot-table th, .shot-table td { white-space:nowrap; }
+.shot-table th { padding-inline:9px; }
+.shot-table td:nth-child(2) .cell-input { min-width:150px; }
+.shot-table td:nth-child(4) .cell-input { min-width:112px; }
+.shot-table td:nth-child(6) .cell-input { min-width:112px; }
+.shot-table .cell-select.is-placeholder { color:var(--text-placeholder); }
+.shot-table .cell-select:not(.is-placeholder) { color:var(--text); }
+.shot-table th.shot-col-actions, .shot-table tbody tr:not(.add-shot-row) td:last-child { position:sticky; right:0; background:var(--bg); box-shadow:-8px 0 10px -10px var(--border-strong); }
+.shot-table th.shot-col-actions { z-index:3; }
+.shot-table tbody tr:not(.add-shot-row) td:last-child { z-index:2; }
+.shot-table tbody tr:hover td:last-child { background:var(--bg-subtle); }
+.movement-tag { max-width:180px; }
+.movement-tag button { min-width:18px; min-height:18px; display:inline-flex; align-items:center; justify-content:center; }
+.add-shot-btn { min-height:34px; }
+@media (max-width: 1024px) { .scene-slugline { gap:5px; } }
+@media (max-width: 680px) { .scene-slugline { gap:4px; } .scene-location-field { width:100px; } }

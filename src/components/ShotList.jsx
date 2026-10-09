@@ -197,7 +197,7 @@ export default function ShotList({
             </button>
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="scene-slugline">
               <input
                 className="scene-select"
                 aria-label="Nama scene"
@@ -205,13 +205,13 @@ export default function ShotList({
                 onChange={e => updateSceneMeta('name', e.target.value)}
                 style={{ border: 'none', fontWeight: 500, fontSize: 13, padding: '4px 0', outline: 'none', background: 'transparent', minWidth: 0 }}
               />
-              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
+              <span className="scene-slugline-separator" aria-hidden="true">·</span>
               <select
                 className="cell-select"
                 aria-label="Interior atau eksterior"
                 value={scene.intExt}
                 onChange={e => updateSceneMeta('intExt', e.target.value)}
-                style={{ fontSize: 12, color: 'var(--text-muted)', width: 'auto', padding: '4px 4px' }}
+                className="cell-select scene-slugline-field"
               >
                 <option>INT</option>
                 <option>EXT</option>
@@ -222,15 +222,15 @@ export default function ShotList({
                 aria-label="Lokasi scene"
                 onChange={e => updateSceneMeta('location', e.target.value)}
                 placeholder="Lokasi"
-                style={{ fontSize: 12, color: 'var(--text-muted)', border: 'none', outline: 'none', background: 'transparent', width: 140 }}
+                className="scene-location-field"
               />
-              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>
+              <span className="scene-slugline-separator" aria-hidden="true">·</span>
               <select
                 className="cell-select"
                 aria-label="Waktu scene"
                 value={scene.dayNight}
                 onChange={e => updateSceneMeta('dayNight', e.target.value)}
-                style={{ fontSize: 12, color: 'var(--text-muted)', width: 'auto', padding: '4px 4px' }}
+                className="cell-select scene-slugline-field"
               >
                 <option>DAY</option>
                 <option>NIGHT</option>
@@ -280,7 +280,7 @@ export default function ShotList({
               }}
             >
               <div className="scene-item-name">{s.name}</div>
-              <div className="scene-item-sub">{s.intExt}{s.location ? `. ${s.location}` : ''} — {s.dayNight}</div>
+              <div className="scene-item-sub">{s.intExt}{s.location ? `. ${s.location}` : ''} · {s.dayNight}</div>
             </div>
           ))}
         </div>
@@ -292,32 +292,32 @@ export default function ShotList({
           <table className="shot-table">
             <thead>
               <tr>
-                <th style={{ width: 52 }}>Shot</th>
-                <th style={{ minWidth: 100 }}>Subjek</th>
-                <th style={{ width: 80 }}>Ukuran</th>
-                <th style={{ width: 90 }}>Kamera</th>
-                <th style={{ width: 100 }}>Angle</th>
-                <th style={{ width: 80 }}>Lens</th>
-                <th style={{ minWidth: 140 }}>Movement</th>
-                <th style={{ minWidth: 140 }}>Equipment</th>
-                <th style={{ width: 90 }}>Audio</th>
-                <th style={{ width: 60 }}>Take</th>
-                <th style={{ width: 60 }}>Naskah</th>
-                <th style={{ width: 70 }}>Setup</th>
-                <th style={{ width: 80 }}>Estimasi Shoot</th>
-                <th style={{ minWidth: 120 }}>Catatan</th>
-                <th style={{ width: 116 }}>Aksi</th>
+                <th style={{ width: 62 }}>Shot</th>
+                <th style={{ minWidth: 160 }}>Subjek</th>
+                <th style={{ width: 104 }}>Ukuran</th>
+                <th style={{ width: 126 }}>Kamera</th>
+                <th style={{ width: 110 }}>Angle</th>
+                <th style={{ width: 124 }}>Lens</th>
+                <th style={{ minWidth: 156 }}>Movement</th>
+                <th style={{ minWidth: 156 }}>Equipment</th>
+                <th style={{ width: 108 }}>Audio</th>
+                <th style={{ width: 72 }}>Take</th>
+                <th style={{ width: 82 }}>Naskah</th>
+                <th style={{ width: 90 }}>Setup</th>
+                <th style={{ width: 112 }}>Estimasi Shoot</th>
+                <th style={{ minWidth: 160 }}>Catatan</th>
+                <th className="shot-col-actions" style={{ width: 132 }}>Aksi</th>
               </tr>
             </thead>
             <tbody>
               {scene.shots.map((shot) => (
                 <tr key={shot.id}>
-                  <td><div className="shot-num">#{shot.num}</div></td>
+                  <td><div className="shot-num">{shot.num}</div></td>
                   <td>
                     <input className="cell-input" value={shot.subject} onChange={e => updateShot(shot.id, 'subject', e.target.value)} placeholder="Subjek" />
                   </td>
                   <td>
-                    <SelectCell value={shot.size} onChange={v => updateShot(shot.id, 'size', v)} options={SIZES} placeholder="Size" />
+                    <SelectCell value={shot.size} onChange={v => updateShot(shot.id, 'size', v)} options={SIZES} placeholder="Ukuran" />
                   </td>
                   <td>
                     <input className="cell-input" value={shot.camera} onChange={e => updateShot(shot.id, 'camera', e.target.value)} placeholder="Kamera" />
@@ -332,11 +332,11 @@ export default function ShotList({
                     <div className="movement-cell">
                       {shot.movements.map(m => (
                         <span key={m} className="movement-tag">
-                          {m}
+                          {m === 'Handheld Movement' ? 'Handheld' : m}
                           <button
                             onClick={() => removeMovement(shot.id, m)}
-                            title={`Remove movement ${m}`}
-                            aria-label={`Remove movement ${m}`}
+                            title={`Hapus movement ${m}`}
+                            aria-label={`Hapus movement ${m}`}
                           >
                             <X size={9} />
                           </button>
@@ -365,7 +365,7 @@ export default function ShotList({
                     </div>
                   </td>
                   <td>
-                    <SelectCell value={shot.sound} onChange={v => updateShot(shot.id, 'sound', v)} options={SOUNDS} placeholder="Sound" />
+                    <SelectCell value={shot.sound} onChange={v => updateShot(shot.id, 'sound', v)} options={SOUNDS} placeholder="Audio" />
                   </td>
                   <td>
                     <input className="cell-input" value={shot.take} onChange={e => updateShot(shot.id, 'take', e.target.value)} placeholder="1" />
@@ -431,7 +431,7 @@ export default function ShotList({
               <tr className="add-shot-row">
                 <td colSpan={15}>
                   <button className="add-shot-btn" onClick={addShot}>
-                    <Plus size={13} /> Add Shot
+                    <Plus size={13} /> Tambah Shot
                   </button>
                 </td>
               </tr>
@@ -446,7 +446,7 @@ export default function ShotList({
 function SelectCell({ value, onChange, options, placeholder }) {
   return (
     <select
-      className="cell-select"
+      className={'cell-select' + (value ? '' : ' is-placeholder')}
       value={value}
       onChange={e => onChange(e.target.value)}
       aria-label={placeholder}
