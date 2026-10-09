@@ -267,6 +267,9 @@ export default function PrintReport({ project, scenes, floorplans, mode = 'full'
   const storyboardMode = mode === 'storyboard'
   const includeShotList = tableMode || storyboardMode
   const includeFloorplans = mode === 'floorplan' || mode === 'full'
+  const storyboardItems = scenes.flatMap((scene, sceneIndex) => (
+    (scene.shots || []).map((shot, shotIndex) => ({ scene, sceneIndex, shot, shotIndex }))
+  ))
 
   return (
     <main className={'print-report print-mode-' + mode + ' print-orientation-' + orientation}>
@@ -324,17 +327,53 @@ export default function PrintReport({ project, scenes, floorplans, mode = 'full'
         <section className={'print-shot-list-section' + (tableMode ? ' print-table-section' : ' print-storyboard-section')}>
           <div className="print-section-kicker">{storyboardMode ? 'STORYBOARD' : 'SHOT LIST'}</div>
           <h2>{storyboardMode ? 'Storyboard & Camera Coverage' : 'Shot List'}</h2>
-          {scenes.map((scene, index) => (
-            <section className="print-scene-shots" key={scene.id}>
-              <div className="print-scene-heading">
-                <div>
-                  <h3>{String(index + 1).padStart(2, '0')} · {scene.name || 'Scene'}</h3>
-                  <p>{scene.intExt || 'INT'} · {display(scene.location)} · {scene.dayNight || 'DAY'}</p>
-                </div>
-                <span>{(scene.shots || []).length} shot{(scene.shots || []).length === 1 ? '' : 's'}</span>
-              </div>
 
-              {tableMode ? (
+          {storyboardMode ? (
+            <div className="print-storyboard-all-shots">
+              {storyboardItems.length === 0 ? (
+                <p className="print-muted">Belum ada shot di proyek ini.</p>
+              ) : storyboardItems.map(({ scene, sceneIndex, shot, shotIndex }) => (
+                <article className="print-storyboard-card" key={scene.id + '-' + (shot.id || shotIndex)}>
+                  <div className="print-storyboard-scene-label">
+                    <strong>{String(sceneIndex + 1).padStart(2, '0')} · {scene.name || 'Scene'}</strong>
+                    <span>{scene.intExt || 'INT'} · {display(scene.location)} · {scene.dayNight || 'DAY'}</span>
+                  </div>
+                  <header className="print-storyboard-card-header">
+                    <strong>#{shot.num || String(shotIndex + 1).padStart(3, '0')}</strong>
+                    <span>{display(shot.subject)}</span>
+                    <small className={'print-storyboard-status status-' + (['done', 'skip'].includes(shot.status) ? shot.status : 'planned')}>
+                      {shot.status === 'done' ? 'Done' : shot.status === 'skip' ? 'Skip' : 'Planned'}
+                    </small>
+                  </header>
+                  {shot.storyboardImage ? (
+                    <figure className="print-storyboard-image">
+                      <img src={shot.storyboardImage} alt={'Storyboard shot ' + (shot.num || shotIndex + 1)} />
+                    </figure>
+                  ) : (
+                    <div className="print-storyboard-placeholder">Storyboard belum ditambahkan</div>
+                  )}
+                  <div className="print-storyboard-details">
+                    <span><small>Size</small><strong>{display(shot.size)}</strong></span>
+                    <span><small>Camera</small><strong>{display(shot.camera)}</strong></span>
+                    <span><small>Angle</small><strong>{display(shot.angle)}</strong></span>
+                    <span><small>Lens</small><strong>{display(shot.lens)}</strong></span>
+                    <span><small>Movement</small><strong>{display(shot.movements)}</strong></span>
+                    <span><small>Equipment</small><strong>{display(shot.equipment)}</strong></span>
+                  </div>
+                  {shot.notes && <p className="print-storyboard-notes">{shot.notes}</p>}
+                </article>
+              ))}
+            </div>
+          ) : (
+            scenes.map((scene, index) => (
+              <section className="print-scene-shots" key={scene.id}>
+                <div className="print-scene-heading">
+                  <div>
+                    <h3>{String(index + 1).padStart(2, '0')} · {scene.name || 'Scene'}</h3>
+                    <p>{scene.intExt || 'INT'} · {display(scene.location)} · {scene.dayNight || 'DAY'}</p>
+                  </div>
+                  <span>{(scene.shots || []).length} shot{(scene.shots || []).length === 1 ? '' : 's'}</span>
+                </div>
                 <table className="print-shot-table">
                   <colgroup>
                     <col className="col-shot" />
@@ -382,41 +421,9 @@ export default function PrintReport({ project, scenes, floorplans, mode = 'full'
                     ))}
                   </tbody>
                 </table>
-              ) : (
-                <div className="print-storyboard-grid">
-                  {(scene.shots || []).length === 0 ? (
-                    <p className="print-muted">Belum ada shot di scene ini.</p>
-                  ) : (scene.shots || []).map((shot, shotIndex) => (
-                    <article className="print-storyboard-card" key={shot.id || shotIndex}>
-                      <header className="print-storyboard-card-header">
-                        <strong>#{shot.num || String(shotIndex + 1).padStart(3, '0')}</strong>
-                        <span>{display(shot.subject)}</span>
-                        <small className={'print-storyboard-status status-' + (['done', 'skip'].includes(shot.status) ? shot.status : 'planned')}>
-                          {shot.status === 'done' ? 'Done' : shot.status === 'skip' ? 'Skip' : 'Planned'}
-                        </small>
-                      </header>
-                      {shot.storyboardImage ? (
-                        <figure className="print-storyboard-image">
-                          <img src={shot.storyboardImage} alt={'Storyboard shot ' + (shot.num || shotIndex + 1)} />
-                        </figure>
-                      ) : (
-                        <div className="print-storyboard-placeholder">Storyboard belum ditambahkan</div>
-                      )}
-                      <div className="print-storyboard-details">
-                        <span><small>Size</small><strong>{display(shot.size)}</strong></span>
-                        <span><small>Camera</small><strong>{display(shot.camera)}</strong></span>
-                        <span><small>Angle</small><strong>{display(shot.angle)}</strong></span>
-                        <span><small>Lens</small><strong>{display(shot.lens)}</strong></span>
-                        <span><small>Movement</small><strong>{display(shot.movements)}</strong></span>
-                        <span><small>Equipment</small><strong>{display(shot.equipment)}</strong></span>
-                      </div>
-                      {shot.notes && <p className="print-storyboard-notes">{shot.notes}</p>}
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
-          ))}
+              </section>
+            ))
+          )}
         </section>
       )}
 

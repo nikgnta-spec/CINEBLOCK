@@ -1345,44 +1345,81 @@ button:focus-visible,
   .print-shot-table .print-table-subject { font-weight: 600; }
   .print-shot-table .print-empty-row { color: #6b7280; font-style: italic; }
 
-  .print-storyboard-section .print-scene-shots { break-inside: auto; }
-  .print-storyboard-grid {
+  .print-storyboard-all-shots {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 3mm;
     align-items: start;
   }
   .print-storyboard-card {
     min-width: 0;
-    padding: 8px;
+    padding: 6px;
     border: 1px solid #cbd5e1;
-    break-inside: avoid;
+    break-inside: avoid-page;
     page-break-inside: avoid;
+  }
+  .print-storyboard-scene-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 5px;
+    color: #475569;
+    font-size: 6pt;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+  .print-storyboard-scene-label strong {
+    color: #334155;
+    font-size: 7pt;
   }
   .print-storyboard-card-header {
     display: flex;
     align-items: flex-start;
-    gap: 6px;
+    gap: 5px;
     flex-wrap: wrap;
-    margin-bottom: 6px;
-    padding-bottom: 5px;
+    margin-bottom: 5px;
+    padding-bottom: 4px;
     border-bottom: 1px solid #e5e7eb;
   }
   .print-storyboard-card-header > strong { flex: 0 0 auto; font-size: 8pt; }
-  .print-storyboard-card-header > span { min-width: 0; flex: 1 1 50%; font-size: 8pt; font-weight: 650; overflow-wrap: anywhere; }
+  .print-storyboard-card-header > span { min-width: 0; flex: 1 1 45%; font-size: 8pt; font-weight: 650; overflow-wrap: anywhere; }
   .print-storyboard-status { padding: 2px 4px; border: 1px solid #cbd5e1; border-radius: 3px; color: #475569; font-size: 6pt; white-space: nowrap; }
   .print-storyboard-status.status-done { border-color: #15803d; color: #166534; }
   .print-storyboard-status.status-skip { border-color: #b91c1c; color: #991b1b; }
-  .print-storyboard-image { display: flex; align-items: center; justify-content: center; height: 42mm; margin: 0 0 7px; border: 1px solid #e5e7eb; overflow: hidden; }
-  .print-storyboard-image img { display: block; max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
-  .print-storyboard-placeholder { display: flex; align-items: center; justify-content: center; height: 42mm; margin-bottom: 7px; border: 1px dashed #cbd5e1; color: #64748b; font-size: 8pt; text-align: center; }
-  .print-storyboard-details { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px 8px; }
+  .print-storyboard-image {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 30mm;
+    margin: 0 0 5px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+  }
+  .print-storyboard-image img {
+    display: block;
+    width: 100%;
+    height: 28mm;
+    object-fit: contain;
+    object-position: center;
+  }
+  .print-storyboard-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 30mm;
+    margin-bottom: 5px;
+    border: 1px dashed #cbd5e1;
+    color: #64748b;
+    font-size: 7pt;
+    text-align: center;
+  }
+  .print-storyboard-details { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 6px; }
   .print-storyboard-details > span { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
-  .print-storyboard-details small { color: #64748b; font-size: 6pt; text-transform: uppercase; }
-  .print-storyboard-details strong { font-size: 7pt; font-weight: 500; overflow-wrap: anywhere; white-space: pre-wrap; }
-  .print-storyboard-notes { margin: 6px 0 0; padding-top: 5px; border-top: 1px solid #e5e7eb; font-size: 7pt; white-space: pre-wrap; overflow-wrap: anywhere; }
-  .print-orientation-landscape .print-storyboard-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .print-orientation-portrait .print-storyboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .print-storyboard-details small { color: #64748b; font-size: 5.5pt; text-transform: uppercase; }
+  .print-storyboard-details strong { font-size: 6.5pt; line-height: 1.25; font-weight: 500; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .print-storyboard-notes { margin: 5px 0 0; padding-top: 4px; border-top: 1px solid #e5e7eb; font-size: 6.5pt; line-height: 1.25; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .print-orientation-portrait .print-storyboard-all-shots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 
@@ -1499,29 +1536,44 @@ button:focus-visible,
     overflow-wrap: anywhere !important;
   }
 
-  /* Keep each storyboard shot together and never crop the actual image content. */
+  /* Keep storyboard cards together; scale images into a thumbnail frame without cropping. */
+  .print-storyboard-all-shots {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 3mm !important;
+    align-items: start !important;
+  }
   .print-storyboard-card {
-    break-inside: avoid !important;
+    min-width: 0 !important;
+    break-inside: avoid-page !important;
     page-break-inside: avoid !important;
   }
   .print-storyboard-image {
-    height: 42mm !important;
-    max-height: 42mm !important;
-    overflow: hidden !important;
+    width: 100% !important;
+    height: 30mm !important;
+    max-height: 30mm !important;
+    margin: 0 0 5px !important;
+    overflow: visible !important;
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
   .print-storyboard-image img {
     display: block !important;
-    width: auto !important;
-    height: auto !important;
+    width: 100% !important;
+    height: 28mm !important;
     max-width: 100% !important;
-    max-height: 40mm !important;
+    max-height: 28mm !important;
     object-fit: contain !important;
+    object-position: center !important;
   }
   .print-storyboard-placeholder {
+    height: 30mm !important;
+    max-height: 30mm !important;
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+  }
+  .print-orientation-portrait .print-storyboard-all-shots {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
   .print-reference-grid figure,
   .print-reference-grid img {
