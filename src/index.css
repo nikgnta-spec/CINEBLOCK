@@ -324,256 +324,280 @@ button:focus-visible,
 }
 
 
-/* Interactive top-down floorplan */
-.floorplan-page {
+/* Floorplan — canvas-first, minimal controls */
+.floorplan-workspace {
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  color: var(--text);
-}
-.floorplan-toolbar {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border);
-  flex-wrap: wrap;
-}
-.floorplan-toolbar-left {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.floorplan-label {
-  display: block;
-  margin-bottom: 5px;
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-}
-.floorplan-select,
-.floorplan-input {
-  min-width: 150px;
-  max-width: 280px;
-  padding: 7px 9px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  height: 100%;
   background: var(--bg);
   color: var(--text);
-  outline: none;
 }
-.floorplan-select.full { width: 100%; max-width: none; }
-.floorplan-select:focus,
-.floorplan-input:focus { border-color: var(--border-strong); }
-.floorplan-summary {
-  padding-bottom: 7px;
-  color: var(--text-muted);
-  font-size: 11px;
-  white-space: nowrap;
-}
-.floorplan-toolstrip {
+.floorplan-top {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 8px 18px;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 62px;
+  padding: 10px 22px;
+  border-bottom: 1px solid var(--border);
+}
+.floorplan-scene-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.floorplan-scene-select {
+  min-width: 180px;
+  max-width: 320px;
+  padding: 7px 34px 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  outline: none;
+}
+.floorplan-scene-select:focus { border-color: var(--border-strong); }
+.floorplan-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-muted);
+}
+.floorplan-icon-button:hover { background: var(--bg-hover); color: var(--text); }
+.floorplan-icon-button.danger { color: var(--danger); }
+.floorplan-top-meta {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.floorplan-top-meta span { white-space: nowrap; }
+.floorplan-main-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 9px 18px;
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
 }
-.floorplan-tool {
+.floorplan-tool-group { display: flex; align-items: center; gap: 6px; }
+.floorplan-tool-button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  padding: 7px 9px;
+  justify-content: center;
+  gap: 8px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 12px;
   border: 1px solid transparent;
-  border-radius: var(--radius);
+  border-radius: 7px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 500;
   white-space: nowrap;
+  flex-shrink: 0;
+  transition: background .12s, color .12s, border-color .12s;
 }
-.floorplan-tool:hover { background: var(--bg-hover); color: var(--text); }
-.floorplan-tool.active {
+.floorplan-tool-button:hover { background: var(--bg-hover); color: var(--text); }
+.floorplan-tool-button.active {
   border-color: var(--border-strong);
   background: var(--bg-subtle);
   color: var(--text);
 }
-.floorplan-tool:disabled { opacity: .35; cursor: not-allowed; }
-.floorplan-tool-spacer { flex: 1; min-width: 8px; }
-.floorplan-clear { color: var(--danger); }
-.floorplan-layout {
+.floorplan-tool-button:disabled { opacity: .35; cursor: not-allowed; }
+.floorplan-tool-button.object-actor { color: #8b5cf6; }
+.floorplan-tool-button.object-camera { color: #2563eb; }
+.floorplan-tool-button.object-light { color: #d97706; }
+.floorplan-tool-button.object-actor.active { border-color: #8b5cf6; background: rgba(139,92,246,.08); }
+.floorplan-tool-button.object-camera.active { border-color: #2563eb; background: rgba(37,99,235,.08); }
+.floorplan-tool-button.object-light.active { border-color: #d97706; background: rgba(217,119,6,.08); }
+.floorplan-tool-divider { width: 1px; height: 30px; flex-shrink: 0; background: var(--border); }
+.floorplan-tool-spacer { flex: 1; min-width: 12px; }
+.floorplan-clear-button:hover { color: var(--danger); }
+.floorplan-editor {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 1fr) 340px;
   flex: 1;
-  min-height: 560px;
+  min-height: 620px;
+  min-width: 0;
 }
-.floorplan-map-column {
+.floorplan-canvas-column {
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  min-width: 0;
-  padding: 14px;
-  border-right: 1px solid var(--border);
+  padding: 18px;
+  background: var(--bg-subtle);
 }
-.floorplan-map-frame {
-  width: 100%;
-  aspect-ratio: 1000 / 650;
-  min-height: 360px;
+.floorplan-canvas-frame {
+  flex: 1;
+  min-height: 560px;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 8px;
   background: var(--bg);
+  box-shadow: 0 1px 2px rgba(0,0,0,.025);
 }
-.floorplan-map {
+.floorplan-canvas {
   display: block;
   width: 100%;
   height: 100%;
   touch-action: none;
   user-select: none;
 }
-.floorplan-map.cursor-select { cursor: default; }
-.floorplan-map.cursor-draw { cursor: crosshair; }
-.floorplan-map-help {
+.floorplan-canvas.can-select { cursor: default; }
+.floorplan-canvas.can-draw { cursor: crosshair; }
+.floorplan-inspector {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 10px 2px 0;
-  color: var(--text-muted);
-  font-size: 10px;
-}
-.floorplan-map-help span { display: inline-flex; align-items: center; gap: 5px; }
-.floorplan-sidebar {
+  flex-direction: column;
   min-width: 0;
-  overflow-y: auto;
+  border-left: 1px solid var(--border);
   background: var(--bg);
 }
-.floorplan-panel {
-  padding: 14px;
+.floorplan-inspector-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
   border-bottom: 1px solid var(--border);
 }
-.floorplan-panel-heading {
-  display: flex;
+.floorplan-type-icon {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 10px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .06em;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 8px;
 }
-.floorplan-count {
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 500;
-}
-.floorplan-shot-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 9px 7px;
-  border-radius: var(--radius);
-  text-align: left;
-}
-.floorplan-shot-item:hover { background: var(--bg-hover); }
-.floorplan-shot-item.active { background: var(--bg-subtle); outline: 1px solid var(--border); }
-.floorplan-shot-icon {
-  display: flex;
-  flex-shrink: 0;
-  color: #2563eb;
-}
-.floorplan-shot-copy {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  flex-direction: column;
-  gap: 2px;
-}
-.floorplan-shot-copy strong {
-  overflow: hidden;
-  font-size: 11px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.floorplan-shot-copy small {
-  overflow: hidden;
-  color: var(--text-muted);
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.floorplan-shot-status { color: var(--text-placeholder); font-size: 12px; }
-.floorplan-shot-status.placed { color: #2563eb; }
-.floorplan-muted {
-  margin: 4px 0;
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.6;
-}
-.floorplan-delete { padding: 4px 6px; color: var(--danger); font-size: 10px; }
-.floorplan-editor-fields { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
-.floorplan-linked-shot {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 3px;
-  color: #2563eb;
-  font-size: 11px;
-  font-weight: 600;
-}
-.floorplan-hint { color: var(--text-muted); font-size: 10px; line-height: 1.5; }
-.floorplan-coordinate-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.floorplan-coordinate-grid label {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 600;
-}
-.floorplan-coordinate-grid input {
+.floorplan-type-icon.actor { color: #8b5cf6; background: rgba(139,92,246,.11); }
+.floorplan-type-icon.camera { color: #2563eb; background: rgba(37,99,235,.11); }
+.floorplan-type-icon.light { color: #d97706; background: rgba(217,119,6,.12); }
+.floorplan-type-icon.room,
+.floorplan-type-icon.wall { color: var(--text-muted); background: var(--bg-subtle); }
+.floorplan-inspector-title { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 3px; }
+.floorplan-inspector-title strong { font-size: 16px; font-weight: 600; }
+.floorplan-inspector-title span { color: var(--text-muted); font-size: 13px; }
+.floorplan-inspector-section { display: flex; flex-direction: column; gap: 9px; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+.floorplan-inspector-section > label,
+.floorplan-section-title { color: var(--text-muted); font-size: 12px; font-weight: 600; }
+.floorplan-field {
   width: 100%;
   min-width: 0;
-  padding: 6px;
+  padding: 10px 11px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 6px;
   background: var(--bg);
   color: var(--text);
-  font-size: 11px;
+  font-size: 14px;
+  outline: none;
 }
-.floorplan-inline-controls { display: flex; flex-wrap: wrap; gap: 6px; }
-.floorplan-inline-controls .btn,
-.floorplan-editor-fields > .btn { justify-content: center; padding: 6px 8px; font-size: 10px; }
-.floorplan-path-meta { color: var(--text-muted); font-size: 10px; }
-.floorplan-text-button { align-self: flex-start; color: var(--danger); font-size: 10px; }
-.floorplan-text-button:hover { text-decoration: underline; }
-.floorplan-legend-panel { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }
-.floorplan-legend-panel .floorplan-panel-heading { width: 100%; }
+.floorplan-field:focus { border-color: var(--border-strong); }
+.floorplan-link-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 11px 12px;
+  border-radius: 7px;
+  background: var(--bg-subtle);
+}
+.floorplan-link-card span { color: var(--text-muted); font-size: 12px; }
+.floorplan-link-card strong { font-size: 14px; font-weight: 600; }
+.floorplan-path-button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 2px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+}
+.floorplan-path-button:hover { background: var(--bg-hover); }
+.floorplan-path-button.active { color: #2563eb; border-color: #2563eb; background: rgba(37,99,235,.06); }
+.floorplan-path-button span { display: inline-flex; align-items: center; justify-content: center; min-width: 23px; height: 23px; margin-left: auto; padding: 0 5px; border-radius: 4px; background: var(--bg-subtle); font-size: 12px; }
+.floorplan-remove-path { align-self: flex-start; color: var(--danger); font-size: 13px; padding: 3px 0; }
+.floorplan-remove-path:hover { text-decoration: underline; }
+.floorplan-coordinates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.floorplan-coordinates label { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 13px; font-weight: 600; }
+.floorplan-coordinates input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+}
+.floorplan-rotate-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.floorplan-rotate-button:hover { background: var(--bg-hover); }
+.floorplan-object-browser { padding: 18px 12px; }
+.floorplan-object-browser-head { display: flex; align-items: center; justify-content: space-between; padding: 0 8px 12px; border-bottom: 1px solid var(--border); }
+.floorplan-object-browser-head strong { font-size: 16px; font-weight: 600; }
+.floorplan-object-browser-head span { color: var(--text-muted); font-size: 13px; }
+.floorplan-object-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 58px;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 5px;
+  text-align: left;
+}
+.floorplan-object-row:hover { background: var(--bg-hover); }
+.floorplan-object-row .floorplan-type-icon { width: 36px; height: 36px; flex-basis: 36px; }
+.floorplan-object-row-name { flex: 1; min-width: 0; overflow: hidden; font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.floorplan-object-row-type { color: var(--text-muted); font-size: 10px; font-weight: 600; letter-spacing: .06em; }
+.floorplan-empty-state { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; min-height: 190px; color: var(--text-muted); font-size: 14px; }
 
-@media (max-width: 1100px) {
-  .floorplan-layout { grid-template-columns: minmax(0, 1fr) 270px; }
-  .floorplan-tool { padding: 7px; }
-  .floorplan-tool span { display: none; }
-  .floorplan-tool.active span { display: inline; }
+@media (max-width: 1120px) {
+  .floorplan-editor { grid-template-columns: minmax(0, 1fr) 300px; }
+  .floorplan-main-tools { padding-inline: 10px; gap: 7px; }
+  .floorplan-tool-button { padding-inline: 9px; }
 }
-@media (max-width: 760px) {
-  .floorplan-toolbar { align-items: stretch; padding: 12px; }
-  .floorplan-toolbar-left { align-items: stretch; width: 100%; }
-  .floorplan-toolbar-left > div { flex: 1 1 140px; min-width: 0; }
-  .floorplan-select { width: 100%; max-width: none; min-width: 0; }
-  .floorplan-summary { padding: 0; }
-  .floorplan-toolstrip { padding: 7px 10px; }
-  .floorplan-tool { gap: 4px; padding: 7px; }
-  .floorplan-tool span { display: none; }
-  .floorplan-layout { display: flex; flex-direction: column; min-height: auto; }
-  .floorplan-map-column { border-right: 0; padding: 10px; }
-  .floorplan-map-frame { min-height: 280px; }
-  .floorplan-sidebar { overflow: visible; border-top: 1px solid var(--border); }
-  .floorplan-panel { padding: 12px; }
-  .floorplan-legend-panel { display: none; }
+@media (max-width: 780px) {
+  .floorplan-workspace { height: auto; }
+  .floorplan-top { min-height: 56px; padding: 8px 12px; }
+  .floorplan-scene-select { min-width: 0; max-width: 200px; }
+  .floorplan-top-meta { gap: 8px; font-size: 11px; }
+  .floorplan-main-tools { gap: 6px; padding: 8px; }
+  .floorplan-tool-button { min-width: 42px; height: 42px; padding: 0 8px; }
+  .floorplan-tool-button span { display: none; }
+  .floorplan-tool-divider { margin-inline: 1px; }
+  .floorplan-editor { display: flex; flex-direction: column; min-height: 0; }
+  .floorplan-canvas-column { padding: 10px; }
+  .floorplan-canvas-frame { min-height: 54vw; max-height: 70vh; }
+  .floorplan-inspector { border-left: 0; border-top: 1px solid var(--border); }
+  .floorplan-inspector-head { padding: 14px 16px; }
+  .floorplan-inspector-section { padding: 14px 16px; }
+  .floorplan-object-browser { padding: 12px; }
 }
