@@ -19,7 +19,7 @@ const CAMERA_PATH_MOVEMENTS = new Set([
 ])
 const MAP_WIDTH = 1000
 const MAP_HEIGHT = 650
-const EMPTY_LAYOUT = { rooms: [], walls: [], doors: [], windows: [], props: [], actors: [], cameras: [], lights: [] }
+const EMPTY_LAYOUT = { rooms: [], walls: [], props: [], actors: [], cameras: [], lights: [] }
 const PROP_TYPES = ['Table', 'Chair', 'Sofa', 'Bed', 'Desk', 'Cabinet', 'Counter', 'Custom']
 const RESIZE_HANDLES = [
   { key: 'nw', sx: -1, sy: -1, cursor: 'nwse-resize' },
@@ -27,6 +27,47 @@ const RESIZE_HANDLES = [
   { key: 'sw', sx: -1, sy: 1, cursor: 'nesw-resize' },
   { key: 'se', sx: 1, sy: 1, cursor: 'nwse-resize' },
 ]
+const ROOM_SIDES = [
+  { value: 'top', label: 'Top wall' },
+  { value: 'right', label: 'Right wall' },
+  { value: 'bottom', label: 'Bottom wall' },
+  { value: 'left', label: 'Left wall' },
+]
+const getOpeningSegments = (length, openings = []) => {
+  const ranges = openings
+    .map(opening => {
+      const width = Math.min(Number(opening.width) || 48, length)
+      const center = clamp(opening.offset, 0, 1) * length
+      return { start: clamp(center - width / 2, 0, length), end: clamp(center + width / 2, 0, length) }
+    })
+    .sort((a, b) => a.start - b.start)
+  const segments = []
+  let cursor = 0
+  for (const range of ranges) {
+    if (range.start > cursor) segments.push({ start: cursor, end: range.start })
+    cursor = Math.max(cursor, range.end)
+  }
+  if (cursor < length) segments.push({ start: cursor, end: length })
+  return segments
+}
+const getRoomOpeningPlacement = (room, opening) => {
+  const side = ROOM_SIDES.some(item => item.value === opening.side) ? opening.side : 'bottom'
+  const offset = clamp(opening.offset, 0.05, 0.95)
+  if (side === 'top') return { x: room.x + offset * room.width, y: room.y, angle: 180, length: room.width }
+  if (side === 'right') return { x: room.x + room.width, y: room.y + offset * room.height, angle: -90, length: room.height }
+  if (side === 'left') return { x: room.x, y: room.y + offset * room.height, angle: 90, length: room.height }
+  return { x: room.x + offset * room.width, y: room.y + room.height, angle: 0, length: room.width }
+}
+const getWallMetrics = wall => {
+  const dx = wall.x2 - wall.x1
+  const dy = wall.y2 - wall.y1
+  return { length: Math.hypot(dx, dy), angle: Math.atan2(dy, dx) * 180 / Math.PI, ux: dx / (Math.hypot(dx, dy) || 1), uy: dy / (Math.hypot(dx, dy) || 1) }
+}
+const getOpeningSymbol = (opening, width) => (
+  opening.type === 'door'
+    ? `M ${-width / 2} 0 V ${-width} M ${-width / 2} ${-width} A ${width} ${width} 0 0 1 ${width / 2} 0`
+    : `M ${-width / 2} -4 H ${width / 2} M ${-width / 2} 0 H ${width / 2} M ${-width / 2} 4 H ${width / 2} M ${-width / 2} -7 V 7 M ${width / 2} -7 V 7`
+)
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0))
 const makeId = () => crypto.randomUUID()
 const padNum = number => String(number).padStart(2, '0')
@@ -98,8 +139,6 @@ function findAvailablePosition(layout, occupiedOverrides = null) {
     ...(layout.actors || []),
     ...(layout.cameras || []),
     ...(layout.lights || []),
-    ...(layout.doors || []),
-    ...(layout.windows || []),
     ...(layout.props || []),
   ]
   const centerX = 500
@@ -206,8 +245,6 @@ export default function Floorplan({
   const allObjects = [
     ...layout.rooms.map(item => ({ ...item, entityType: 'room' })),
     ...layout.walls.map(item => ({ ...item, entityType: 'wall' })),
-    ...layout.doors.map(item => ({ ...item, entityType: 'door' })),
-    ...layout.windows.map(item => ({ ...item, entityType: 'window' })),
     ...layout.props.map(item => ({ ...item, entityType: 'prop' })),
     ...layout.actors.map(item => ({ ...item, entityType: 'actor' })),
     ...layout.cameras.map(item => ({ ...item, entityType: 'camera' })),
@@ -332,14 +369,9 @@ export default function Floorplan({
     } else if (type === 'light') {
       object = { id: makeId(), ...position, angle: 0, lightType: 'Key', label: 'Light ' + padNum(count + 1) }
       updateLayout(previous => ({ ...previous, lights: [...previous.lights, object] }))
-    } else if (type === 'door' || type === 'window' || type === 'prop') {
-      const defaults = type === 'door'
-        ? { width: 52, height: 12, label: 'Door ' + padNum(count + 1) }
-        : type === 'window'
-          ? { width: 64, height: 10, label: 'Window ' + padNum(count + 1) }
-          : { width: 52, height: 36, label: 'Table ' + padNum(count + 1), propType: 'Table' }
-      object = { id: makeId(), ...position, angle: 0, ...defaults }
-      updateLayout(previous => ({ ...previous, [collection]: [...(previous[collection] || []), object] }))
+    } else if (type === 'prop') {
+      object = { id: makeId(), ...position, angle: 0, width: 52, height: 36, label: 'Table ' + padNum(count + 1), propType: 'Table' }
+      updateLayout(previous => ({ ...previous, props: [...previous.props, object] }))
     } else {
       const linkedShotIds = new Set(layout.cameras.map(camera => camera.shotId).filter(Boolean))
       let targetShot = scene.shots.find(shot => !linkedShotIds.has(shot.id))
@@ -477,6 +509,41 @@ export default function Floorplan({
         ? item
         : { ...item, path: [...(item.path || []), { x: Math.round(point.x), y: Math.round(point.y) }] }),
     }))
+  }
+
+  const addOpening = type => {
+    if (!selectedEntity || !['room', 'wall'].includes(selectedType)) return
+    const opening = {
+      id: makeId(),
+      type,
+      offset: 0.5,
+      width: type === 'door' ? 48 : 58,
+      ...(selectedType === 'room' ? { side: 'bottom' } : {}),
+    }
+    updateSelected({ openings: [...(selectedEntity.openings || []), opening] })
+    setTool('select')
+  }
+
+  const updateOpening = (openingId, patch) => {
+    if (!selectedEntity || !['room', 'wall'].includes(selectedType)) return
+    updateSelected({
+      openings: (selectedEntity.openings || []).map(opening => opening.id === openingId ? { ...opening, ...patch } : opening),
+    })
+  }
+
+  const removeOpening = openingId => {
+    if (!selectedEntity || !['room', 'wall'].includes(selectedType)) return
+    updateSelected({ openings: (selectedEntity.openings || []).filter(opening => opening.id !== openingId) })
+  }
+
+  const beginOpeningDrag = (hostType, host, opening, event) => {
+    event.stopPropagation()
+    event.preventDefault()
+    dragRef.current = { mode: 'opening', type: hostType, id: host.id, openingId: opening.id }
+    svgRef.current?.setPointerCapture?.(event.pointerId)
+    setSelected({ type: hostType, id: host.id })
+    setSelectedWaypoint(null)
+    setTool('select')
   }
 
   const handleCanvasPointerDown = event => {
@@ -659,6 +726,8 @@ export default function Floorplan({
           id: makeId(),
           x1: Math.round(drawStart.x), y1: Math.round(drawStart.y),
           x2: Math.round(previewPoint.x), y2: Math.round(previewPoint.y),
+          thickness: 6,
+          openings: [],
         }
         updateLayout(previous => ({ ...previous, walls: [...previous.walls, wall] }))
         setSelected({ type: 'wall', id: wall.id })
@@ -733,7 +802,7 @@ export default function Floorplan({
   }
 
   const clearLayout = () => {
-    if (!window.confirm('Clear this scene’s rooms, walls, doors, windows, props, actors, cameras and lighting?')) return
+    if (!window.confirm('Clear this scene’s rooms, walls, props, actors, cameras and lighting?')) return
     updateLayout(() => ({ ...EMPTY_LAYOUT }))
     setSelected(null)
     setSelectedWaypoint(null)
@@ -761,9 +830,9 @@ export default function Floorplan({
 
   const objectTypeLabel = type => ({
     actor: 'Actor', camera: 'Camera', light: 'Lighting', room: 'Room',
-    wall: 'Wall', door: 'Door', window: 'Window', prop: 'Prop',
+    wall: 'Wall', prop: 'Prop',
   })[type] || type
-  const objectCount = layout.rooms.length + layout.walls.length + layout.doors.length + layout.windows.length + layout.props.length + layout.actors.length + layout.cameras.length + layout.lights.length
+  const objectCount = layout.rooms.length + layout.walls.length + layout.props.length + layout.actors.length + layout.cameras.length + layout.lights.length
   const selectedPath = selectedEntity?.path || []
   if (!scene) return null
 
@@ -806,12 +875,6 @@ export default function Floorplan({
           </button>
           <button className={'floorplan-tool-button' + (tool === 'wall' ? ' active' : '')} onClick={() => setTool('wall')} title="Add wall by dragging its endpoints" aria-label="Draw wall" aria-pressed={tool === 'wall'}>
             <Minus size={19} /><span>Wall</span>
-          </button>
-          <button className="floorplan-tool-button" onClick={() => addObject('door')} title="Add door" aria-label="Add door">
-            <FloorplanObjectIcon type="door" size={20} /><span>Door</span>
-          </button>
-          <button className="floorplan-tool-button" onClick={() => addObject('window')} title="Add window" aria-label="Add window">
-            <FloorplanObjectIcon type="window" size={20} /><span>Window</span>
           </button>
         </div>
         <span className="floorplan-tool-divider" />
@@ -902,7 +965,7 @@ export default function Floorplan({
                   <line
                     x1={wall.x1} y1={wall.y1} x2={wall.x2} y2={wall.y2}
                     stroke={selected?.type === 'wall' && selected.id === wall.id ? 'var(--text)' : 'var(--border-strong)'}
-                    strokeWidth={selected?.type === 'wall' && selected.id === wall.id ? 8 : 6}
+                    strokeWidth={selected?.type === 'wall' && selected.id === wall.id ? (wall.thickness || 6) + 2 : (wall.thickness || 6)}
                     strokeLinecap="square" vectorEffect="non-scaling-stroke"
                   />
                   <line x1={wall.x1} y1={wall.y1} x2={wall.x2} y2={wall.y2}
