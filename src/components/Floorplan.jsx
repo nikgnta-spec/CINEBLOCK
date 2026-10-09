@@ -580,6 +580,40 @@ export default function Floorplan({
     const drag = dragRef.current
     if (!drag) return
 
+    if (drag.mode === 'opening') {
+      const collection = drag.type + 's'
+      const host = (layout[collection] || []).find(item => item.id === drag.id)
+      const opening = host?.openings?.find(item => item.id === drag.openingId)
+      if (!host || !opening) return
+      let offset = 0.5
+      let length = 1
+      if (drag.type === 'wall') {
+        const metrics = getWallMetrics(host)
+        length = metrics.length || 1
+        offset = ((point.x - host.x1) * metrics.ux + (point.y - host.y1) * metrics.uy) / length
+      } else {
+        const placement = getRoomOpeningPlacement(host, opening)
+        length = placement.length || 1
+        offset = ['top', 'bottom'].includes(opening.side || 'bottom')
+          ? (point.x - host.x) / length
+          : (point.y - host.y) / length
+      }
+      const minimumOffset = Math.min(0.49, (Number(opening.width) || 48) / (2 * length))
+      const nextOffset = clamp(offset, minimumOffset, 1 - minimumOffset)
+      updateLayout(previous => ({
+        ...previous,
+        [collection]: previous[collection].map(item => item.id !== drag.id
+          ? item
+          : {
+            ...item,
+            openings: (item.openings || []).map(entry => entry.id === drag.openingId
+              ? { ...entry, offset: nextOffset }
+              : entry),
+          }),
+      }))
+      return
+    }
+
     if (drag.mode === 'wall-endpoint') {
       const endpointPatch = drag.endpoint === 'start'
         ? { x1: Math.round(point.x), y1: Math.round(point.y) }
