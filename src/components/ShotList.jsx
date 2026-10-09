@@ -5,16 +5,6 @@ const SIZES = [
   'ECU', 'CU', 'MCU', 'MS', 'MLS', 'FS', 'LS', 'ELS', 'WS', 'EWS', 'W',
   'CU (OTS)', 'MCU (OTS)', 'ECU (OTS)', 'MS (OTS)', 'MLS (OTS)', 'LS (OTS)',
 ]
-const CAMERAS = [
-  'ARRI Alexa 35', 'ARRI Alexa Mini', 'ARRI Alexa Mini LF', 'ARRI Alexa LF',
-  'ARRI Alexa 65', 'ARRI Amira', 'Sony FX3', 'Sony FX6', 'Sony FX9',
-  'Sony VENICE', 'Sony VENICE 2', 'Sony BURANO',
-  'Canon C70', 'Canon C80', 'Canon C200', 'Canon C300 Mark III',
-  'Canon C400', 'Canon C500 Mark II', 'RED KOMODO', 'RED KOMODO-X',
-  'RED V-RAPTOR', 'Blackmagic Pocket Cinema Camera 4K',
-  'Blackmagic Pocket Cinema Camera 6K', 'Blackmagic URSA Mini Pro 12K',
-  'Panasonic VariCam', 'Panasonic EVA1', 'DJI Ronin 4D', 'iPhone',
-]
 const ANGLES = [
   'Eye Level', 'Low Angle', 'High Angle', 'Extreme Low', 'Extreme High',
   'Dutch Tilt', 'POV', "Bird's Eye", "Worm's Eye", 'Overhead',
@@ -205,9 +195,6 @@ export default function ShotList({ scenes, onChange, defaultShot, defaultScene }
         </div>
 
         <div className="shot-table-wrap">
-          <datalist id="camera-options">
-            {CAMERAS.map(option => <option key={option} value={option} />)}
-          </datalist>
           <datalist id="lens-options">
             {LENSES.map(option => <option key={option} value={option} />)}
           </datalist>
@@ -242,7 +229,7 @@ export default function ShotList({ scenes, onChange, defaultShot, defaultScene }
                     <SelectCell value={shot.size} onChange={v => updateShot(shot.id, 'size', v)} options={SIZES} placeholder="Size" />
                   </td>
                   <td>
-                    <input className="cell-input" list="camera-options" value={shot.camera} onChange={e => updateShot(shot.id, 'camera', e.target.value)} placeholder="Camera" aria-label="Camera model (choose or type)" />
+                    <input className="cell-input" value={shot.camera} onChange={e => updateShot(shot.id, 'camera', e.target.value)} placeholder="Camera" />
                   </td>
                   <td>
                     <SelectCell value={shot.angle} onChange={v => updateShot(shot.id, 'angle', v)} options={ANGLES} placeholder="Angle" />
