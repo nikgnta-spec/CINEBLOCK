@@ -275,3 +275,36 @@ button:focus-visible,
     width: 160px;
   }
 }
+
+
+/* Visual reference captions and order controls */
+.visual-ref-item {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+.visual-ref-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.visual-ref-caption {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 11px;
+  outline: none;
+}
+.visual-ref-caption:focus {
+  border-color: var(--border-strong);
+}
+.visual-ref-order {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0;
+}
