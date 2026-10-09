@@ -31,7 +31,7 @@ function FloorplanObjectIcon({ type, size = 20 }) {
     <svg
       width={size}
       height={size}
-      viewBox={type === 'camera' ? '-36 -25 72 50' : type === 'light' ? '-22 -22 44 44' : ['door', 'window', 'prop'].includes(type) ? '-26 -22 52 44' : '-50 -42 100 84'}
+      viewBox={type === 'camera' ? '-36 -25 72 50' : type === 'light' ? '-22 -22 44 44' : ['door', 'window', 'prop', 'room', 'wall'].includes(type) ? '-26 -22 52 44' : '-50 -42 100 84'}
       fill="none"
       stroke="currentColor"
       strokeWidth="3.5"
