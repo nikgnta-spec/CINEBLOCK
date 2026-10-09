@@ -19,7 +19,8 @@ const CAMERA_PATH_MOVEMENTS = new Set([
 ])
 const MAP_WIDTH = 1000
 const MAP_HEIGHT = 650
-const EMPTY_LAYOUT = { rooms: [], walls: [], actors: [], cameras: [], lights: [] }
+const EMPTY_LAYOUT = { rooms: [], walls: [], doors: [], windows: [], props: [], actors: [], cameras: [], lights: [] }
+const PROP_TYPES = ['Table', 'Chair', 'Sofa', 'Bed', 'Desk', 'Cabinet', 'Counter', 'Custom']
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0))
 const makeId = () => crypto.randomUUID()
 const padNum = number => String(number).padStart(2, '0')
@@ -39,7 +40,22 @@ function FloorplanObjectIcon({ type, size = 20 }) {
       aria-hidden="true"
       focusable="false"
     >
-      {type === 'actor' ? (
+      {type === 'door' ? (
+        <g>
+          <path d="M-16 -5 H16 M-16 5 H16" />
+          <path d="M-16 5 V-17 A22 22 0 0 1 6 5" />
+        </g>
+      ) : type === 'window' ? (
+        <g>
+          <path d="M-20 -7 H20 M-20 0 H20 M-20 7 H20" />
+          <path d="M-20 -10 V10 M20 -10 V10" />
+        </g>
+      ) : type === 'prop' ? (
+        <g>
+          <rect x="-16" y="-12" width="32" height="24" rx="2" />
+          <path d="M-10 -7 H10 M-10 7 H10" />
+        </g>
+      ) : type === 'actor' ? (
         <g transform="scale(0.68)">
           <path d="M-22 -6 C-30 -10 -37 -6 -40 2 C-43 12 -36 22 -27 23 C-21 31 -10 34 0 34 C10 34 21 31 27 23 C36 22 43 12 40 2 C37 -6 30 -10 22 -6" />
           <path d="M0 -31 C-17 -31 -22 -17 -21 -6 C-20 5 -15 13 -8 15 C-5 16 -4 20 0 21 C4 20 5 16 8 15 C15 13 20 5 21 -6 C22 -17 17 -31 0 -31 Z" />
@@ -72,6 +88,9 @@ function findAvailablePosition(layout, occupiedOverrides = null) {
     ...(layout.actors || []),
     ...(layout.cameras || []),
     ...(layout.lights || []),
+    ...(layout.doors || []),
+    ...(layout.windows || []),
+    ...(layout.props || []),
   ]
   const centerX = 500
   const centerY = 325
@@ -175,6 +194,10 @@ export default function Floorplan({
   const scene = scenes.find(item => item.id === activeSceneId) || scenes[0]
   const layout = scene ? (floorplans?.[scene.id] || EMPTY_LAYOUT) : EMPTY_LAYOUT
   const allObjects = [
+    ...layout.rooms.map(item => ({ ...item, entityType: 'room' })),
+    ...layout.doors.map(item => ({ ...item, entityType: 'door' })),
+    ...layout.windows.map(item => ({ ...item, entityType: 'window' })),
+    ...layout.props.map(item => ({ ...item, entityType: 'prop' })),
     ...layout.actors.map(item => ({ ...item, entityType: 'actor' })),
     ...layout.cameras.map(item => ({ ...item, entityType: 'camera' })),
     ...layout.lights.map(item => ({ ...item, entityType: 'light' })),
@@ -287,27 +310,25 @@ export default function Floorplan({
   // Object buttons create an object immediately. The new marker is selected and
   // can be dragged straight to its final position without another placement click.
   const addObject = type => {
-    const count = type === 'actor' ? layout.actors.length : type === 'camera' ? layout.cameras.length : layout.lights.length
+    const collection = type + 's'
+    const count = (layout[collection] || []).length
     const position = findAvailablePosition(layout)
     let object
 
     if (type === 'actor') {
-      object = {
-        id: makeId(),
-        ...position,
-        angle: 0,
-        label: 'Actor ' + padNum(count + 1),
-        path: [],
-      }
+      object = { id: makeId(), ...position, angle: 0, label: 'Actor ' + padNum(count + 1), path: [] }
       updateLayout(previous => ({ ...previous, actors: [...previous.actors, object] }))
     } else if (type === 'light') {
-      object = {
-        id: makeId(),
-        ...position,
-        angle: 0,
-        lightType: 'Key',
-      }
+      object = { id: makeId(), ...position, angle: 0, lightType: 'Key', label: 'Light ' + padNum(count + 1) }
       updateLayout(previous => ({ ...previous, lights: [...previous.lights, object] }))
+    } else if (type === 'door' || type === 'window' || type === 'prop') {
+      const defaults = type === 'door'
+        ? { width: 52, height: 12, label: 'Door ' + padNum(count + 1) }
+        : type === 'window'
+          ? { width: 64, height: 10, label: 'Window ' + padNum(count + 1) }
+          : { width: 52, height: 36, label: 'Table ' + padNum(count + 1), propType: 'Table' }
+      object = { id: makeId(), ...position, angle: 0, ...defaults }
+      updateLayout(previous => ({ ...previous, [collection]: [...(previous[collection] || []), object] }))
     } else {
       const linkedShotIds = new Set(layout.cameras.map(camera => camera.shotId).filter(Boolean))
       let targetShot = scene.shots.find(shot => !linkedShotIds.has(shot.id))
@@ -318,17 +339,12 @@ export default function Floorplan({
           shots: renumberShots([...currentScene.shots, targetShot]),
         })))
       }
-      object = {
-        id: makeId(),
-        ...position,
-        angle: 0,
-        shotId: targetShot.id,
-        path: [],
-      }
+      object = { id: makeId(), ...position, angle: 0, shotId: targetShot.id, path: [] }
       updateLayout(previous => ({ ...previous, cameras: [...previous.cameras, object] }))
     }
 
     setSelected({ type, id: object.id })
+    setSelectedWaypoint(null)
     setTool('select')
   }
 
@@ -488,7 +504,7 @@ export default function Floorplan({
       ...previous,
       [drag.type + 's']: previous[drag.type + 's'].map(item => {
         if (item.id !== drag.id) return item
-        if (drag.type === 'actor' || drag.type === 'camera' || drag.type === 'light') {
+        if (['actor', 'camera', 'light', 'door', 'window', 'prop'].includes(drag.type)) {
           return {
             ...item,
             x: Math.round(clamp(drag.original.x + dx, 0, MAP_WIDTH)),
@@ -631,12 +647,17 @@ export default function Floorplan({
       const shot = scene.shots.find(entry => entry.id === item.shotId)
       return shot ? ('Shot ' + shot.num + (shot.subject ? ' — ' + shot.subject : '')) : 'Unlinked camera'
     }
-    if (type === 'light') return item.lightType || 'Key'
-    return item.label || 'Actor'
+    if (type === 'light') return item.label || item.lightType || 'Light'
+    if (type === 'prop') return item.label || item.propType || 'Prop'
+    const fallback = ({ room: 'Room', wall: 'Wall', door: 'Door', window: 'Window', actor: 'Actor' })[type] || type
+    return item.label || fallback
   }
 
-  const objectTypeLabel = type => type === 'actor' ? 'Actor' : type === 'camera' ? 'Camera' : type === 'light' ? 'Lighting' : type === 'room' ? 'Room' : 'Wall'
-  const objectCount = layout.actors.length + layout.cameras.length + layout.lights.length
+  const objectTypeLabel = type => ({
+    actor: 'Actor', camera: 'Camera', light: 'Lighting', room: 'Room',
+    wall: 'Wall', door: 'Door', window: 'Window', prop: 'Prop',
+  })[type] || type
+  const objectCount = layout.rooms.length + layout.walls.length + layout.doors.length + layout.windows.length + layout.props.length + layout.actors.length + layout.cameras.length + layout.lights.length
   const selectedPath = selectedEntity?.path || []
   if (!scene) return null
 
@@ -661,6 +682,10 @@ export default function Floorplan({
           </button>
         </div>
         <div className="floorplan-top-meta">
+          <span>{layout.rooms.length} Room{layout.rooms.length === 1 ? '' : 's'}</span>
+          <span>{layout.doors.length} Door{layout.doors.length === 1 ? '' : 's'}</span>
+          <span>{layout.windows.length} Window{layout.windows.length === 1 ? '' : 's'}</span>
+          <span>{layout.props.length} Props</span>
           <span>{layout.actors.length} Actor{layout.actors.length === 1 ? '' : 's'}</span>
           <span>{layout.cameras.length} Camera{layout.cameras.length === 1 ? '' : 's'}</span>
           <span>{layout.lights.length} Lighting</span>
@@ -689,6 +714,15 @@ export default function Floorplan({
           </button>
           <button className="floorplan-tool-button" onClick={() => addObject('camera')} title="Add camera and link a shot" aria-label="Add camera">
             <FloorplanObjectIcon type="camera" size={22} /><span>Camera</span>
+          </button>
+          <button className="floorplan-tool-button" onClick={() => addObject('door')} title="Add door" aria-label="Add door">
+            <FloorplanObjectIcon type="door" size={22} /><span>Door</span>
+          </button>
+          <button className="floorplan-tool-button" onClick={() => addObject('window')} title="Add window" aria-label="Add window">
+            <FloorplanObjectIcon type="window" size={22} /><span>Window</span>
+          </button>
+          <button className="floorplan-tool-button" onClick={() => addObject('prop')} title="Add prop or furniture" aria-label="Add prop">
+            <FloorplanObjectIcon type="prop" size={22} /><span>Props</span>
           </button>
           <button className="floorplan-tool-button" onClick={() => addObject('light')} title="Add lighting" aria-label="Add lighting">
             <FloorplanObjectIcon type="light" size={22} /><span>Lighting</span>
@@ -778,6 +812,9 @@ export default function Floorplan({
               ))}
 
               {[
+                ...layout.doors.map(item => ({ ...item, _kind: 'door' })),
+                ...layout.windows.map(item => ({ ...item, _kind: 'window' })),
+                ...layout.props.map(item => ({ ...item, _kind: 'prop' })),
                 ...layout.actors.map(item => ({ ...item, _kind: 'actor' })),
                 ...layout.cameras.map(item => ({ ...item, _kind: 'camera' })),
                 ...layout.lights.map(item => ({ ...item, _kind: 'light' })),
@@ -842,10 +879,10 @@ export default function Floorplan({
                       style={{ cursor: 'grab' }}
                     >
                       <rect
-                        x={type === 'actor' ? -36 : type === 'camera' ? -36 : -25}
-                        y={type === 'actor' ? -30 : type === 'camera' ? -25 : -24}
-                        width={type === 'actor' ? 72 : type === 'camera' ? 74 : 50}
-                        height={type === 'actor' ? 80 : type === 'camera' ? 78 : 62}
+                        x={['door', 'window', 'prop'].includes(type) ? -(Number(object.width) || 48) / 2 : type === 'actor' ? -36 : type === 'camera' ? -36 : -25}
+                        y={['door', 'window', 'prop'].includes(type) ? -(Number(object.height) || 32) / 2 : type === 'actor' ? -30 : type === 'camera' ? -25 : -24}
+                        width={['door', 'window', 'prop'].includes(type) ? Math.max(48, Number(object.width) || 48) : type === 'actor' ? 72 : type === 'camera' ? 74 : 50}
+                        height={['door', 'window', 'prop'].includes(type) ? Math.max(38, Number(object.height) || 32) : type === 'actor' ? 80 : type === 'camera' ? 78 : 62}
                         fill="transparent"
                         pointerEvents="all"
                       />
