@@ -2,7 +2,7 @@ import { useState } from 'react'
 import './App.css'
 import ProjectInfo from './components/ProjectInfo'
 import ShotList from './components/ShotList'
-import { FileText, List, Download } from 'lucide-react'
+import { Download } from 'lucide-react'
 
 const TABS = [
   { id: 'project', label: 'Project Info' },
