@@ -1045,13 +1045,6 @@ export default function Floorplan({
                           onChange={event => updateLinkedShot('lens', event.target.value)}
                           placeholder="Choose or type focal length"
                         />
-                        {parseFocalLengthRange(selectedShot.lens) ? (
-                          <p className="floorplan-field-note">
-                            Horizontal FOV ≈ {formatFov(parseFocalLengthRange(selectedShot.lens))} · Full-frame
-                          </p>
-                        ) : (
-                          <p className="floorplan-field-note">Enter a focal length in mm to show the camera FOV.</p>
-                        )}
                         <datalist id="floorplan-lens-options">
                           {SHOT_LENSES.map(option => <option key={option} value={option} />)}
                         </datalist>
