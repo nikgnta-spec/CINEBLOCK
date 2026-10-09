@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import SceneNavigator from './SceneNavigator'
 import { SIZES, ANGLES, LENSES, MOVEMENTS, EQUIPMENT } from '../shotOptions'
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Trash2, Copy, Check, CircleSlash, ImagePlus, LayoutGrid, List, Eye } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Trash2, Copy, Check, CircleSlash, ImagePlus, LayoutGrid, List,  } from 'lucide-react'
 
 
 
@@ -174,6 +174,7 @@ export default function ShotList({
         ...original,
         id: crypto.randomUUID(),
         num: nextShotNumber(s.shots),
+        status: 'planned',
         movements: [...(original.movements || [])],
         equipment: [...(Array.isArray(original.equipment) ? original.equipment : original.equipment ? [original.equipment] : [])],
       }
@@ -384,7 +385,7 @@ export default function ShotList({
                 <th style={{ width: 62 }}>Shot</th>
                 <th style={{ minWidth: 160 }}>Subjek</th>
                 <th style={{ width: 138 }}>Status</th>
-                <th style={{ width: 140 }}>Storyboard</th>
+                <th style={{ width: 180 }}>Storyboard</th>
                 <th style={{ width: 104 }}>Ukuran</th>
                 <th style={{ width: 126 }}>Kamera</th>
                 <th style={{ width: 110 }}>Angle</th>
@@ -402,7 +403,7 @@ export default function ShotList({
             </thead>
             <tbody>
               {scene.shots.map((shot) => (
-                <tr key={shot.id} data-shot-id={shot.id} className={selectedShotId === shot.id ? 'shot-row is-selected' : 'shot-row'} onClick={event => { if (!event.target.closest('button')) onSelectedShotIdChange?.(shot.id) }}>
+                <tr key={shot.id} data-shot-id={shot.id} className={'shot-row' + (selectedShotId === shot.id ? ' is-selected' : '') + (shot.status === 'done' ? ' status-done' : shot.status === 'skip' ? ' status-skip' : '')} onClick={event => { if (!event.target.closest('button')) onSelectedShotIdChange?.(shot.id) }}>
                   <td><div className="shot-num">{shot.num}</div></td>
                   <td>
                     <input className="cell-input" value={shot.subject} onChange={e => updateShot(shot.id, 'subject', e.target.value)} placeholder="Subjek" />
@@ -588,7 +589,7 @@ export default function ShotList({
                 <button type="button" className="storyboard-preview-close" onClick={() => setPreviewShot(null)} aria-label="Tutup preview storyboard"><X size={18} /></button>
               </header>
               <img src={previewShot.storyboardImage} alt={'Storyboard shot ' + previewShot.num} />
-              <footer><span>Status: {statusLabel(previewShot.status)}</span><button type="button" className="btn btn-secondary" onClick={() => { setPreviewShot(null); setViewMode('table') }}><Eye size={14} /> Kembali ke tabel</button></footer>
+              <footer><span>Status: {statusLabel(previewShot.status)}</span><button type="button" className="btn btn-secondary" onClick={() => setPreviewShot(null)}><X size={14} /> Tutup preview</button></footer>
             </section>
           </div>
         )}
