@@ -509,6 +509,22 @@ export default function Floorplan({
                           </g>
                         </g>
                       )}
+                      {type === 'actor' && (
+                        <text
+                          x="0"
+                          y="40"
+                          textAnchor="middle"
+                          fontSize="15"
+                          fontWeight="500"
+                          fill="var(--text)"
+                          stroke="var(--bg)"
+                          strokeWidth="4"
+                          paintOrder="stroke"
+                          pointerEvents="none"
+                        >
+                          {object.label || 'Actor'}
+                        </text>
+                      )}
                       {type === 'light' && (
                         <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
                           <path d="M1 -11 L49 -27 L49 27 L1 11 Z" fill="var(--bg-subtle)" stroke="var(--text-muted)" strokeWidth="1.5" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
