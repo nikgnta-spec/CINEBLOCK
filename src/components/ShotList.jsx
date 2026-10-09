@@ -53,12 +53,6 @@ export default function ShotList({ scenes, onChange, defaultShot, defaultScene }
     setActiveIdx(scenes.length)
   }
 
-  const deleteScene = (idx) => {
-    if (scenes.length === 1) return
-    onChange(prev => prev.filter((_, i) => i !== idx))
-    setActiveIdx(Math.max(0, idx - 1))
-  }
-
   const addShot = () => {
     updateScene(s => ({
       ...s,
