@@ -880,7 +880,7 @@ export default function App() {
             {tab === 'project' && (
               <ProjectInfo project={project} onChange={setProject} />
             )}
-            {tab === 'shotlist' && (
+            <div style={{ display: tab === 'shotlist' ? 'block' : 'none' }}>
               <ShotList
                 scenes={scenes}
                 onChange={setScenes}
@@ -894,8 +894,8 @@ export default function App() {
                 onRenameScene={renameScene}
                 onFloorplansChange={setFloorplans}
               />
-            )}
-            {tab === 'floorplan' && (
+            </div>
+            <div style={{ display: tab === 'floorplan' ? 'block' : 'none' }}>
               <Floorplan
                 scenes={scenes}
                 onChange={setScenes}
@@ -909,7 +909,7 @@ export default function App() {
                 floorplans={floorplans}
                 onFloorplansChange={setFloorplans}
               />
-            )}
+            </div>
           </>
         )}
       </div>
