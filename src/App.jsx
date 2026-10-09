@@ -7,9 +7,9 @@ import { Download, Upload, Plus, Trash2 } from 'lucide-react'
 import { loadAppState, saveAppState } from './storage'
 
 const TABS = [
-  { id: 'project', label: 'Project Info' },
-  { id: 'shotlist', label: 'Shot List' },
   { id: 'floorplan', label: 'Floorplan' },
+  { id: 'shotlist', label: 'Shot List' },
+  { id: 'project', label: 'Project Info' },
 ]
 
 const defaultProject = {
@@ -226,15 +226,28 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
         x2: coords(item.x2, 1000),
         y2: coords(item.y2, 650),
       })),
+      actors: (Array.isArray(raw.actors) ? raw.actors : []).filter(item => item && typeof item === 'object').slice(0, 200).map((item, index) => ({
+        id: safeId(item),
+        x: coords(item.x, 1000),
+        y: coords(item.y, 650),
+        angle: coords(item.angle, 360),
+        label: safeLabel(item.label, 'Actor ' + String(index + 1).padStart(2, '0')),
+        movement: safeLabel(item.movement, 'Blocking'),
+        path: (Array.isArray(item.path) ? item.path : []).slice(0, 100).map(point => ({
+          x: coords(point?.x, 1000),
+          y: coords(point?.y, 650),
+        })),
+      })),
       cameras: (Array.isArray(raw.cameras) ? raw.cameras : [])
-        .filter(item => item && validShotIds.has(item.shotId))
+        .filter(item => item && typeof item === 'object')
         .slice(0, 200)
-        .map(item => ({
+        .map((item, index) => ({
           id: safeId(item),
-          shotId: item.shotId,
+          shotId: typeof item.shotId === 'string' && validShotIds.has(item.shotId) ? item.shotId : '',
           x: coords(item.x, 1000),
           y: coords(item.y, 650),
           angle: coords(item.angle, 360),
+          label: safeLabel(item.label, 'Camera ' + String(index + 1).padStart(2, '0')),
           movement: safeLabel(item.movement, 'Static'),
           path: (Array.isArray(item.path) ? item.path : []).slice(0, 100).map(point => ({
             x: coords(point?.x, 1000),
@@ -246,8 +259,13 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
         x: coords(item.x, 1000),
         y: coords(item.y, 650),
         angle: coords(item.angle, 360),
-        type: safeLabel(item.type, 'Key'),
+        lightType: safeLabel(item.lightType || item.type, 'Key'),
         label: safeLabel(item.label, 'Light ' + String(index + 1)),
+        movement: safeLabel(item.movement, 'Static'),
+        path: (Array.isArray(item.path) ? item.path : []).slice(0, 100).map(point => ({
+          x: coords(point?.x, 1000),
+          y: coords(point?.y, 650),
+        })),
       })),
     }
   }
@@ -279,7 +297,7 @@ function normalizeWorkspaceProjects(savedProjects) {
 }
 
 export default function App() {
-  const [tab, setTab] = useState('project')
+  const [tab, setTab] = useState('floorplan')
   const [project, setProject] = useState(defaultProject)
   const [scenes, setScenes] = useState(() => [defaultScene(1)])
   const [activeSceneId, setActiveSceneId] = useState('')
@@ -396,7 +414,7 @@ export default function App() {
     setScenes(targetScenes)
     setActiveSceneId(targetActiveSceneId)
     setFloorplans(targetFloorplans)
-    setTab('project')
+    setTab('floorplan')
   }
 
   const createNewProject = () => {
@@ -412,7 +430,7 @@ export default function App() {
     setScenes(newScenes)
     setActiveSceneId(newScenes[0].id)
     setFloorplans(newFloorplans)
-    setTab('project')
+    setTab('floorplan')
   }
 
   const deleteCurrentProject = () => {
@@ -435,7 +453,7 @@ export default function App() {
     setScenes(targetScenes)
     setActiveSceneId(targetActiveSceneId)
     setFloorplans(targetFloorplans)
-    setTab('project')
+    setTab('floorplan')
   }
 
   const downloadBackup = () => {
@@ -498,7 +516,7 @@ export default function App() {
       setScenes(targetScenes)
       setActiveSceneId(targetActiveSceneId)
       setFloorplans(targetFloorplans)
-      setTab('project')
+      setTab('floorplan')
     } catch (error) {
       console.error('CINEBLOCK could not import backup:', error)
       window.alert(error.message || 'The backup file could not be imported.')
@@ -615,6 +633,8 @@ export default function App() {
                 onChange={setScenes}
                 activeSceneId={activeSceneId}
                 onActiveSceneChange={setActiveSceneId}
+                defaultShot={defaultShot}
+                defaultScene={defaultScene}
                 floorplans={floorplans}
                 onFloorplansChange={setFloorplans}
               />
