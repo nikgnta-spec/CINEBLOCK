@@ -490,18 +490,33 @@ export default function Floorplan({
     // camera's creation must also undo that shot creation.
     const currentCameraIds = new Set(current.cameras.map(camera => camera.id))
     const previousCameraIds = new Set(previous.cameras.map(camera => camera.id))
-    const autoShotsToRemove = [...autoCreatedShotsByCameraRef.current.entries()]
-      .filter(([cameraId, record]) => record.sceneId === scene.id
+    const shotRecords = [...autoCreatedShotsByCameraRef.current.entries()]
+      .filter(([cameraId, record]) => record.sceneId === scene.id)
+    const autoShotsToRemove = shotRecords
+      .filter(([cameraId, record]) => record.autoCreated
         && currentCameraIds.has(cameraId)
         && !previousCameraIds.has(cameraId))
       .map(([, record]) => record.shot.id)
+    const deletedShotsToRestore = shotRecords
+      .filter(([cameraId, record]) => record.deletedShot
+        && !currentCameraIds.has(cameraId)
+        && previousCameraIds.has(cameraId))
+      .map(([, record]) => record.shot)
 
-    if (autoShotsToRemove.length) {
+    if (autoShotsToRemove.length || deletedShotsToRestore.length) {
       const removedShotIds = new Set(autoShotsToRemove)
-      onChange(previousScenes => previousScenes.map(item => item.id !== scene.id ? item : ({
-        ...item,
-        shots: item.shots.filter(shot => !removedShotIds.has(shot.id)),
-      })))
+      onChange(previousScenes => previousScenes.map(item => {
+        if (item.id !== scene.id) return item
+        const existingShotIds = new Set(item.shots.map(shot => shot.id))
+        const restoredShots = deletedShotsToRestore.filter(shot => !existingShotIds.has(shot.id))
+        return {
+          ...item,
+          shots: renumberShots([
+            ...item.shots.filter(shot => !removedShotIds.has(shot.id)),
+            ...restoredShots,
+          ]),
+        }
+      }))
     }
 
     updateLayout(() => cloneLayoutSnapshot(previous))
@@ -523,20 +538,32 @@ export default function Floorplan({
     // Redo restores the paired auto-created shot when it restores that camera.
     const currentCameraIds = new Set(current.cameras.map(camera => camera.id))
     const nextCameraIds = new Set(next.cameras.map(camera => camera.id))
-    const autoShotsToRestore = [...autoCreatedShotsByCameraRef.current.entries()]
-      .filter(([cameraId, record]) => record.sceneId === scene.id
+    const shotRecords = [...autoCreatedShotsByCameraRef.current.entries()]
+      .filter(([cameraId, record]) => record.sceneId === scene.id)
+    const autoShotsToRestore = shotRecords
+      .filter(([cameraId, record]) => record.autoCreated
         && !currentCameraIds.has(cameraId)
         && nextCameraIds.has(cameraId))
       .map(([, record]) => record.shot)
+    const deletedShotIdsToRemove = shotRecords
+      .filter(([cameraId, record]) => record.deletedShot
+        && currentCameraIds.has(cameraId)
+        && !nextCameraIds.has(cameraId))
+      .map(([, record]) => record.shot.id)
 
-    if (autoShotsToRestore.length) {
+    if (autoShotsToRestore.length || deletedShotIdsToRemove.length) {
+      const removedShotIds = new Set(deletedShotIdsToRemove)
       onChange(previousScenes => previousScenes.map(item => {
         if (item.id !== scene.id) return item
         const existingShotIds = new Set(item.shots.map(shot => shot.id))
         const restoredShots = autoShotsToRestore.filter(shot => !existingShotIds.has(shot.id))
-        return restoredShots.length
-          ? { ...item, shots: renumberShots([...item.shots, ...restoredShots]) }
-          : item
+        return {
+          ...item,
+          shots: renumberShots([
+            ...item.shots.filter(shot => !removedShotIds.has(shot.id)),
+            ...restoredShots,
+          ]),
+        }
       }))
     }
 
@@ -549,6 +576,25 @@ export default function Floorplan({
     const selection = [...selectionRef.current]
     if (selection.length < 2) return
     if (!window.confirm(`Hapus ${selection.length} objek yang dipilih dari denah? Tindakan ini tidak dapat dibatalkan.`)) return
+    const selectedCameraIds = new Set(selection.filter(item => item.type === 'camera').map(item => item.id))
+    const removedCameras = layout.cameras.filter(camera => selectedCameraIds.has(camera.id))
+    const removedShots = removedCameras
+      .map(camera => ({ camera, shot: scene.shots.find(shot => shot.id === camera.shotId) }))
+      .filter(entry => entry.shot)
+    removedShots.forEach(({ camera, shot }) => {
+      autoCreatedShotsByCameraRef.current.set(camera.id, {
+        sceneId: scene.id,
+        shot: { ...shot },
+        deletedShot: true,
+      })
+    })
+    const removedShotIds = new Set(removedShots.map(({ shot }) => shot.id))
+    if (removedShotIds.size) {
+      onChange(previousScenes => previousScenes.map(item => item.id !== scene.id ? item : ({
+        ...item,
+        shots: renumberShots(item.shots.filter(shot => !removedShotIds.has(shot.id))),
+      })))
+    }
     updateLayout(previous => {
       const next = { ...previous }
       for (const type of ['rooms', 'walls', 'props', 'actors', 'cameras', 'lights']) {
@@ -674,6 +720,7 @@ export default function Floorplan({
         autoCreatedShotsByCameraRef.current.set(cameraId, {
           sceneId: scene.id,
           shot: { ...targetShot },
+          autoCreated: true,
         })
       }
       updateLayout(previous => ({ ...previous, cameras: [...previous.cameras, object] }))
@@ -1297,11 +1344,18 @@ export default function Floorplan({
       : null
     const linkedShotId = camera?.shotId || ''
     if (linkedShotId) {
+      const linkedShot = scene.shots.find(shot => shot.id === linkedShotId)
+      if (linkedShot) {
+        autoCreatedShotsByCameraRef.current.set(selected.id, {
+          sceneId: scene.id,
+          shot: { ...linkedShot },
+          deletedShot: true,
+        })
+      }
       onChange(previousScenes => previousScenes.map(item => item.id !== scene.id ? item : ({
         ...item,
         shots: renumberShots(item.shots.filter(shot => shot.id !== linkedShotId)),
       })))
-      autoCreatedShotsByCameraRef.current.delete(selected.id)
     }
 
     updateLayout(previous => ({
