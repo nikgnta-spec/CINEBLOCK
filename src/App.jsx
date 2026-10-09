@@ -101,7 +101,9 @@ const defaultShot = (num) => ({
 
 export default function App() {
   const [savedState] = useState(() => readSavedState())
-  const [tab, setTab] = useState('project')
+  const [tab, setTab] = useState(() => (
+    savedState?.tab === 'shotlist' ? 'shotlist' : 'project'
+  ))
   const [project, setProject] = useState(() => normalizeSavedProject(savedState?.project))
   const [scenes, setScenes] = useState(() => normalizeSavedScenes(savedState?.scenes) || [defaultScene(1)])
   const [saveStatus, setSaveStatus] = useState('saved')
@@ -110,7 +112,7 @@ export default function App() {
     setSaveStatus('saving')
     const timeout = window.setTimeout(() => {
       try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ project, scenes }))
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ tab, project, scenes }))
         setSaveStatus('saved')
       } catch (error) {
         console.error('CINEBLOCK could not save data:', error)
@@ -119,7 +121,7 @@ export default function App() {
     }, 300)
 
     return () => window.clearTimeout(timeout)
-  }, [project, scenes])
+  }, [tab, project, scenes])
 
   return (
     <div className="app">
