@@ -467,6 +467,7 @@ export default function Floorplan({
   }
 
   const beginResize = (type, item, sx, sy, event) => {
+    if (tool === 'pan') return
     event.stopPropagation()
     event.preventDefault()
     const point = getPoint(event)
@@ -486,6 +487,7 @@ export default function Floorplan({
   }
 
   const beginWallEndpointDrag = (wall, endpoint, event) => {
+    if (tool === 'pan') return
     event.stopPropagation()
     event.preventDefault()
     dragRef.current = {
@@ -500,6 +502,7 @@ export default function Floorplan({
   }
 
   const beginObjectDrag = (type, item, event) => {
+    if (tool === 'pan') return
     event.stopPropagation()
     if (tool === 'room' || tool === 'wall') return
     if (tool === 'path') setTool('select')
@@ -511,6 +514,7 @@ export default function Floorplan({
   }
 
   const beginWaypointDrag = (type, item, pathIndex, event) => {
+    if (tool === 'pan') return
     event.stopPropagation()
     const point = getPoint(event)
     const waypoint = (item.path || [])[pathIndex]
@@ -530,6 +534,7 @@ export default function Floorplan({
   }
 
   const beginRotate = (type, item, event) => {
+    if (tool === 'pan') return
     event.stopPropagation()
     const point = getPoint(event)
     dragRef.current = {
@@ -612,6 +617,7 @@ export default function Floorplan({
   }
 
   const beginOpeningDrag = (hostType, host, opening, event) => {
+    if (tool === 'pan') return
     event.stopPropagation()
     event.preventDefault()
     dragRef.current = { mode: 'opening', type: hostType, id: host.id, openingId: opening.id }
@@ -1516,9 +1522,9 @@ export default function Floorplan({
               )}
             </svg>
             <div className="floorplan-view-controls" role="group" aria-label="Kontrol tampilan denah">
-              <button type="button" className="floorplan-view-control-button" onClick={() => zoomCanvas(1.25)} disabled={viewBox.width <= 220} title="Perkecil tampilan" aria-label="Perkecil tampilan"><Minus size={16} /></button>
+              <button type="button" className="floorplan-view-control-button" onClick={() => zoomCanvas(1.25)} disabled={viewBox.width >= MAP_WIDTH} title="Perkecil tampilan" aria-label="Perkecil tampilan"><Minus size={16} /></button>
               <span className="floorplan-zoom-level" aria-live="polite">{Math.round((MAP_WIDTH / viewBox.width) * 100)}%</span>
-              <button type="button" className="floorplan-view-control-button" onClick={() => zoomCanvas(0.8)} disabled={viewBox.width >= MAP_WIDTH} title="Perbesar tampilan" aria-label="Perbesar tampilan"><Plus size={16} /></button>
+              <button type="button" className="floorplan-view-control-button" onClick={() => zoomCanvas(0.8)} disabled={viewBox.width <= 220} title="Perbesar tampilan" aria-label="Perbesar tampilan"><Plus size={16} /></button>
               <span className="floorplan-view-control-divider" />
               <button type="button" className="floorplan-view-control-button floorplan-fit-button" onClick={fitCanvas} title="Muat seluruh denah ke kanvas" aria-label="Muat seluruh denah ke kanvas"><Maximize2 size={15} /><span>Muat denah</span></button>
             </div>
