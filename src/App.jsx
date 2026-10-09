@@ -43,7 +43,7 @@ const defaultShot = (num) => ({
   angle: '',
   lens: '',
   movements: [],
-  support: '',
+  equipment: '',
   sound: '',
   take: '',
   script: '',
