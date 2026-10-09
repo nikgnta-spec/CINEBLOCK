@@ -776,7 +776,7 @@ button:focus-visible,
 
 @page {
   size: A4 portrait;
-  margin: 0;
+  margin: 12mm;
 }
 
 @media print {
@@ -1421,7 +1421,7 @@ button:focus-visible,
     min-width: 0 !important;
     height: auto !important;
     margin: 0 !important;
-    padding: 12mm 12mm 14mm !important;
+    padding: 0 !important;
     overflow: visible !important;
     background: #fff !important;
     color: #111827 !important;
