@@ -40,7 +40,11 @@ function FloorplanObjectIcon({ type, size = 20 }) {
       aria-hidden="true"
       focusable="false"
     >
-      {type === 'door' ? (
+      {type === 'room' ? (
+        <rect x="-17" y="-13" width="34" height="26" />
+      ) : type === 'wall' ? (
+        <path d="M-20 0 H20" strokeWidth="5" />
+      ) : type === 'door' ? (
         <g>
           <path d="M-16 -5 H16 M-16 5 H16" />
           <path d="M-16 5 V-17 A22 22 0 0 1 6 5" />
@@ -684,6 +688,7 @@ export default function Floorplan({
         </div>
         <div className="floorplan-top-meta">
           <span>{layout.rooms.length} Room{layout.rooms.length === 1 ? '' : 's'}</span>
+          <span>{layout.walls.length} Wall{layout.walls.length === 1 ? '' : 's'}</span>
           <span>{layout.doors.length} Door{layout.doors.length === 1 ? '' : 's'}</span>
           <span>{layout.windows.length} Window{layout.windows.length === 1 ? '' : 's'}</span>
           <span>{layout.props.length} Props</span>
