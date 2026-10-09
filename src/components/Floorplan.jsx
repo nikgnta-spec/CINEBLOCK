@@ -502,21 +502,24 @@ export default function Floorplan({
       .filter(([cameraId, record]) => record.deletedShot
         && !currentCameraIds.has(cameraId)
         && previousCameraIds.has(cameraId))
-      .map(([, record]) => record.shot)
+      .map(([, record]) => record)
 
     if (autoShotsToRemove.length || deletedShotsToRestore.length) {
       const removedShotIds = new Set(autoShotsToRemove)
       onChange(previousScenes => previousScenes.map(item => {
         if (item.id !== scene.id) return item
-        const existingShotIds = new Set(item.shots.map(shot => shot.id))
-        const restoredShots = deletedShotsToRestore.filter(shot => !existingShotIds.has(shot.id))
-        return {
-          ...item,
-          shots: renumberShots([
-            ...item.shots.filter(shot => !removedShotIds.has(shot.id)),
-            ...restoredShots,
-          ]),
+        let nextShots = item.shots.filter(shot => !removedShotIds.has(shot.id))
+        const existingShotIds = new Set(nextShots.map(shot => shot.id))
+        const restoredRecords = deletedShotsToRestore
+          .filter(record => !existingShotIds.has(record.shot.id))
+          .sort((left, right) => (left.shotIndex ?? Number.MAX_SAFE_INTEGER) - (right.shotIndex ?? Number.MAX_SAFE_INTEGER))
+        for (const record of restoredRecords) {
+          const index = Number.isInteger(record.shotIndex)
+            ? Math.max(0, Math.min(record.shotIndex, nextShots.length))
+            : nextShots.length
+          nextShots.splice(index, 0, record.shot)
         }
+        return { ...item, shots: renumberShots(nextShots) }
       }))
     }
 
@@ -580,13 +583,18 @@ export default function Floorplan({
     const selectedCameraIds = new Set(selection.filter(item => item.type === 'camera').map(item => item.id))
     const removedCameras = layout.cameras.filter(camera => selectedCameraIds.has(camera.id))
     const removedShots = removedCameras
-      .map(camera => ({ camera, shot: scene.shots.find(shot => shot.id === camera.shotId) }))
+      .map(camera => ({
+        camera,
+        shotIndex: scene.shots.findIndex(shot => shot.id === camera.shotId),
+        shot: scene.shots.find(shot => shot.id === camera.shotId),
+      }))
       .filter(entry => entry.shot)
-    removedShots.forEach(({ camera, shot }) => {
+    removedShots.forEach(({ camera, shotIndex, shot }) => {
       const previousRecord = autoCreatedShotsByCameraRef.current.get(camera.id)
       autoCreatedShotsByCameraRef.current.set(camera.id, {
         sceneId: scene.id,
         shot: { ...shot },
+        shotIndex,
         autoCreated: Boolean(previousRecord?.autoCreated),
         deletedShot: true,
       })
@@ -1348,12 +1356,14 @@ export default function Floorplan({
       : null
     const linkedShotId = camera?.shotId || ''
     if (linkedShotId) {
-      const linkedShot = scene.shots.find(shot => shot.id === linkedShotId)
+      const shotIndex = scene.shots.findIndex(shot => shot.id === linkedShotId)
+      const linkedShot = scene.shots[shotIndex]
       if (linkedShot) {
         const previousRecord = autoCreatedShotsByCameraRef.current.get(selected.id)
         autoCreatedShotsByCameraRef.current.set(selected.id, {
           sceneId: scene.id,
           shot: { ...linkedShot },
+          shotIndex,
           autoCreated: Boolean(previousRecord?.autoCreated),
           deletedShot: true,
         })
