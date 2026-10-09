@@ -638,6 +638,21 @@ button:focus-visible,
 .floorplan-remove-path:hover { text-decoration: underline; }
 .floorplan-coordinates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .floorplan-coordinates label { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 13px; font-weight: 600; }
+.floorplan-size-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.floorplan-size-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.floorplan-size-field .floorplan-field { padding: 9px 8px; }
 .floorplan-coordinates input {
   width: 100%;
   min-width: 0;
