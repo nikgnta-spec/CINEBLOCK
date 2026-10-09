@@ -74,23 +74,72 @@ function normalizeSavedProject(savedProject) {
 function normalizeSavedScenes(savedScenes) {
   if (!Array.isArray(savedScenes) || savedScenes.length === 0) return null
 
-  return savedScenes.map(scene => ({
-    ...scene,
-    shots: Array.isArray(scene.shots)
-      ? scene.shots.map(shot => ({
-          ...shot,
-          movements: Array.isArray(shot.movements) ? shot.movements : [],
-          // Keep projects created before the Support -> Equipment rename readable.
-          equipment: Array.isArray(shot.equipment)
-            ? shot.equipment
-            : shot.equipment
-              ? [shot.equipment]
-              : shot.support
-                ? [shot.support]
-                : [],
-        }))
-      : [],
-  }))
+  const usedSceneIds = new Set()
+  return savedScenes.map((rawScene, sceneIndex) => {
+    const sourceScene = rawScene && typeof rawScene === 'object' ? rawScene : {}
+    let sceneId = typeof sourceScene.id === 'string' && sourceScene.id
+      ? sourceScene.id
+      : crypto.randomUUID()
+    if (usedSceneIds.has(sceneId)) sceneId = crypto.randomUUID()
+    usedSceneIds.add(sceneId)
+
+    const usedShotIds = new Set()
+    const rawShots = Array.isArray(sourceScene.shots) ? sourceScene.shots : []
+    const shots = rawShots.map((rawShot, shotIndex) => {
+      const sourceShot = rawShot && typeof rawShot === 'object' ? rawShot : {}
+      let shotId = typeof sourceShot.id === 'string' && sourceShot.id
+        ? sourceShot.id
+        : crypto.randomUUID()
+      if (usedShotIds.has(shotId)) shotId = crypto.randomUUID()
+      usedShotIds.add(shotId)
+
+      const legacyEquipment = Array.isArray(sourceShot.equipment)
+        ? sourceShot.equipment
+        : sourceShot.equipment
+          ? [sourceShot.equipment]
+          : sourceShot.support
+            ? [sourceShot.support]
+            : []
+
+      const stringField = (key, maxLength = 500) => (
+        typeof sourceShot[key] === 'string' ? sourceShot[key].slice(0, maxLength) : ''
+      )
+
+      return {
+        ...sourceShot,
+        id: shotId,
+        // Shot numbers are positional; this also repairs duplicates from older versions.
+        num: String(shotIndex + 1).padStart(3, '0'),
+        subject: stringField('subject', 1000),
+        size: stringField('size', 100),
+        camera: stringField('camera', 200),
+        angle: stringField('angle', 100),
+        lens: stringField('lens', 100),
+        movements: Array.isArray(sourceShot.movements)
+          ? [...new Set(sourceShot.movements.filter(item => typeof item === 'string'))]
+          : [],
+        equipment: [...new Set(legacyEquipment.filter(item => typeof item === 'string'))],
+        sound: stringField('sound', 100),
+        take: stringField('take', 100),
+        script: stringField('script', 100),
+        setup: stringField('setup', 100),
+        estShoot: stringField('estShoot', 100),
+        notes: stringField('notes', 2000),
+      }
+    })
+
+    return {
+      ...sourceScene,
+      id: sceneId,
+      name: typeof sourceScene.name === 'string'
+        ? sourceScene.name.slice(0, 120)
+        : `Scene ${String(sceneIndex + 1).padStart(2, '0')}`,
+      location: typeof sourceScene.location === 'string' ? sourceScene.location.slice(0, 300) : '',
+      intExt: ['INT', 'EXT', 'INT/EXT'].includes(sourceScene.intExt) ? sourceScene.intExt : 'INT',
+      dayNight: ['DAY', 'NIGHT', 'DAWN', 'DUSK'].includes(sourceScene.dayNight) ? sourceScene.dayNight : 'DAY',
+      shots,
+    }
+  })
 }
 
 const defaultScene = (num) => ({
