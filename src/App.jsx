@@ -230,7 +230,9 @@ export default function App() {
 
         const restoredProject = normalizeSavedProject(savedState?.project)
         const restoredScenes = normalizeSavedScenes(savedState?.scenes) || scenes
-        const restoredActiveSceneId = savedState?.activeSceneId || restoredScenes[0]?.id || ''
+        const restoredActiveSceneId = restoredScenes.some(scene => scene.id === savedState?.activeSceneId)
+          ? savedState.activeSceneId
+          : restoredScenes[0]?.id || ''
         let restoredProjects = normalizeWorkspaceProjects(savedState?.projects)
         let restoredProjectId = savedState?.activeProjectId || restoredProjects[0]?.id || crypto.randomUUID()
 
@@ -309,10 +311,13 @@ export default function App() {
 
     setProjects(previous => upsertProject(previous, snapshotCurrentProject()))
     const targetScenes = normalizeSavedScenes(target.scenes) || [defaultScene(1)]
+    const targetActiveSceneId = targetScenes.some(scene => scene.id === target.activeSceneId)
+      ? target.activeSceneId
+      : targetScenes[0]?.id || ''
     setActiveProjectId(target.id)
     setProject(normalizeSavedProject(target.project))
     setScenes(targetScenes)
-    setActiveSceneId(target.activeSceneId || targetScenes[0]?.id || '')
+    setActiveSceneId(targetActiveSceneId)
     setTab('project')
   }
 
@@ -340,11 +345,14 @@ export default function App() {
     const remaining = projects.filter(item => item.id !== activeProjectId)
     const target = remaining[0]
     const targetScenes = normalizeSavedScenes(target.scenes) || [defaultScene(1)]
+    const targetActiveSceneId = targetScenes.some(scene => scene.id === target.activeSceneId)
+      ? target.activeSceneId
+      : targetScenes[0]?.id || ''
     setProjects(remaining)
     setActiveProjectId(target.id)
     setProject(normalizeSavedProject(target.project))
     setScenes(targetScenes)
-    setActiveSceneId(target.activeSceneId || targetScenes[0]?.id || '')
+    setActiveSceneId(targetActiveSceneId)
     setTab('project')
   }
 
@@ -397,12 +405,15 @@ export default function App() {
         : activeProjectId
       const target = merged.find(item => item.id === preferredId) || merged[0]
       const targetScenes = normalizeSavedScenes(target.scenes) || [defaultScene(1)]
+      const targetActiveSceneId = targetScenes.some(scene => scene.id === target.activeSceneId)
+        ? target.activeSceneId
+        : targetScenes[0]?.id || ''
 
       setProjects(merged)
       setActiveProjectId(target.id)
       setProject(normalizeSavedProject(target.project))
       setScenes(targetScenes)
-      setActiveSceneId(target.activeSceneId || targetScenes[0]?.id || '')
+      setActiveSceneId(targetActiveSceneId)
       setTab('project')
     } catch (error) {
       console.error('CINEBLOCK could not import backup:', error)
