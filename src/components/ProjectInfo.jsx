@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useId, useRef } from 'react'
 import { Plus, X, ChevronLeft, ChevronRight } from 'lucide-react'
 
 function readAsDataUrl(fileOrBlob) {
@@ -225,27 +225,33 @@ export default function ProjectInfo({ project, onChange }) {
 }
 
 function Field({ label, value, onChange, placeholder }) {
+  const fieldId = useId()
   return (
     <div className="field">
-      <label>{label}</label>
+      <label htmlFor={fieldId}>{label}</label>
       <input
+        id={fieldId}
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
+        maxLength={300}
       />
     </div>
   )
 }
 
 function FieldArea({ label, value, onChange, placeholder }) {
+  const fieldId = useId()
   return (
     <div className="field full">
-      <label>{label}</label>
+      <label htmlFor={fieldId}>{label}</label>
       <textarea
+        id={fieldId}
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         rows={3}
+        maxLength={5000}
       />
     </div>
   )
