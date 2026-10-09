@@ -595,6 +595,14 @@ export default function Floorplan({
                       onPointerDown={event => beginObjectDrag(type, object, event)}
                       style={{ cursor: 'grab' }}
                     >
+                      <rect
+                        x={type === 'actor' ? -36 : type === 'camera' ? -36 : -25}
+                        y={type === 'actor' ? -30 : type === 'camera' ? -25 : -24}
+                        width={type === 'actor' ? 72 : type === 'camera' ? 74 : 50}
+                        height={type === 'actor' ? 80 : type === 'camera' ? 78 : 62}
+                        fill="transparent"
+                        pointerEvents="all"
+                      />
                       {type === 'camera' && (
                         <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
                           <path d="M9 -9 L33 -20 L33 20 L9 9 Z" fill="var(--bg)" stroke="var(--text)" strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
