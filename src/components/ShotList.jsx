@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import SceneNavigator from './SceneNavigator'
 import { SIZES, ANGLES, LENSES, MOVEMENTS, EQUIPMENT } from '../shotOptions'
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Trash2, Copy, Check, CircleSlash, ImagePlus, LayoutGrid, List,  } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Trash2, Copy, Check, CircleSlash, ImagePlus, LayoutGrid, List } from 'lucide-react'
 
 
 
