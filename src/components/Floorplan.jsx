@@ -275,7 +275,8 @@ function fovSectorPath(fovDegrees) {
     + ' A ' + FOV_RADIUS + ' ' + FOV_RADIUS + ' 0 0 1 ' + x2.toFixed(2) + ' ' + y2.toFixed(2) + ' Z'
 }
 
-const LIGHT_CONE_RADIUS = 220
+// World units: 100 units = 1 meter; default light throw is 1.5 m.
+const LIGHT_CONE_RADIUS = 150
 const LIGHT_CONE_ANGLE = 56
 
 function lightConeSectorPath() {
@@ -1880,7 +1881,7 @@ export default function Floorplan({
                         </g>
                       )}
                       {type === 'camera' && (
-                        <g transform={'rotate(' + (object.angle || 0) + ') scale(0.78)'} pointerEvents="none">
+                        <g transform={'rotate(' + (object.angle || 0) + ') scale(0.58)'} pointerEvents="none">
                           <path d="M9 -9 L33 -20 L33 20 L9 9 Z" fill="var(--bg)" stroke="var(--text)" strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                           <rect x="-29" y="-15" width="40" height="30" rx="6" fill="var(--bg)" stroke="var(--text)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
                         </g>
@@ -1935,7 +1936,7 @@ export default function Floorplan({
                         </g>
                       )}
                       {type === 'actor' && (
-                        <g transform={'rotate(' + (object.angle || 0) + ') scale(0.68)'} pointerEvents="none">
+                        <g transform={'rotate(' + (object.angle || 0) + ') scale(0.45)'} pointerEvents="none">
                           <g fill="none" stroke="var(--text)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
                             <path d="M-22 -6 C-30 -10 -37 -6 -40 2 C-43 12 -36 22 -27 23 C-21 31 -10 34 0 34 C10 34 21 31 27 23 C36 22 43 12 40 2 C37 -6 30 -10 22 -6" />
                             <path d="M0 -31 C-17 -31 -22 -17 -21 -6 C-20 5 -15 13 -8 15 C-5 16 -4 20 0 21 C4 20 5 16 8 15 C15 13 20 5 21 -6 C22 -17 17 -31 0 -31 Z" />
@@ -1962,7 +1963,7 @@ export default function Floorplan({
                       )}
                       {type === 'light' && (
                         <g
-                          transform={'rotate(' + (90 + (object.angle || 0)) + ')'}
+                          transform={'rotate(' + (90 + (object.angle || 0)) + ') scale(0.72)'}
                           pointerEvents="none"
                           fill="var(--bg)"
                           stroke="var(--text)"
