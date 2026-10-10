@@ -38,6 +38,9 @@ function getFittedViewBox(layout) {
     if (Number.isFinite(px) && Number.isFinite(py)) points.push({ x: px, y: py })
   }
 
+  // Fit the room structure first, then include every placed object and path.
+  // This prevents a distant marker from making the room tiny while preserving
+  // all objects in the initial view.
   ;(layout.rooms || []).forEach(room => {
     addPoint(room.x, room.y)
     addPoint(Number(room.x) + Number(room.width), Number(room.y) + Number(room.height))
@@ -58,28 +61,28 @@ function getFittedViewBox(layout) {
 
   if (!points.length) return { x: 0, y: 0, width: MAP_WIDTH, height: MAP_HEIGHT }
 
-  const padding = 52
-  const minX = Math.max(0, Math.min(...points.map(point => point.x)) - padding)
-  const minY = Math.max(0, Math.min(...points.map(point => point.y)) - padding)
-  const maxX = Math.min(MAP_WIDTH, Math.max(...points.map(point => point.x)) + padding)
-  const maxY = Math.min(MAP_HEIGHT, Math.max(...points.map(point => point.y)) + padding)
-  let width = Math.max(220, maxX - minX)
-  let height = Math.max(143, maxY - minY)
+  const minX = Math.min(...points.map(point => point.x))
+  const minY = Math.min(...points.map(point => point.y))
+  const maxX = Math.max(...points.map(point => point.x))
+  const maxY = Math.max(...points.map(point => point.y))
+  const contentWidth = Math.max(220, maxX - minX)
+  const contentHeight = Math.max(143, maxY - minY)
+  // Leave enough breathing room for room titles, labels and object handles.
+  const padding = Math.max(48, Math.max(contentWidth, contentHeight) * 0.09)
   const mapAspect = MAP_WIDTH / MAP_HEIGHT
+  let width = contentWidth + padding * 2
+  let height = contentHeight + padding * 2
 
-  // Keep the original world-coordinate aspect ratio so fitting the view does
-  // not distort room dimensions or camera/light fields of view.
+  // Preserve world proportions and keep some margin around content even when
+  // the room touches the map's coordinate boundary.
   if (width / height < mapAspect) width = height * mapAspect
   else height = width / mapAspect
-  const scale = Math.min(1, MAP_WIDTH / width, MAP_HEIGHT / height)
-  width *= scale
-  height *= scale
 
   const centerX = (minX + maxX) / 2
   const centerY = (minY + maxY) / 2
   return {
-    x: clamp(centerX - width / 2, 0, MAP_WIDTH - width),
-    y: clamp(centerY - height / 2, 0, MAP_HEIGHT - height),
+    x: centerX - width / 2,
+    y: centerY - height / 2,
     width,
     height,
   }
