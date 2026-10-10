@@ -276,7 +276,7 @@ function fovSectorPath(fovDegrees) {
 }
 
 // World units: 100 units = 1 meter; default light throw is 1.5 m.
-const LIGHT_CONE_RADIUS = 90
+const LIGHT_CONE_RADIUS = 45
 const LIGHT_CONE_ANGLE = 56
 
 function lightConeSectorPath() {
