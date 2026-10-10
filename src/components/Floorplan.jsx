@@ -708,7 +708,7 @@ export default function Floorplan({
 
   const zoomCanvas = factor => {
     setViewBox(current => {
-      const width = clamp(current.width * factor, 220, MAP_WIDTH)
+      const width = clamp(current.width * factor, 80, MAP_WIDTH)
       const height = width / (MAP_WIDTH / MAP_HEIGHT)
       const centerX = current.x + current.width / 2
       const centerY = current.y + current.height / 2
@@ -2084,7 +2084,7 @@ export default function Floorplan({
             <div className="floorplan-view-controls" role="group" aria-label="Kontrol tampilan denah">
               <button type="button" className="floorplan-view-control-button" onClick={() => zoomCanvas(1.25)} disabled={viewBox.width >= MAP_WIDTH} title="Perkecil tampilan" aria-label="Perkecil tampilan"><Minus size={16} /></button>
               <span className="floorplan-zoom-level" aria-live="polite">{Math.round((MAP_WIDTH / viewBox.width) * 100)}%</span>
-              <button type="button" className="floorplan-view-control-button" onClick={() => zoomCanvas(0.8)} disabled={viewBox.width <= 220} title="Perbesar tampilan" aria-label="Perbesar tampilan"><Plus size={16} /></button>
+              <button type="button" className="floorplan-view-control-button" onClick={() => zoomCanvas(0.8)} disabled={viewBox.width <= 80} title="Perbesar tampilan" aria-label="Perbesar tampilan"><Plus size={16} /></button>
               <span className="floorplan-view-control-divider" />
               <button type="button" className="floorplan-view-control-button floorplan-fit-button" onClick={fitCanvas} title="Muat seluruh denah ke kanvas" aria-label="Muat seluruh denah ke kanvas"><Maximize2 size={15} /><span>Muat denah</span></button>
             </div>
