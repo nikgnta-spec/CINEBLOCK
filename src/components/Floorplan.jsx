@@ -708,13 +708,13 @@ export default function Floorplan({
 
   const zoomCanvas = factor => {
     setViewBox(current => {
-      const width = clamp(current.width * factor, 80, MAP_WIDTH)
+      const width = clamp(current.width * factor, 80, MAP_WIDTH * 2.5)
       const height = width / (MAP_WIDTH / MAP_HEIGHT)
       const centerX = current.x + current.width / 2
       const centerY = current.y + current.height / 2
       return {
-        x: clamp(centerX - width / 2, 0, MAP_WIDTH - width),
-        y: clamp(centerY - height / 2, 0, MAP_HEIGHT - height),
+        x: centerX - width / 2,
+        y: centerY - height / 2,
         width,
         height,
       }
@@ -1018,8 +1018,8 @@ export default function Floorplan({
       const dy = ((event.clientY - drag.startClientY) / rect.height) * drag.viewBox.height
       setViewBox({
         ...drag.viewBox,
-        x: clamp(drag.viewBox.x - dx, 0, MAP_WIDTH - drag.viewBox.width),
-        y: clamp(drag.viewBox.y - dy, 0, MAP_HEIGHT - drag.viewBox.height),
+        x: drag.viewBox.x - dx,
+        y: drag.viewBox.y - dy,
       })
       return
     }
@@ -1600,8 +1600,8 @@ export default function Floorplan({
                   <path d="M 50 0 L 0 0 0 50" fill="none" stroke="var(--border)" strokeWidth="0.8" strokeOpacity="0.5" />
                 </pattern>
               </defs>
-              <rect width={MAP_WIDTH} height={MAP_HEIGHT} fill="var(--bg)" />
-              <rect width={MAP_WIDTH} height={MAP_HEIGHT} fill="url(#floorplan-grid)" pointerEvents="none" />
+              <rect x={-MAP_WIDTH * 2} y={-MAP_HEIGHT * 2} width={MAP_WIDTH * 5} height={MAP_HEIGHT * 5} fill="var(--bg)" />
+              <rect x={-MAP_WIDTH * 2} y={-MAP_HEIGHT * 2} width={MAP_WIDTH * 5} height={MAP_HEIGHT * 5} fill="url(#floorplan-grid)" pointerEvents="none" />
 
               {layout.rooms.map(room => {
                 const openings = room.openings || []
@@ -2082,7 +2082,7 @@ export default function Floorplan({
               )}
             </svg>
             <div className="floorplan-view-controls" role="group" aria-label="Kontrol tampilan denah">
-              <button type="button" className="floorplan-view-control-button" onClick={() => zoomCanvas(1.25)} disabled={viewBox.width >= MAP_WIDTH} title="Perkecil tampilan" aria-label="Perkecil tampilan"><Minus size={16} /></button>
+              <button type="button" className="floorplan-view-control-button" onClick={() => zoomCanvas(1.25)} disabled={viewBox.width >= MAP_WIDTH * 2.5} title="Perkecil tampilan" aria-label="Perkecil tampilan"><Minus size={16} /></button>
               <span className="floorplan-zoom-level" aria-live="polite">{Math.round((MAP_WIDTH / viewBox.width) * 100)}%</span>
               <button type="button" className="floorplan-view-control-button" onClick={() => zoomCanvas(0.8)} disabled={viewBox.width <= 80} title="Perbesar tampilan" aria-label="Perbesar tampilan"><Plus size={16} /></button>
               <span className="floorplan-view-control-divider" />
