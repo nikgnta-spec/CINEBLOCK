@@ -996,6 +996,22 @@ export default function Floorplan({
   }
 
   const handleCanvasPointerDown = event => {
+    // Match common diagram editors: middle-drag pans; Space + left-drag pans.
+    // Object drags and the existing Pan tool keep their established behavior.
+    const spaceHeld = event.getModifierState?.('Space') || event.nativeEvent?.getModifierState?.('Space')
+    const startedOnEmptyCanvas = event.target === event.currentTarget
+    if (event.button === 1 || (event.button === 0 && spaceHeld && startedOnEmptyCanvas)) {
+      event.preventDefault()
+      event.stopPropagation()
+      svgRef.current?.setPointerCapture?.(event.pointerId)
+      dragRef.current = {
+        mode: 'pan',
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        viewBox: { ...viewBox },
+      }
+      return
+    }
     if (tool === 'pan') {
       event.preventDefault()
       svgRef.current?.setPointerCapture?.(event.pointerId)
