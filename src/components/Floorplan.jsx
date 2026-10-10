@@ -38,9 +38,6 @@ function getFittedViewBox(layout) {
     if (Number.isFinite(px) && Number.isFinite(py)) points.push({ x: px, y: py })
   }
 
-  // Fit the room structure first, then include every placed object and path.
-  // This prevents a distant marker from making the room tiny while preserving
-  // all objects in the initial view.
   ;(layout.rooms || []).forEach(room => {
     addPoint(room.x, room.y)
     addPoint(Number(room.x) + Number(room.width), Number(room.y) + Number(room.height))
@@ -67,25 +64,18 @@ function getFittedViewBox(layout) {
   const maxY = Math.max(...points.map(point => point.y))
   const contentWidth = Math.max(220, maxX - minX)
   const contentHeight = Math.max(143, maxY - minY)
-  // Leave enough breathing room for room titles, labels and object handles.
-  const padding = Math.max(48, Math.max(contentWidth, contentHeight) * 0.09)
+
+  // Keep the complete drawing comfortably inside the visible canvas.
+  const padding = Math.max(64, Math.max(contentWidth, contentHeight) * 0.16)
   const mapAspect = MAP_WIDTH / MAP_HEIGHT
   let width = contentWidth + padding * 2
   let height = contentHeight + padding * 2
-
-  // Preserve world proportions and keep some margin around content even when
-  // the room touches the map's coordinate boundary.
   if (width / height < mapAspect) width = height * mapAspect
   else height = width / mapAspect
 
   const centerX = (minX + maxX) / 2
   const centerY = (minY + maxY) / 2
-  return {
-    x: centerX - width / 2,
-    y: centerY - height / 2,
-    width,
-    height,
-  }
+  return { x: centerX - width / 2, y: centerY - height / 2, width, height }
 }
 const PROP_TYPES = ['Table', 'Chair', 'Sofa', 'Bed', 'Desk', 'Cabinet', 'Counter', 'Custom']
 const RESIZE_HANDLES = [
