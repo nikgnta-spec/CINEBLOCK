@@ -134,6 +134,19 @@ const getOpeningSymbol = (opening, width) => (
 )
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0))
 const formatMeters = value => (Math.max(0, Number(value) || 0) / 100).toFixed(2) + ' m'
+const LIGHT_CONE_COLORS = {
+  key: { fill: '#f59e0b', stroke: '#fbbf24' },
+  fill: { fill: '#38bdf8', stroke: '#7dd3fc' },
+  back: { fill: '#c084fc', stroke: '#d8b4fe' },
+  default: { fill: '#94a3b8', stroke: '#cbd5e1' },
+}
+const getLightConeColors = lightType => {
+  const type = String(lightType || '').toLowerCase()
+  if (type.includes('key')) return LIGHT_CONE_COLORS.key
+  if (type.includes('fill')) return LIGHT_CONE_COLORS.fill
+  if (type.includes('back') || type.includes('rim')) return LIGHT_CONE_COLORS.back
+  return LIGHT_CONE_COLORS.default
+}
 const makeId = () => crypto.randomUUID()
 const padNum = number => String(number).padStart(2, '0')
 const normalizeAngle = angle => ((angle % 360) + 360) % 360
@@ -180,15 +193,23 @@ function FloorplanObjectIcon({ type, size = 20 }) {
         </g>
       ) : type === 'camera' ? (
         <g>
-          <path d="M9 -9 L33 -20 L33 20 L9 9 Z" />
-          <rect x="-29" y="-15" width="40" height="30" rx="6" />
+          <rect x="-19" y="-13" width="28" height="26" rx="3" />
+          <path d="M-12 -13 L-7 -20 H1 L6 -13" />
+          <path d="M9 -8 H16" strokeWidth="4" />
+          <circle cx="22" cy="0" r="9" />
+          <circle cx="22" cy="0" r="3.5" />
+        </g>
+      ) : type === 'light' ? (
+        <g>
+          <path d="M-18 -12 L8 -8 L8 8 L-18 12 Z" />
+          <path d="M8 -8 L17 -13 M8 8 L17 13" />
+          <path d="M0 8 V18 M-10 21 H10 M0 18 L-10 25 M0 18 L10 25" />
+          <path d="M-22 -16 L-18 -12 M-22 16 L-18 12" />
         </g>
       ) : (
-        <g transform="rotate(90)" strokeWidth="2.8">
-          <path d="M-13 -8 L-8 -11 L3 -11 L11 -7 L11 7 L3 11 L-8 11 L-13 8 Z" />
-          <path d="M-13 -5 L-18 -9 M-13 5 L-18 9" />
-          <circle cx="7" cy="0" r="4.2" fill="currentColor" stroke="none" />
-          <path d="M-2 -6 L-2 6" strokeOpacity="0.65" />
+        <g>
+          <rect x="-16" y="-12" width="32" height="24" rx="2" />
+          <path d="M-10 -7 H10 M-10 7 H10" />
         </g>
       )}
     </svg>
@@ -312,6 +333,7 @@ export default function Floorplan({
   const [previewPoint, setPreviewPoint] = useState(null)
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: MAP_WIDTH, height: MAP_HEIGHT })
   const [historyRevision, setHistoryRevision] = useState(0)
+  const [canvasPixelWidth, setCanvasPixelWidth] = useState(800)
   const selectionRef = useRef([])
   const layoutRef = useRef(null)
   const dragHistoryBeforeRef = useRef(null)
@@ -332,6 +354,17 @@ export default function Floorplan({
     ...layout.cameras.map(item => ({ ...item, entityType: 'camera' })),
     ...layout.lights.map(item => ({ ...item, entityType: 'light' })),
   ]
+  useEffect(() => {
+    const canvas = svgRef.current
+    if (!canvas || typeof ResizeObserver === 'undefined') return undefined
+    const observer = new ResizeObserver(entries => {
+      const width = entries[0]?.contentRect.width
+      if (width) setCanvasPixelWidth(width)
+    })
+    observer.observe(canvas)
+    return () => observer.disconnect()
+  }, [])
+
   const selectedEntity = selected
     ? (layout[selected.type + 's'] || []).find(item => item.id === selected.id) || null
     : null
@@ -1453,9 +1486,9 @@ export default function Floorplan({
       const shot = scene.shots.find(entry => entry.id === item.shotId)
       return shot ? ('Shot ' + shot.num + (shot.subject ? ' — ' + shot.subject : '')) : 'Unlinked camera'
     }
-    if (type === 'light') return item.label || item.lightType || 'Light'
+    if (type === 'light') return (item.label || 'Light') + ' — ' + (item.lightType || 'Key')
     if (type === 'prop') return item.propType || 'Prop'
-    const fallback = ({ room: 'Room', wall: 'Wall', door: 'Door', window: 'Window', actor: 'Actor' })[type] || type
+    const fallback = ({ room: 'Room', wall: 'Wall', door: 'Pintu', window: 'Jendela', actor: 'Actor' })[type] || type
     return item.label || fallback
   }
 
@@ -1464,6 +1497,11 @@ export default function Floorplan({
     wall: 'Wall', prop: 'Prop',
   })[type] || type
   const objectCount = layout.rooms.length + layout.walls.length + layout.props.length + layout.actors.length + layout.cameras.length + layout.lights.length
+  const targetScaleMeters = Math.max(0.01, viewBox.width * 84 / Math.max(1, canvasPixelWidth) / 100)
+  const scalePower = 10 ** Math.floor(Math.log10(targetScaleMeters))
+  const scaleUnit = targetScaleMeters / scalePower
+  const scaleMeters = (scaleUnit <= 1 ? 1 : scaleUnit <= 2 ? 2 : scaleUnit <= 5 ? 5 : 10) * scalePower
+  const scaleBarWidth = Math.max(36, Math.min(120, scaleMeters * 100 / viewBox.width * canvasPixelWidth))
   const selectedPath = selectedEntity?.path || []
   if (!scene) return null
 
@@ -1542,6 +1580,11 @@ export default function Floorplan({
       <div className="floorplan-editor">
         <div className="floorplan-canvas-column">
           <div className="floorplan-canvas-frame">
+            <div className="floorplan-scale-indicator" aria-label={'Skala ' + scaleMeters + ' meter'}>
+              <span className="floorplan-scale-label">{scaleMeters} m</span>
+              <span className="floorplan-scale-bar" style={{ width: scaleBarWidth }} />
+              <span className="floorplan-scale-caption">Skala denah · 100 unit = 1 m</span>
+            </div>
             <svg
               ref={svgRef}
               className={'floorplan-canvas' + (tool === 'select' ? ' can-select' : tool === 'pan' ? ' can-pan' : ' can-draw')}
@@ -1559,8 +1602,12 @@ export default function Floorplan({
                 <marker id="floorplan-arrow" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
                   <path d="M0,0 L6,3.5 L0,7 Z" fill="var(--text-muted)" />
                 </marker>
+                <pattern id="floorplan-grid" width="50" height="50" patternUnits="userSpaceOnUse">
+                  <path d="M 50 0 L 0 0 0 50" fill="none" stroke="var(--border)" strokeWidth="0.8" strokeOpacity="0.5" />
+                </pattern>
               </defs>
               <rect width={MAP_WIDTH} height={MAP_HEIGHT} fill="var(--bg)" />
+              <rect width={MAP_WIDTH} height={MAP_HEIGHT} fill="url(#floorplan-grid)" pointerEvents="none" />
 
               {layout.rooms.map(room => {
                 const openings = room.openings || []
@@ -1611,6 +1658,12 @@ export default function Floorplan({
                           onPointerDown={event => beginOpeningDrag('room', room, opening, event)}
                           onClick={event => event.stopPropagation()}
                         >
+                          <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type === 'door' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">
+                            {opening.type === 'door' ? 'Pintu' : 'Jendela'}
+                          </text>
+                          <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type === 'door' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">
+                            {opening.type === 'door' ? 'Pintu' : 'Jendela'}
+                          </text>
                           {opening.type === 'door' ? (
                             <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
                               <path d={'M ' + (-openingWidth / 2) + ' 0 V ' + (-openingWidth)} />
@@ -1713,10 +1766,10 @@ export default function Floorplan({
                 >
                   <path
                     d={lightConeSectorPath()}
-                    fill="var(--text-muted)"
-                    fillOpacity={selected?.type === 'light' && selected.id === light.id ? 0.16 : 0.09}
-                    stroke="var(--text-muted)"
-                    strokeOpacity={selected?.type === 'light' && selected.id === light.id ? 0.7 : 0.4}
+                    fill={getLightConeColors(light.lightType).fill}
+                    fillOpacity={selected?.type === 'light' && selected.id === light.id ? 0.2 : 0.1}
+                    stroke={getLightConeColors(light.lightType).stroke}
+                    strokeOpacity={selected?.type === 'light' && selected.id === light.id ? 0.9 : 0.55}
                     strokeWidth={selected?.type === 'light' && selected.id === light.id ? 1.6 : 1.2}
                     vectorEffect="non-scaling-stroke"
                   />
@@ -1948,12 +2001,12 @@ export default function Floorplan({
                       ) : null}
                       {type === 'camera' && (
                         <text x="0" y="46" textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" pointerEvents="none">
-                          {shot ? shot.num : '—'}
+                          {objectName('camera', object)}
                         </text>
                       )}
                       {type === 'light' && (
                         <text x="0" y="35" textAnchor="middle" fontSize="13" fontWeight="500" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" pointerEvents="none">
-                          {object.lightType || 'Key'}
+                          {objectName('light', object)}
                         </text>
                       )}
                       {['door', 'window', 'prop'].includes(type) && (
