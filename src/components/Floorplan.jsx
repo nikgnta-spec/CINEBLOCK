@@ -127,19 +127,48 @@ const getOpeningSymbol = (opening, width) => (
 )
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0))
 const formatMeters = value => (Math.max(0, Number(value) || 0) / 100).toFixed(2) + ' m'
-const LIGHT_CONE_COLORS = {
-  key: { fill: '#f59e0b', stroke: '#fbbf24' },
-  fill: { fill: '#38bdf8', stroke: '#7dd3fc' },
-  back: { fill: '#c084fc', stroke: '#d8b4fe' },
-  default: { fill: '#94a3b8', stroke: '#cbd5e1' },
+// Production-aware colors: function defines the family; stable ID picks an
+// instance shade so multiple lights remain distinguishable without random colors.
+const LIGHT_COLOR_PALETTES = {
+  key: ['#FFD166', '#F5A742', '#E9C46A', '#F28C45'],
+  fill: ['#67E8F9', '#22D3EE', '#38BDF8', '#5EEAD4'],
+  back: ['#D8B4FE', '#C084FC', '#A78BFA', '#E879F9'],
+  practical: ['#86EFAC', '#4ADE80', '#A3E635', '#34D399'],
+  ambient: ['#CBD5E1', '#94A3B8', '#A8B7CC', '#7C9AB8'],
+  special: ['#FDA4AF', '#FB7185', '#F472B6', '#F9A8D4'],
+  default: ['#CBD5E1', '#94A3B8', '#A8B7CC', '#7C9AB8'],
 }
-const getLightConeColors = lightType => {
-  const type = String(lightType || '').toLowerCase()
-  if (type.includes('key')) return LIGHT_CONE_COLORS.key
-  if (type.includes('fill')) return LIGHT_CONE_COLORS.fill
-  if (type.includes('back') || type.includes('rim')) return LIGHT_CONE_COLORS.back
-  return LIGHT_CONE_COLORS.default
+const CAMERA_FOV_COLORS = ['#60A5FA', '#38BDF8', '#818CF8', '#7DD3FC']
+const CATEGORY_COLORS = {
+  actor: '#C084FC',
+  prop: '#4ADE80',
+  camera: '#60A5FA',
+  room: '#94A3B8',
+  wall: '#94A3B8',
+  door: '#94A3B8',
+  window: '#94A3B8',
 }
+const stableColorIndex = id => {
+  const text = String(id || 'default')
+  let hash = 0
+  for (let index = 0; index < text.length; index += 1) hash = ((hash * 31) + text.charCodeAt(index)) >>> 0
+  return hash % 4
+}
+const getLightConeColors = light => {
+  const type = String(light?.lightType || '').toLowerCase()
+  const family = type.includes('key') ? 'key'
+    : type.includes('fill') ? 'fill'
+      : type.includes('back') || type.includes('rim') ? 'back'
+        : type.includes('practical') ? 'practical'
+          : type.includes('ambient') ? 'ambient'
+            : type.includes('special') ? 'special' : 'default'
+  const color = LIGHT_COLOR_PALETTES[family][stableColorIndex(light?.id)]
+  return { fill: color, stroke: color }
+}
+const getCameraFovColor = camera => CAMERA_FOV_COLORS[stableColorIndex(camera?.id)]
+const getObjectColor = (type, object) => (
+  type === 'light' ? getLightConeColors(object).stroke : CATEGORY_COLORS[type] || '#94A3B8'
+)
 const makeId = () => crypto.randomUUID()
 const padNum = number => String(number).padStart(2, '0')
 const normalizeAngle = angle => ((angle % 360) + 360) % 360
@@ -1806,10 +1835,10 @@ export default function Floorplan({
                 >
                   <path
                     d={lightConeSectorPath()}
-                    fill={getLightConeColors(light.lightType).fill}
-                    fillOpacity={selected?.type === 'light' && selected.id === light.id ? 0.2 : 0.1}
-                    stroke={getLightConeColors(light.lightType).stroke}
-                    strokeOpacity={selected?.type === 'light' && selected.id === light.id ? 0.9 : 0.55}
+                    fill={getLightConeColors(light).fill}
+                    fillOpacity={selected?.type === 'light' && selected.id === light.id ? 0.26 : 0.18}
+                    stroke={getLightConeColors(light).stroke}
+                    strokeOpacity={selected?.type === 'light' && selected.id === light.id ? 1 : 0.9}
                     strokeWidth={selected?.type === 'light' && selected.id === light.id ? 1.6 : 1.2}
                     vectorEffect="non-scaling-stroke"
                   />
@@ -1904,10 +1933,10 @@ export default function Floorplan({
                         <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
                           <path
                             d={cameraFov.widePath}
-                            fill="var(--text-muted)"
-                            fillOpacity={active ? 0.16 : 0.09}
-                            stroke="var(--text-muted)"
-                            strokeOpacity={active ? 0.7 : 0.42}
+                            fill={getCameraFovColor(object)}
+                            fillOpacity={active ? 0.2 : 0.12}
+                            stroke={getCameraFovColor(object)}
+                            strokeOpacity={active ? 1 : 0.88}
                             strokeWidth={active ? 1.6 : 1.2}
                             vectorEffect="non-scaling-stroke"
                           />
@@ -1916,8 +1945,8 @@ export default function Floorplan({
                               d={cameraFov.narrowPath}
                               fill="var(--bg)"
                               fillOpacity="0.28"
-                              stroke="var(--text-muted)"
-                              strokeOpacity={active ? 0.8 : 0.48}
+                              stroke={getCameraFovColor(object)}
+                              strokeOpacity={active ? 1 : 0.9}
                               strokeWidth="1.2"
                               strokeDasharray="5 4"
                               vectorEffect="non-scaling-stroke"
@@ -1927,8 +1956,8 @@ export default function Floorplan({
                       )}
                       {type === 'camera' && (
                         <g transform={'rotate(' + (object.angle || 0) + ') scale(0.42)'} pointerEvents="none">
-                          <path d="M9 -9 L33 -20 L33 20 L9 9 Z" fill="var(--bg)" stroke="var(--text)" strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-                          <rect x="-29" y="-15" width="40" height="30" rx="6" fill="var(--bg)" stroke="var(--text)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+                          <path d="M9 -9 L33 -20 L33 20 L9 9 Z" fill="var(--bg)" stroke={getObjectColor(type, object)} strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                          <rect x="-29" y="-15" width="40" height="30" rx="6" fill="var(--bg)" stroke={getObjectColor(type, object)} strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
                         </g>
                       )}
                       {type === 'camera' && (panLeft || panRight || panBoth) && (
@@ -1982,7 +2011,7 @@ export default function Floorplan({
                       )}
                       {type === 'actor' && (
                         <g transform={'rotate(' + (object.angle || 0) + ') scale(0.28)'} pointerEvents="none">
-                          <g fill="none" stroke="var(--text)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+                          <g fill="#C084FC" fillOpacity="0.12" stroke={getObjectColor(type, object)} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
                             <path d="M-22 -6 C-30 -10 -37 -6 -40 2 C-43 12 -36 22 -27 23 C-21 31 -10 34 0 34 C10 34 21 31 27 23 C36 22 43 12 40 2 C37 -6 30 -10 22 -6" />
                             <path d="M0 -31 C-17 -31 -22 -17 -21 -6 C-20 5 -15 13 -8 15 C-5 16 -4 20 0 21 C4 20 5 16 8 15 C15 13 20 5 21 -6 C22 -17 17 -31 0 -31 Z" />
                             <path d="M-18 0 C-12 -5 -7 6 0 6 C7 6 12 -5 18 0" />
@@ -2011,7 +2040,7 @@ export default function Floorplan({
                           transform={'rotate(' + (90 + (object.angle || 0)) + ') scale(0.48)'}
                           pointerEvents="none"
                           fill="var(--bg)"
-                          stroke="var(--text)"
+                          stroke={getObjectColor(type, object)}
                           strokeWidth="2.5"
                           strokeLinejoin="round"
                           vectorEffect="non-scaling-stroke"
