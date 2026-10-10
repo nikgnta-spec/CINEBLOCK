@@ -712,33 +712,37 @@ export default function Floorplan({
     const rect = svg?.getBoundingClientRect()
     if (!rect || !rect.width || !rect.height) return
 
-    const pointerX = (event.clientX - rect.left) / rect.width
-    const pointerY = (event.clientY - rect.top) / rect.height
+    // Anchor the zoom to the exact world point beneath the mouse cursor.
+    const pointerX = clamp((event.clientX - rect.left) / rect.width, 0, 1)
+    const pointerY = clamp((event.clientY - rect.top) / rect.height, 0, 1)
     const factor = event.deltaY < 0 ? 0.9 : 1.1
 
     setViewBox(current => {
       const width = clamp(current.width * factor, 80, MAP_WIDTH * 2.5)
       const height = width / (MAP_WIDTH / MAP_HEIGHT)
-      const worldX = current.x + pointerX * current.width
-      const worldY = current.y + pointerY * current.height
+      const anchorX = current.x + pointerX * current.width
+      const anchorY = current.y + pointerY * current.height
       return {
-        x: worldX - pointerX * width,
-        y: worldY - pointerY * height,
+        x: anchorX - pointerX * width,
+        y: anchorY - pointerY * height,
         width,
         height,
       }
     })
   }
 
-  const zoomCanvas = factor => {
+  const zoomCanvas = (factor, clientX, clientY) => {
+    const rect = svgRef.current?.getBoundingClientRect()
+    const pointerX = rect && Number.isFinite(clientX) ? clamp((clientX - rect.left) / rect.width, 0, 1) : 0.5
+    const pointerY = rect && Number.isFinite(clientY) ? clamp((clientY - rect.top) / rect.height, 0, 1) : 0.5
     setViewBox(current => {
       const width = clamp(current.width * factor, 80, MAP_WIDTH * 2.5)
       const height = width / (MAP_WIDTH / MAP_HEIGHT)
-      const centerX = current.x + current.width / 2
-      const centerY = current.y + current.height / 2
+      const anchorX = current.x + pointerX * current.width
+      const anchorY = current.y + pointerY * current.height
       return {
-        x: centerX - width / 2,
-        y: centerY - height / 2,
+        x: anchorX - pointerX * width,
+        y: anchorY - pointerY * height,
         width,
         height,
       }
