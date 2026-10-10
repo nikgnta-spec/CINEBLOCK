@@ -706,6 +706,30 @@ export default function Floorplan({
     }
   }
 
+  const handleCanvasWheel = event => {
+    event.preventDefault()
+    const svg = svgRef.current
+    const rect = svg?.getBoundingClientRect()
+    if (!rect || !rect.width || !rect.height) return
+
+    const pointerX = (event.clientX - rect.left) / rect.width
+    const pointerY = (event.clientY - rect.top) / rect.height
+    const factor = event.deltaY < 0 ? 0.9 : 1.1
+
+    setViewBox(current => {
+      const width = clamp(current.width * factor, 80, MAP_WIDTH * 2.5)
+      const height = width / (MAP_WIDTH / MAP_HEIGHT)
+      const worldX = current.x + pointerX * current.width
+      const worldY = current.y + pointerY * current.height
+      return {
+        x: worldX - pointerX * width,
+        y: worldY - pointerY * height,
+        width,
+        height,
+      }
+    })
+  }
+
   const zoomCanvas = factor => {
     setViewBox(current => {
       const width = clamp(current.width * factor, 80, MAP_WIDTH * 2.5)
@@ -1587,6 +1611,7 @@ export default function Floorplan({
               role="img"
               aria-label="Kanvas Floorplan tampak atas"
               onPointerDown={handleCanvasPointerDown}
+              onWheel={handleCanvasWheel}
               onClick={handleCanvasClick}
               onPointerMove={handleCanvasPointerMove}
               onPointerUp={handleCanvasPointerUp}
