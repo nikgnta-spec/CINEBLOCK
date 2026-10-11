@@ -120,11 +120,6 @@ const getWallMetrics = wall => {
   const dy = wall.y2 - wall.y1
   return { length: Math.hypot(dx, dy), angle: Math.atan2(dy, dx) * 180 / Math.PI, ux: dx / (Math.hypot(dx, dy) || 1), uy: dy / (Math.hypot(dx, dy) || 1) }
 }
-const getOpeningSymbol = (opening, width) => (
-  opening.type === 'door'
-    ? `M ${-width / 2} 0 V ${-width} M ${-width / 2} ${-width} A ${width} ${width} 0 0 1 ${width / 2} 0`
-    : `M ${-width / 2} -4 H ${width / 2} M ${-width / 2} 0 H ${width / 2} M ${-width / 2} 4 H ${width / 2} M ${-width / 2} -7 V 7 M ${width / 2} -7 V 7`
-)
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0))
 const formatMeters = value => (Math.max(0, Number(value) || 0) / 100).toFixed(2) + ' m'
 // Production-aware colors: function defines the family; stable ID picks an
@@ -316,14 +311,6 @@ function lightConeSectorPath() {
   const y2 = LIGHT_CONE_RADIUS * Math.sin(halfAngle)
   return 'M 14 0 L ' + x1.toFixed(2) + ' ' + y1.toFixed(2)
     + ' A ' + LIGHT_CONE_RADIUS + ' ' + LIGHT_CONE_RADIUS + ' 0 0 1 ' + x2.toFixed(2) + ' ' + y2.toFixed(2) + ' Z'
-}
-
-function formatFov(focalRange) {
-  if (!focalRange) return ''
-  const widest = horizontalFovDegrees(focalRange.min)
-  const narrowest = horizontalFovDegrees(focalRange.max)
-  if (focalRange.min === focalRange.max) return widest.toFixed(1) + '°'
-  return widest.toFixed(1) + '° → ' + narrowest.toFixed(1) + '°'
 }
 
 function renumberShots(shots) {
@@ -548,7 +535,7 @@ export default function Floorplan({
     const currentCameraIds = new Set(current.cameras.map(camera => camera.id))
     const previousCameraIds = new Set(previous.cameras.map(camera => camera.id))
     const shotRecords = [...autoCreatedShotsByCameraRef.current.entries()]
-      .filter(([cameraId, record]) => record.sceneId === scene.id)
+      .filter(([, record]) => record.sceneId === scene.id)
     const autoShotsToRemove = shotRecords
       .filter(([cameraId, record]) => record.autoCreated
         && currentCameraIds.has(cameraId)
@@ -599,7 +586,7 @@ export default function Floorplan({
     const currentCameraIds = new Set(current.cameras.map(camera => camera.id))
     const nextCameraIds = new Set(next.cameras.map(camera => camera.id))
     const shotRecords = [...autoCreatedShotsByCameraRef.current.entries()]
-      .filter(([cameraId, record]) => record.sceneId === scene.id)
+      .filter(([, record]) => record.sceneId === scene.id)
     const autoShotsToRestore = shotRecords
       .filter(([cameraId, record]) => record.autoCreated
         && !currentCameraIds.has(cameraId)
@@ -1001,13 +988,6 @@ export default function Floorplan({
     }
     updateSelected({ openings: [...(selectedEntity.openings || []), opening] })
     setTool('select')
-  }
-
-  const updateOpening = (openingId, patch) => {
-    if (!selectedEntity || !['room', 'wall'].includes(selectedType)) return
-    updateSelected({
-      openings: (selectedEntity.openings || []).map(opening => opening.id === openingId ? { ...opening, ...patch } : opening),
-    })
   }
 
   const removeOpening = openingId => {
