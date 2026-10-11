@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { loadAppState, saveAppState } from '../src/storage.js'
+import { loadAppState, saveAppState, selectNewestStorageRecord } from '../src/storage.js'
 
 const STORAGE_KEY = 'cineblock.app-state.v1'
 
@@ -61,4 +61,35 @@ test('saveAppState rejects when both IndexedDB and compatibility storage fail', 
       /Storage quota exceeded/,
     )
   }, { failWrites: true })
+})
+
+
+test('selectNewestStorageRecord ignores non-finite timestamps', () => {
+  const olderDatabase = {
+    __cineblockStorageRecord: true,
+    savedAt: 100,
+    state: { project: { title: 'database' } },
+  }
+  const invalidFallback = {
+    __cineblockStorageRecord: true,
+    savedAt: Number.POSITIVE_INFINITY,
+    state: { project: { title: 'invalid fallback' } },
+  }
+
+  assert.equal(selectNewestStorageRecord(olderDatabase, invalidFallback), olderDatabase)
+})
+
+test('selectNewestStorageRecord prefers a genuinely newer timestamped fallback', () => {
+  const database = {
+    __cineblockStorageRecord: true,
+    savedAt: 100,
+    state: { project: { title: 'database' } },
+  }
+  const fallback = {
+    __cineblockStorageRecord: true,
+    savedAt: 200,
+    state: { project: { title: 'fallback' } },
+  }
+
+  assert.equal(selectNewestStorageRecord(database, fallback), fallback)
 })
