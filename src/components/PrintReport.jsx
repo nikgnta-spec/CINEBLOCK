@@ -258,6 +258,7 @@ function PrintFloorplan({ scene, layout }) {
 
 export default function PrintReport({ project, scenes, floorplans, mode = 'full', orientation = 'portrait' }) {
   const references = (project.visualRefs || []).map((src, index) => ({
+    id: index,
     src,
     label: project.visualRefLabels?.[index] || 'Reference ' + (index + 1),
   })).filter(reference => typeof reference.src === 'string' && reference.src.length > 0)
@@ -311,7 +312,7 @@ export default function PrintReport({ project, scenes, floorplans, mode = 'full'
               <h2>Visual References</h2>
               <div className="print-reference-grid">
                 {references.map(reference => (
-                  <figure key={reference.label + reference.src.slice(0, 32)}>
+                  <figure key={reference.id}>
                     <img src={reference.src} alt={reference.label} />
                     <figcaption>{reference.label}</figcaption>
                   </figure>
