@@ -1,6 +1,8 @@
 import { useId, useRef } from 'react'
 import { Plus, X, ChevronLeft, ChevronRight } from 'lucide-react'
 
+const MAX_VISUAL_REFERENCE_SIZE_BYTES = 8 * 1024 * 1024
+
 function readAsDataUrl(fileOrBlob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -49,6 +51,9 @@ export default function ProjectInfo({ project, onChange }) {
     if (!file) return
 
     try {
+      if (file.size > MAX_VISUAL_REFERENCE_SIZE_BYTES) {
+        throw new Error('Ukuran gambar referensi maksimal 8 MB.')
+      }
       const dataUrl = await makePersistentImage(file)
       onChange(p => {
         const refs = [...p.visualRefs]
