@@ -51,7 +51,18 @@ a { color: inherit; text-decoration: none; }
   padding: 0 16px; min-height: 56px; border-bottom: 1px solid var(--border); flex-shrink: 0; background: var(--bg);
 }
 .topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.topbar-logo { font-size: 13px; font-weight: 700; letter-spacing: 0.1em; white-space: nowrap; }
+.topbar-brand { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; min-width: 0; color: var(--text); }
+.topbar-mark { display: inline-flex; width: 29px; height: 29px; flex: 0 0 29px; align-items: center; justify-content: center; }
+.topbar-mark img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.topbar-mark-light { display: none !important; }
+:root[data-theme="light"] .topbar-mark-dark { display: none !important; }
+:root[data-theme="light"] .topbar-mark-light { display: block !important; }
+.topbar-wordmark { font-size: 14px; line-height: 1; font-weight: 750; letter-spacing: 0.075em; white-space: nowrap; }
+@media (max-width: 680px) {
+  .topbar-brand { gap: 0; }
+  .topbar-wordmark { display: none; }
+  .topbar-mark { width: 27px; height: 27px; flex-basis: 27px; }
+}
 .topbar-project { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 13px; }
 .topbar-project span { color: var(--text); font-weight: 600; }
 .topbar-right { display: flex; align-items: center; gap: 8px; }
