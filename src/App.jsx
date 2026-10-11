@@ -5,7 +5,7 @@ import ShotList from './components/ShotList'
 import Floorplan from './components/Floorplan'
 import PrintReport from './components/PrintReport'
 import { Download, Upload, Plus, Trash2, X, FileText, PanelsTopLeft, RectangleHorizontal, RectangleVertical, MoreHorizontal, Sun, Moon } from 'lucide-react'
-import { loadAppState, saveAppState } from './storage'
+import { loadAppState, saveAppState, subscribeToExternalSave } from './storage'
 
 const MAX_BACKUP_FILE_SIZE_BYTES = 10 * 1024 * 1024
 
@@ -436,12 +436,14 @@ export default function App() {
   const [activeProjectId, setActiveProjectId] = useState('')
   const [hydrated, setHydrated] = useState(false)
   const [saveStatus, setSaveStatus] = useState('loading')
+  const [externalSaveDetected, setExternalSaveDetected] = useState(false)
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
   const [exportMode, setExportMode] = useState('shotlist-table')
   const [exportOrientation, setExportOrientation] = useState('landscape')
   const [printRequest, setPrintRequest] = useState(false)
   const printStartedRef = useRef(false)
   const saveRevisionRef = useRef(0)
+  const externalSaveDetectedRef = useRef(false)
   const backupInputRef = useRef(null)
 
   useEffect(() => {
@@ -556,11 +558,22 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!hydrated || !activeProjectId) return undefined
+    if (!hydrated) return undefined
+
+    return subscribeToExternalSave(() => {
+      externalSaveDetectedRef.current = true
+      setExternalSaveDetected(true)
+      setSaveStatus('conflict')
+    })
+  }, [hydrated])
+
+  useEffect(() => {
+    if (!hydrated || !activeProjectId || externalSaveDetectedRef.current) return undefined
 
     const revision = ++saveRevisionRef.current
     setSaveStatus('saving')
     const timeout = window.setTimeout(async () => {
+      if (externalSaveDetectedRef.current) return
       try {
         const currentRecord = createProjectRecord(activeProjectId, project, scenes, activeSceneId, floorplans)
         const savedProjects = upsertProject(projects, currentRecord)
@@ -750,18 +763,20 @@ export default function App() {
         </div>
         <div className="topbar-right">
           <span
-            className={`save-status${saveStatus === 'saving' || saveStatus === 'loading' ? ' is-saving' : saveStatus === 'error' ? ' is-error' : ''}`}
+            className={`save-status${saveStatus === 'saving' || saveStatus === 'loading' ? ' is-saving' : saveStatus === 'error' || saveStatus === 'conflict' ? ' is-error' : ''}`}
             aria-live="polite"
-            title="Proyek, Shot List, tab aktif, dan scene aktif disimpan di browser ini"
+            title={externalSaveDetected ? "Data berubah di tab lain. Muat ulang halaman sebelum melanjutkan; perubahan lokal setelah konflik tidak akan disimpan." : "Proyek, Shot List, tab aktif, dan scene aktif disimpan di browser ini"}
             style={{ fontSize: 11, color: 'var(--text-muted)' }}
           >
             {saveStatus === 'loading'
               ? 'Memuat…'
               : saveStatus === 'saving'
                 ? 'Menyimpan…'
-                : saveStatus === 'error'
-                  ? 'Gagal menyimpan'
-                  : 'Tersimpan di perangkat ini'}
+                : saveStatus === 'conflict'
+                  ? 'Data berubah di tab lain — muat ulang'
+                  : saveStatus === 'error'
+                    ? 'Gagal menyimpan'
+                    : 'Tersimpan di perangkat ini'}
           </span>
           <button
             className="btn btn-secondary theme-toggle"
