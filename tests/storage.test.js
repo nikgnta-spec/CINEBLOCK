@@ -1,12 +1,40 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { selectNewestStorageRecord } from '../src/storage.js'
+import { loadAppState, selectNewestStorageRecord } from '../src/storage.js'
 
 const record = (savedAt, title) => ({
   __cineblockStorageRecord: true,
   savedAt,
   state: { project: { title } },
 })
+
+function withBrowserStorage(rawValue, run) {
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
+  const originalIndexedDB = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB')
+  const values = new Map()
+  if (rawValue !== null) values.set('cineblock.app-state.v1', JSON.stringify(rawValue))
+
+  globalThis.window = {
+    localStorage: {
+      getItem(key) {
+        return values.get(key) ?? null
+      },
+      setItem(key, value) {
+        values.set(key, String(value))
+      },
+    },
+  }
+  globalThis.indexedDB = undefined
+
+  return Promise.resolve()
+    .then(run)
+    .finally(() => {
+      if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow)
+      else delete globalThis.window
+      if (originalIndexedDB) Object.defineProperty(globalThis, 'indexedDB', originalIndexedDB)
+      else delete globalThis.indexedDB
+    })
+}
 
 test('prefers the newer timestamped localStorage fallback over stale IndexedDB', () => {
   const databaseRecord = record(100, 'old database')
@@ -44,4 +72,22 @@ test('returns a legacy fallback when IndexedDB has no record', () => {
   }
 
   assert.equal(selectNewestStorageRecord(null, legacyFallbackRecord), legacyFallbackRecord)
+})
+
+test('loads the timestamped fallback when IndexedDB is unavailable', async () => {
+  const fallback = record(200, 'recovered project')
+
+  await withBrowserStorage(fallback, async () => {
+    const state = await loadAppState()
+    assert.equal(state.project.title, 'recovered project')
+  })
+})
+
+test('loads legacy localStorage state when IndexedDB is unavailable', async () => {
+  const legacyState = { tab: 'shotlist', project: { title: 'legacy project' }, scenes: [] }
+
+  await withBrowserStorage(legacyState, async () => {
+    const state = await loadAppState()
+    assert.deepEqual(state, legacyState)
+  })
 })
