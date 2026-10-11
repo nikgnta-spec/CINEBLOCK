@@ -102,47 +102,82 @@ function readLegacyLocalStorage() {
     const raw = window.localStorage.getItem(LEGACY_STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
-    return parsed && typeof parsed === 'object' ? parsed : null
+    if (!parsed || typeof parsed !== 'object') return null
+
+    // Newer saves carry a timestamp so fallback data can be compared with IndexedDB.
+    if (parsed.__cineblockStorageRecord === true && parsed.state && typeof parsed.state === 'object') {
+      return parsed
+    }
+
+    // Existing localStorage saves predate timestamped records.
+    return { __cineblockStorageRecord: true, savedAt: 0, state: parsed }
   } catch (error) {
     console.warn('CINEBLOCK could not read the older browser save:', error)
     return null
   }
 }
 
+function createStorageRecord(state) {
+  return { __cineblockStorageRecord: true, savedAt: Date.now(), state }
+}
+
+function unwrapStorageRecord(record) {
+  return record?.__cineblockStorageRecord === true
+    && record.state
+    && typeof record.state === 'object'
+    ? record.state
+    : record && typeof record === 'object'
+      ? record
+      : null
+}
+
 export async function loadAppState() {
+  let databaseRecord = null
   try {
     const database = await openDatabase()
-    const saved = await readFromDatabase(database)
-    if (saved && typeof saved === 'object') return saved
-
-    // One-time migration from the earlier localStorage-based autosave.
-    const legacy = readLegacyLocalStorage()
-    if (legacy) {
-      try {
-        await writeToDatabase(database, legacy)
-      } catch (error) {
-        console.warn('CINEBLOCK could not migrate the older browser save:', error)
-      }
-      return legacy
-    }
-
-    return null
+    databaseRecord = await readFromDatabase(database)
   } catch (error) {
-    console.warn('CINEBLOCK is using the compatibility storage fallback:', error)
-    return readLegacyLocalStorage()
+    console.warn('CINEBLOCK could not read IndexedDB; checking the compatibility save:', error)
   }
+
+  const fallbackRecord = readLegacyLocalStorage()
+  const databaseTimestamp = databaseRecord?.__cineblockStorageRecord === true
+    ? Number(databaseRecord.savedAt) || 0
+    : 0
+  const fallbackTimestamp = Number(fallbackRecord?.savedAt) || 0
+
+  // Prefer whichever timestamped record is newer. This prevents an older IndexedDB
+  // value from hiding a newer save written to localStorage after an IndexedDB failure.
+  if (fallbackRecord && fallbackTimestamp > databaseTimestamp) {
+    return unwrapStorageRecord(fallbackRecord)
+  }
+  if (databaseRecord) {
+    return unwrapStorageRecord(databaseRecord)
+  }
+  if (fallbackRecord) {
+    const legacyState = unwrapStorageRecord(fallbackRecord)
+    try {
+      const database = await openDatabase()
+      await writeToDatabase(database, createStorageRecord(legacyState))
+    } catch (error) {
+      console.warn('CINEBLOCK could not migrate the older browser save:', error)
+    }
+    return legacyState
+  }
+
+  return null
 }
 
 export async function saveAppState(value) {
+  const record = createStorageRecord(value)
   try {
     const database = await openDatabase()
-    await writeToDatabase(database, value)
+    await writeToDatabase(database, record)
     notifyOtherTabs()
   } catch (error) {
-    // Fallback for browsers where IndexedDB is unavailable. Very large projects
-    // may exceed localStorage quota; surface that error in the app's save status.
+    // Fallback records retain a timestamp so recovery can prefer them over stale IndexedDB data.
     try {
-      window.localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(value))
+      window.localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(record))
       notifyOtherTabs()
     } catch (fallbackError) {
       throw fallbackError || error
