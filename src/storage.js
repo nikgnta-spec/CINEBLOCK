@@ -8,6 +8,8 @@ const CHANNEL_NAME = 'cineblock-app-state'
 const TAB_ID = crypto.randomUUID()
 
 let databasePromise
+let saveQueue = Promise.resolve()
+let lastSavedAt = 0
 
 function openDatabase() {
   if (typeof indexedDB === 'undefined') {
@@ -118,7 +120,10 @@ function readLegacyLocalStorage() {
 }
 
 function createStorageRecord(state) {
-  return { __cineblockStorageRecord: true, savedAt: Date.now(), state }
+  // Keep timestamps strictly increasing for saves queued within this tab, even when
+  // multiple edits are persisted during the same millisecond or the system clock shifts.
+  lastSavedAt = Math.max(Date.now(), lastSavedAt + 1)
+  return { __cineblockStorageRecord: true, savedAt: lastSavedAt, state }
 }
 
 function unwrapStorageRecord(record) {
@@ -178,7 +183,7 @@ export async function loadAppState() {
   return null
 }
 
-export async function saveAppState(value) {
+async function persistAppState(value) {
   const record = createStorageRecord(value)
   try {
     const database = await openDatabase()
@@ -203,4 +208,13 @@ export async function saveAppState(value) {
       throw fallbackError || error
     }
   }
+}
+
+
+// Serialize writes so a slower earlier save cannot overwrite a newer snapshot.
+// Keep the queue alive after a failed save; the next edit can still be persisted.
+export function saveAppState(value) {
+  const operation = saveQueue.then(() => persistAppState(value))
+  saveQueue = operation.catch(() => {})
+  return operation
 }
