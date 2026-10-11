@@ -62,7 +62,7 @@ export default function ProjectInfo({ project, onChange }) {
       })
     } catch (error) {
       console.error('CINEBLOCK could not load visual reference:', error)
-      window.alert('Gambar tidak dapat dibuka. Silakan pilih gambar lain.')
+      window.alert(error instanceof Error ? error.message : 'Gambar tidak dapat dibuka. Silakan pilih gambar lain.')
     } finally {
       input.value = ''
     }
