@@ -2,13 +2,7 @@ name: CINEBLOCK CI
 
 on:
   push:
-    branches:
-      - main
-      - feature/shotlist-equipment-lens-dropdowns
   pull_request:
-    branches:
-      - main
-      - feature/shotlist-equipment-lens-dropdowns
 
 permissions:
   contents: read
