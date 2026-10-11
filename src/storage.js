@@ -3,6 +3,9 @@ const DATABASE_VERSION = 1
 const STORE_NAME = 'appState'
 const PRIMARY_KEY = 'primary'
 const LEGACY_STORAGE_KEY = 'cineblock.app-state.v1'
+const CHANGE_EVENT_KEY = 'cineblock.app-state.changed'
+const CHANNEL_NAME = 'cineblock-app-state'
+const TAB_ID = crypto.randomUUID()
 
 let databasePromise
 
@@ -53,6 +56,47 @@ function writeToDatabase(database, value) {
   })
 }
 
+function notifyOtherTabs() {
+  try {
+    const channel = typeof BroadcastChannel !== 'undefined'
+      ? new BroadcastChannel(CHANNEL_NAME)
+      : null
+    channel?.postMessage({ type: 'saved', source: TAB_ID })
+    channel?.close()
+  } catch {
+    // The storage event below remains a fallback when BroadcastChannel is unavailable.
+  }
+
+  try {
+    window.localStorage.setItem(CHANGE_EVENT_KEY, `${TAB_ID}:${Date.now()}:${Math.random()}`)
+  } catch {
+    // BroadcastChannel still works when localStorage is unavailable.
+  }
+}
+
+export function subscribeToExternalSave(callback) {
+  const channel = typeof BroadcastChannel !== 'undefined'
+    ? new BroadcastChannel(CHANNEL_NAME)
+    : null
+  const handleMessage = event => {
+    if (event.data?.type === 'saved' && event.data.source !== TAB_ID) callback()
+  }
+  const handleStorage = event => {
+    if (event.key === CHANGE_EVENT_KEY && event.newValue && !event.newValue.startsWith(`${TAB_ID}:`)) {
+      callback()
+    }
+  }
+
+  channel?.addEventListener('message', handleMessage)
+  window.addEventListener('storage', handleStorage)
+
+  return () => {
+    channel?.removeEventListener('message', handleMessage)
+    channel?.close()
+    window.removeEventListener('storage', handleStorage)
+  }
+}
+
 function readLegacyLocalStorage() {
   try {
     const raw = window.localStorage.getItem(LEGACY_STORAGE_KEY)
@@ -93,11 +137,13 @@ export async function saveAppState(value) {
   try {
     const database = await openDatabase()
     await writeToDatabase(database, value)
+    notifyOtherTabs()
   } catch (error) {
     // Fallback for browsers where IndexedDB is unavailable. Very large projects
     // may exceed localStorage quota; surface that error in the app's save status.
     try {
       window.localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(value))
+      notifyOtherTabs()
     } catch (fallbackError) {
       throw fallbackError || error
     }
