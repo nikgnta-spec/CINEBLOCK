@@ -1,21 +1,36 @@
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || '').trim().replace(/\/$/, '')
-const SUPABASE_PUBLISHABLE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '').trim()
+function normalizeProjectUrl(value) {
+  return typeof value === 'string' ? value.trim().replace(/\/+$/, '') : ''
+}
 
-export function getSupabaseConfig() {
-  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) return null
+/**
+ * Validate frontend-safe Supabase settings separately from Vite's environment
+ * so URL validation can be tested without a browser or live project.
+ */
+export function parseSupabaseConfig(urlValue, keyValue) {
+  const urlString = normalizeProjectUrl(urlValue)
+  const publishableKey = typeof keyValue === 'string' ? keyValue.trim() : ''
+
+  if (!urlString || !publishableKey) return null
 
   try {
-    const url = new URL(SUPABASE_URL)
-    if (url.protocol !== 'https:' && url.hostname !== 'localhost') return null
-    if (!url.hostname.endsWith('.supabase.co') && url.hostname !== 'localhost') return null
+    const url = new URL(urlString)
+    const isLocalhost = url.hostname === 'localhost'
+    if (url.protocol !== 'https:' && !isLocalhost) return null
+    if (!isLocalhost && !url.hostname.endsWith('.supabase.co')) return null
+    if (url.username || url.password || url.search || url.hash) return null
+    if (url.pathname !== '/' && url.pathname !== '') return null
+
+    return { url: url.origin, publishableKey }
   } catch {
     return null
   }
+}
 
-  return {
-    url: SUPABASE_URL,
-    publishableKey: SUPABASE_PUBLISHABLE_KEY,
-  }
+export function getSupabaseConfig() {
+  return parseSupabaseConfig(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  )
 }
 
 export function getSupabaseSetupStatus() {
@@ -23,6 +38,6 @@ export function getSupabaseSetupStatus() {
     ? { configured: true, message: 'Konfigurasi Supabase tersedia.' }
     : {
         configured: false,
-        message: 'Supabase belum dikonfigurasi. Isi VITE_SUPABASE_URL dan VITE_SUPABASE_PUBLISHABLE_KEY di .env.local.',
+        message: 'Supabase belum dikonfigurasi atau Project URL tidak valid. Periksa VITE_SUPABASE_URL dan VITE_SUPABASE_PUBLISHABLE_KEY di .env.local.',
       }
 }
