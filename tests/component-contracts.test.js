@@ -32,6 +32,12 @@ test('print report renders camera FOV from the lens of the linked shot', async (
   assert.match(source, /className="print-plan-page"/)
 })
 
+test('standalone Shot List and Storyboard PDF exports do not force a blank first page', async () => {
+  const source = await readSource('../src/index.css')
+
+  assert.match(source, /\.print-mode-shotlist \.print-shot-list-section,[\s\S]*?\.print-mode-storyboard \.print-shot-list-section \{ break-before: auto; \}/)
+})
+
 test('visual reference uploads enforce a size limit and clear the input after handling', async () => {
   const source = await readSource('../src/components/ProjectInfo.jsx')
 
