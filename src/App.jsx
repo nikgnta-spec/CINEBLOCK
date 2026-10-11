@@ -3,7 +3,6 @@ import './App.css'
 import ProjectInfo from './components/ProjectInfo'
 import ShotList from './components/ShotList'
 import Floorplan from './components/Floorplan'
-import SceneNavigator from './components/SceneNavigator'
 import PrintReport from './components/PrintReport'
 import { Download, Upload, Plus, Trash2, X, FileText, PanelsTopLeft, RectangleHorizontal, RectangleVertical, MoreHorizontal, Sun, Moon } from 'lucide-react'
 import { loadAppState, saveAppState } from './storage'
@@ -332,7 +331,7 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
     // Migrate old standalone door/window markers to openings on the nearest room edge or wall.
     const normalized = result[scene.id]
     const legacyOpenings = [
-      ...(Array.isArray(raw.doors) ? raw.doors : []).filter(item => item && typeof item === 'object').map((item, index) => ({
+      ...(Array.isArray(raw.doors) ? raw.doors : []).filter(item => item && typeof item === 'object').map(item => ({
         id: safeId(item), type: 'door', x: coords(item.x, 1000), y: coords(item.y, 650),
         angle: coords(item.angle, 360), width: Math.max(12, Math.min(300, Number(item.width) || 52)),
       })),
