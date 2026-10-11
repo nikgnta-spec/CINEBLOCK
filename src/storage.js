@@ -131,11 +131,15 @@ function unwrapStorageRecord(record) {
       : null
 }
 
+function storageTimestamp(record) {
+  if (record?.__cineblockStorageRecord !== true) return 0
+  const timestamp = Number(record.savedAt)
+  return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : 0
+}
+
 export function selectNewestStorageRecord(databaseRecord, fallbackRecord) {
-  const databaseTimestamp = databaseRecord?.__cineblockStorageRecord === true
-    ? Number(databaseRecord.savedAt) || 0
-    : 0
-  const fallbackTimestamp = Number(fallbackRecord?.savedAt) || 0
+  const databaseTimestamp = storageTimestamp(databaseRecord)
+  const fallbackTimestamp = storageTimestamp(fallbackRecord)
 
   return fallbackRecord && fallbackTimestamp > databaseTimestamp
     ? fallbackRecord
