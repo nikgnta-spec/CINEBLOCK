@@ -179,6 +179,16 @@ export async function saveAppState(value) {
   try {
     const database = await openDatabase()
     await writeToDatabase(database, record)
+
+    // Keep the compatibility copy current after every successful primary save.
+    // localStorage can be unavailable or over quota, so mirror failure must not
+    // turn a successful IndexedDB save into a reported save failure.
+    try {
+      window.localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(record))
+    } catch {
+      // IndexedDB remains the source of truth when the compatibility copy cannot be written.
+    }
+
     notifyOtherTabs()
   } catch (error) {
     // Fallback records retain a timestamp so recovery can prefer them over stale IndexedDB data.
