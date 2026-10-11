@@ -734,7 +734,13 @@ export default function App() {
     <div className="app">
       <div className="topbar">
         <div className="topbar-left">
-          <span className="topbar-logo">CINEBLOCK</span>
+          <div className="topbar-brand" role="img" aria-label="CineBlock">
+            <span className="topbar-mark" aria-hidden="true">
+              <img className="topbar-mark-dark" src="/cineblock-mark.svg" alt="" />
+              <img className="topbar-mark-light" src="/cineblock-mark-light.svg" alt="" />
+            </span>
+            <span className="topbar-wordmark">CINEBLOCK</span>
+          </div>
           <span style={{ color: 'var(--text-muted)' }}>/</span>
           <select
             className="project-switcher"
