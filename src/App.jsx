@@ -7,6 +7,8 @@ import PrintReport from './components/PrintReport'
 import { Download, Upload, Plus, Trash2, X, FileText, PanelsTopLeft, RectangleHorizontal, RectangleVertical, MoreHorizontal, Sun, Moon } from 'lucide-react'
 import { loadAppState, saveAppState } from './storage'
 
+const MAX_BACKUP_FILE_SIZE_BYTES = 10 * 1024 * 1024
+
 const TABS = [
   { id: 'floorplan', label: 'Floorplan' },
   { id: 'shotlist', label: 'Shot List' },
@@ -667,6 +669,9 @@ export default function App() {
     if (!file) return
 
     try {
+      if (file.size > MAX_BACKUP_FILE_SIZE_BYTES) {
+        throw new Error('Ukuran file backup maksimal 10 MB.')
+      }
       const parsed = JSON.parse(await file.text())
       if (parsed?.app !== 'CINEBLOCK' || !Array.isArray(parsed.projects)) {
         throw new Error('File ini bukan backup CINEBLOCK yang valid.')
