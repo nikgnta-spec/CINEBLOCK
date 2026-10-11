@@ -441,6 +441,7 @@ export default function App() {
   const [exportOrientation, setExportOrientation] = useState('landscape')
   const [printRequest, setPrintRequest] = useState(false)
   const printStartedRef = useRef(false)
+  const saveRevisionRef = useRef(0)
   const backupInputRef = useRef(null)
 
   useEffect(() => {
@@ -557,6 +558,7 @@ export default function App() {
   useEffect(() => {
     if (!hydrated || !activeProjectId) return undefined
 
+    const revision = ++saveRevisionRef.current
     setSaveStatus('saving')
     const timeout = window.setTimeout(async () => {
       try {
@@ -571,10 +573,10 @@ export default function App() {
           projects: savedProjects,
           activeProjectId,
         })
-        setSaveStatus('saved')
+        if (revision === saveRevisionRef.current) setSaveStatus('saved')
       } catch (error) {
         console.error('CINEBLOCK could not save data:', error)
-        setSaveStatus('error')
+        if (revision === saveRevisionRef.current) setSaveStatus('error')
       }
     }, 250)
 
