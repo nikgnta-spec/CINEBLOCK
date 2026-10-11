@@ -46,6 +46,22 @@ test('saveAppState writes a timestamped compatibility record when IndexedDB is u
   })
 })
 
+test('concurrent saves preserve call order and leave the newest snapshot in fallback storage', async () => {
+  const firstState = { project: { title: 'first snapshot' } }
+  const newestState = { project: { title: 'newest snapshot' } }
+
+  await withUnavailableIndexedDB(async () => {
+    await Promise.all([
+      saveAppState(firstState),
+      saveAppState(newestState),
+    ])
+
+    const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY))
+    assert.equal(saved.state.project.title, 'newest snapshot')
+    assert.ok(Number.isFinite(saved.savedAt))
+  })
+})
+
 test('loadAppState safely ignores malformed compatibility JSON', async () => {
   await withUnavailableIndexedDB(async () => {
     window.localStorage.setItem(STORAGE_KEY, '{not valid json')
