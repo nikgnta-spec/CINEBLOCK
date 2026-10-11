@@ -131,6 +131,17 @@ function unwrapStorageRecord(record) {
       : null
 }
 
+export function selectNewestStorageRecord(databaseRecord, fallbackRecord) {
+  const databaseTimestamp = databaseRecord?.__cineblockStorageRecord === true
+    ? Number(databaseRecord.savedAt) || 0
+    : 0
+  const fallbackTimestamp = Number(fallbackRecord?.savedAt) || 0
+
+  return fallbackRecord && fallbackTimestamp > databaseTimestamp
+    ? fallbackRecord
+    : databaseRecord || fallbackRecord || null
+}
+
 export async function loadAppState() {
   let databaseRecord = null
   try {
@@ -141,28 +152,23 @@ export async function loadAppState() {
   }
 
   const fallbackRecord = readLegacyLocalStorage()
-  const databaseTimestamp = databaseRecord?.__cineblockStorageRecord === true
-    ? Number(databaseRecord.savedAt) || 0
-    : 0
-  const fallbackTimestamp = Number(fallbackRecord?.savedAt) || 0
+  const selectedRecord = selectNewestStorageRecord(databaseRecord, fallbackRecord)
 
-  // Prefer whichever timestamped record is newer. This prevents an older IndexedDB
-  // value from hiding a newer save written to localStorage after an IndexedDB failure.
-  if (fallbackRecord && fallbackTimestamp > databaseTimestamp) {
-    return unwrapStorageRecord(fallbackRecord)
-  }
-  if (databaseRecord) {
-    return unwrapStorageRecord(databaseRecord)
-  }
-  if (fallbackRecord) {
-    const legacyState = unwrapStorageRecord(fallbackRecord)
+  if (selectedRecord === fallbackRecord && fallbackRecord) {
+    const state = unwrapStorageRecord(fallbackRecord)
+    // Best-effort repair: if a newer fallback survived an IndexedDB failure, restore it
+    // to IndexedDB so the stale database record cannot keep winning after this load.
     try {
       const database = await openDatabase()
-      await writeToDatabase(database, createStorageRecord(legacyState))
+      await writeToDatabase(database, createStorageRecord(state))
     } catch (error) {
-      console.warn('CINEBLOCK could not migrate the older browser save:', error)
+      console.warn('CINEBLOCK could not restore the compatibility save to IndexedDB:', error)
     }
-    return legacyState
+    return state
+  }
+
+  if (selectedRecord) {
+    return unwrapStorageRecord(selectedRecord)
   }
 
   return null
