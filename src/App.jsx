@@ -4,6 +4,7 @@ import ProjectInfo from './components/ProjectInfo'
 import ShotList from './components/ShotList'
 import Floorplan from './components/Floorplan'
 import PrintReport from './components/PrintReport'
+import AuthWorkspace from './components/AuthWorkspace'
 import { Download, Upload, Plus, Trash2, X, FileText, PanelsTopLeft, RectangleHorizontal, RectangleVertical, MoreHorizontal, Sun, Moon } from 'lucide-react'
 import { loadAppState, saveAppState, subscribeToExternalSave } from './storage'
 
@@ -768,6 +769,7 @@ export default function App() {
           </details>
         </div>
         <div className="topbar-right">
+          <AuthWorkspace />
           <span
             className={`save-status${saveStatus === 'saving' || saveStatus === 'loading' ? ' is-saving' : saveStatus === 'error' || saveStatus === 'conflict' ? ' is-error' : ''}`}
             aria-live="polite"

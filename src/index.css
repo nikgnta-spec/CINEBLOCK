@@ -1677,3 +1677,24 @@ button:focus-visible,
 .floorplan-scale-bar { display: block; height: 7px; min-width: 36px; max-width: 120px; border: 1px solid var(--text); border-top: 0; }
 .floorplan-scale-caption { color: var(--text-muted); font-size: 9px; line-height: 1.2; white-space: nowrap; }
 .floorplan-object-row-name { overflow-wrap: anywhere; }
+
+/* Cloud auth and project picker */
+.cloud-workspace { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 0; max-width: 430px; }
+.cloud-workspace-unconfigured { flex-direction: row; align-items: center; color: var(--text-muted); font-size: 11px; white-space: nowrap; }
+.cloud-login-form, .cloud-session, .cloud-create-form { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cloud-login-form input, .cloud-create-form input, .cloud-project-select { min-width: 0; width: 132px; height: 34px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-subtle); color: var(--text); }
+.cloud-project-select { width: 150px; }
+.cloud-user { display: inline-flex; align-items: center; gap: 5px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 11px; }
+.cloud-icon-button { min-width: 32px; padding-inline: 8px; }
+.cloud-muted, .cloud-feedback { font-size: 11px; color: var(--text-muted); }
+.cloud-feedback { max-width: 430px; text-align: right; }
+.cloud-feedback.is-error { color: var(--danger); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 1180px) {
+  .cloud-workspace { align-items: stretch; }
+  .cloud-user { display: none; }
+  .cloud-login-form input { width: 112px; }
+}
+@media (max-width: 760px) {
+  .cloud-workspace { display: none; }
+}
