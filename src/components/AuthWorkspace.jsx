@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { LogIn, LogOut, Cloud, RefreshCw } from 'lucide-react'
 import { supabaseClient, supabaseConfig } from '../lib/supabaseClient.js'
 import { importLocalWorkspaceToCloud } from '../lib/cineblockImport.js'
+import { syncLocalScenesAndShots } from '../lib/cineblockSync.js'
 
 export default function AuthWorkspace({ localWorkspace }) {
   const [session, setSession] = useState(null)
@@ -15,6 +16,7 @@ export default function AuthWorkspace({ localWorkspace }) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [importing, setImporting] = useState(false)
+  const [syncing, setSyncing] = useState(false)
 
   const loadProjects = async () => {
     const rows = await supabaseClient.listProjects()
@@ -94,11 +96,29 @@ export default function AuthWorkspace({ localWorkspace }) {
     try {
       const counts = await importLocalWorkspaceToCloud(selectedProjectId, localWorkspace)
       const elements = ['floorplan', 'cameras', 'actors', 'lighting', 'props'].reduce((sum, key) => sum + Number(counts[key] || 0), 0)
-      setNotice('Impor awal berhasil: ' + (counts.scenes || 0) + ' scene, ' + (counts.shots || 0) + ' shot, ' + elements + ' elemen denah. Data lokal tetap menjadi sumber kerja aktif.')
+      setNotice('Impor awal berhasil: ' + (counts.scenes || 0) + ' scene, ' + (counts.shots || 0) + ' shot, ' + elements + ' elemen denah. Data lokal tetap menjadi sumber kerja aktif.' + (counts.baselineWarning ? ' Sinkronisasi OCC belum siap: ' + counts.baselineWarning : ''))
     } catch (err) {
       setError(err.message || 'Impor awal ke cloud gagal. Data lokal tetap utuh.')
     } finally {
       setImporting(false)
+    }
+  }
+
+
+  const syncScenesAndShots = async () => {
+    if (!selectedProjectId) return
+    setSyncing(true)
+    setError('')
+    setNotice('')
+    try {
+      const result = await syncLocalScenesAndShots(selectedProjectId, localWorkspace)
+      const summary = 'Sinkronisasi Scene/Shot selesai: ' + result.updated + ' diperbarui, ' + result.inserted + ' ditambahkan, ' + result.unchanged + ' tidak berubah.'
+      if (result.conflicts.length) setError(summary + ' Konflik: ' + result.conflicts.slice(0, 4).join(' '))
+      else setNotice(summary + ' Floorplan belum disinkronkan pada tahap ini.')
+    } catch (err) {
+      setError(err.message || 'Sinkronisasi gagal. Data lokal tetap tersimpan.')
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -155,7 +175,7 @@ export default function AuthWorkspace({ localWorkspace }) {
         <div className="cloud-session">
           <span className="cloud-user" title={session.user?.email || 'Akun terhubung'}><Cloud size={14} /> {session.user?.email || 'Terhubung'}</span>
           <label className="sr-only" htmlFor="cineblock-cloud-project">Pilih proyek cloud</label>
-          <select id="cineblock-cloud-project" className="cloud-project-select" value={selectedProjectId} onChange={event => { setSelectedProjectId(event.target.value); setNotice('Proyek cloud dipilih. Sinkronisasi tetap terkunci sampai pemetaan data dan OCC terverifikasi.') }} disabled={busy || projects.length === 0}>
+          <select id="cineblock-cloud-project" className="cloud-project-select" value={selectedProjectId} onChange={event => { setSelectedProjectId(event.target.value); setNotice('Proyek cloud dipilih sebagai target. Impor awal hanya berlaku untuk proyek kosong; sinkronisasi Scene/Shot memakai OCC.') }} disabled={busy || projects.length === 0}>
             <option value="">Pilih proyek cloud…</option>
             {projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
           </select>
@@ -164,6 +184,12 @@ export default function AuthWorkspace({ localWorkspace }) {
         </div>
       )}
 
+
+      {session && projects.length > 0 && selectedProjectId && (
+        <button className="btn btn-secondary" type="button" onClick={syncScenesAndShots} disabled={busy || importing || syncing} title="Sinkronkan Scene dan Shot dengan OCC">
+          {syncing ? <RefreshCw size={13} /> : <Cloud size={13} />}{syncing ? ' Menyinkronkan…' : ' Sinkronkan Scene & Shot'}
+        </button>
+      )}
       {session && projects.length > 0 && selectedProjectId && (
         <button className="btn btn-secondary" type="button" onClick={importLocal} disabled={busy || importing} title="Impor awal sekali ke proyek cloud yang masih kosong">
           {importing ? <RefreshCw size={13} /> : <Cloud size={13} />}{importing ? ' Menyalin…' : ' Salin lokal ke cloud'}

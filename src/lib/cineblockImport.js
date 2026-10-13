@@ -1,5 +1,6 @@
 import { supabaseClient } from './supabaseClient.js'
 import { cineblockRepository } from './cineblockRepository.js'
+import { initializeCloudBaseline } from './cineblockSync.js'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -15,6 +16,9 @@ function idMapper() {
 export function mapLocalWorkspaceToRelational(workspace) {
   const localScenes = Array.isArray(workspace?.scenes) ? workspace.scenes : []
   if (!localScenes.length) throw new Error('Proyek lokal belum memiliki scene yang bisa diimpor.')
+  if (localScenes.some(scene => !UUID.test(String(scene.id || '')) || (scene.shots || []).some(shot => !UUID.test(String(shot.id || ''))))) {
+    throw new Error('ID Scene/Shot lokal tidak valid sebagai UUID. Impor dihentikan agar relasi dan OCC tetap konsisten.')
+  }
   const sceneId = idMapper()
   const shotId = idMapper()
   const elementId = idMapper()
@@ -125,10 +129,16 @@ export async function importLocalWorkspaceToCloud(projectId, workspace) {
   const existingScenes = await cineblockRepository.listScenes(projectId)
   if (existingScenes.length) throw new Error('Proyek cloud sudah memiliki scene. Impor awal dihentikan agar data cloud tidak tertimpa.')
   const data = mapLocalWorkspaceToRelational(workspace)
-  return supabaseClient.rpc('cineblock_import_local_project', {
+  const result = await supabaseClient.rpc('cineblock_import_local_project', {
     p_project_id: projectId, p_project_name: data.projectName, p_project_info: data.projectInfo,
     p_scenes: data.scenes, p_shots: data.shots, p_floorplan_elements: data.floorplan,
     p_cameras: data.cameras, p_actors: data.actors, p_lighting: data.lighting,
     p_props: data.props, p_movements: data.movements,
   })
+  try {
+    await initializeCloudBaseline(projectId, workspace)
+    return result
+  } catch (error) {
+    return { ...(result || {}), baselineWarning: error.message || 'Baseline OCC belum dapat disiapkan.' }
+  }
 }
