@@ -769,7 +769,7 @@ export default function App() {
           </details>
         </div>
         <div className="topbar-right">
-          <AuthWorkspace />
+          <AuthWorkspace localWorkspace={{ project, scenes, floorplans, activeSceneId, activeProjectId }} />
           <span
             className={`save-status${saveStatus === 'saving' || saveStatus === 'loading' ? ' is-saving' : saveStatus === 'error' || saveStatus === 'conflict' ? ' is-error' : ''}`}
             aria-live="polite"

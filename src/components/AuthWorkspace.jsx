@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { LogIn, LogOut, Cloud, RefreshCw } from 'lucide-react'
 import { supabaseClient, supabaseConfig } from '../lib/supabaseClient.js'
+import { importLocalWorkspaceToCloud } from '../lib/cineblockImport.js'
 
-export default function AuthWorkspace() {
+export default function AuthWorkspace({ localWorkspace }) {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -13,6 +14,7 @@ export default function AuthWorkspace() {
   const [newProjectName, setNewProjectName] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [importing, setImporting] = useState(false)
 
   const loadProjects = async () => {
     const rows = await supabaseClient.listProjects()
@@ -82,6 +84,24 @@ export default function AuthWorkspace() {
     }
   }
 
+
+  const importLocal = async () => {
+    if (!selectedProjectId) return
+    if (!window.confirm('Salin data proyek lokal yang sedang aktif ke proyek cloud terpilih? Proyek cloud harus kosong. Data lokal tidak akan dihapus.')) return
+    setImporting(true)
+    setError('')
+    setNotice('')
+    try {
+      const counts = await importLocalWorkspaceToCloud(selectedProjectId, localWorkspace)
+      const elements = ['floorplan', 'cameras', 'actors', 'lighting', 'props'].reduce((sum, key) => sum + Number(counts[key] || 0), 0)
+      setNotice('Impor awal berhasil: ' + (counts.scenes || 0) + ' scene, ' + (counts.shots || 0) + ' shot, ' + elements + ' elemen denah. Data lokal tetap menjadi sumber kerja aktif.')
+    } catch (err) {
+      setError(err.message || 'Impor awal ke cloud gagal. Data lokal tetap utuh.')
+    } finally {
+      setImporting(false)
+    }
+  }
+
   const signOut = async () => {
     setBusy(true)
     setError('')
@@ -139,9 +159,15 @@ export default function AuthWorkspace() {
             <option value="">Pilih proyek cloud…</option>
             {projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
           </select>
-          <button className="btn btn-secondary cloud-icon-button" type="button" onClick={() => loadProjects().catch(err => setError(err.message))} disabled={busy} title="Muat ulang proyek cloud" aria-label="Muat ulang proyek cloud"><RefreshCw size={14} /></button>
-          <button className="btn btn-secondary cloud-icon-button" type="button" onClick={signOut} disabled={busy} title="Keluar" aria-label="Keluar"><LogOut size={14} /></button>
+          <button className="btn btn-secondary cloud-icon-button" type="button" onClick={() => loadProjects().catch(err => setError(err.message))} disabled={busy || importing} title="Muat ulang proyek cloud" aria-label="Muat ulang proyek cloud"><RefreshCw size={14} /></button>
+          <button className="btn btn-secondary cloud-icon-button" type="button" onClick={signOut} disabled={busy || importing} title="Keluar" aria-label="Keluar"><LogOut size={14} /></button>
         </div>
+      )}
+
+      {session && projects.length > 0 && selectedProjectId && (
+        <button className="btn btn-secondary" type="button" onClick={importLocal} disabled={busy || importing} title="Impor awal sekali ke proyek cloud yang masih kosong">
+          {importing ? <RefreshCw size={13} /> : <Cloud size={13} />}{importing ? ' Menyalin…' : ' Salin lokal ke cloud'}
+        </button>
       )}
       {session && projects.length === 0 && !busy && (
         <form className="cloud-create-form" onSubmit={createProject}>

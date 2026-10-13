@@ -156,6 +156,10 @@ export const supabaseClient = Object.freeze({
       }
     },
   },
+  async rpc(functionName, args) {
+    if (!/^[a-z_][a-z0-9_]*$/i.test(functionName)) throw new TypeError('Nama RPC tidak valid.')
+    return request('rpc/' + functionName, { method: 'POST', body: args })
+  },
   async listProjects() {
     return request('cineblock_projects?select=id,name,owner_id,updated_at&order=updated_at.desc')
   },
