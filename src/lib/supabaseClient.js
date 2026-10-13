@@ -4,7 +4,8 @@ const SUPABASE_KEY = ENV.VITE_SUPABASE_PUBLISHABLE_KEY || ENV.VITE_SUPABASE_ANON
 const SESSION_KEY = 'cineblock.supabase.session.v1'
 const AUTH_EVENT = 'cineblock:supabase-auth'
 
-// The fallback is a Supabase publishable key, intended for browser exposure. Never put a service_role key here.\nexport const supabaseConfig = Object.freeze({
+// The fallback is a Supabase publishable key, intended for browser exposure. Never put a service_role key here.
+export const supabaseConfig = Object.freeze({
   configured: Boolean(SUPABASE_URL && SUPABASE_KEY),
   url: SUPABASE_URL,
 })
