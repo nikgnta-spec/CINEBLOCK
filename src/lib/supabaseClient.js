@@ -186,6 +186,13 @@ export const supabaseClient = Object.freeze({
     const rows = await request(table, { method: 'POST', body: row, prefer: 'return=representation' })
     return rows?.[0] || null
   },
+  async updateProjectVersioned({ id, expectedRevision, changes }) {
+    if (!id || !Number.isInteger(Number(expectedRevision)) || Number(expectedRevision) < 1) throw new TypeError('id dan expectedRevision yang valid wajib diisi untuk OCC.')
+    const params = new URLSearchParams({ id: 'eq.' + id, revision: 'eq.' + expectedRevision, select: 'id,revision,updated_at' })
+    const rows = await request('cineblock_projects?' + params.toString(), { method: 'PATCH', body: changes, prefer: 'return=representation' })
+    if (!Array.isArray(rows) || rows.length !== 1) throw new OptimisticConflictError('cineblock_projects', id, expectedRevision)
+    return rows[0]
+  },
   async deleteVersionedRow(table, { id, expectedVersion }) {
     assertTable(table)
     if (!id || !Number.isInteger(expectedVersion) || expectedVersion < 1) throw new TypeError('id dan expectedVersion yang valid wajib diisi untuk OCC.')
@@ -214,6 +221,7 @@ export const supabaseClient = Object.freeze({
 })
 
 const ALLOWED_TABLES = new Set([
+  'cineblock_projects',
   'cineblock_scenes',
   'cineblock_shots',
   'cineblock_floorplan_elements',

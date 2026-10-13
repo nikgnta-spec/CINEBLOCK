@@ -186,8 +186,8 @@ export default function AuthWorkspace({ localWorkspace }) {
 
 
       {session && projects.length > 0 && selectedProjectId && (
-        <button className="btn btn-secondary" type="button" onClick={syncScenesAndShots} disabled={busy || importing || syncing} title="Sinkronkan Scene, Shot, dan elemen Floorplan dengan OCC">
-          {syncing ? <RefreshCw size={13} /> : <Cloud size={13} />}{syncing ? ' Menyinkronkan…' : ' Sinkronkan Scene, Shot & Floorplan'}
+        <button className="btn btn-secondary" type="button" onClick={syncScenesAndShots} disabled={busy || importing || syncing} title="Sinkronkan Info Proyek, Scene, Shot, Floorplan, dan Movement dengan OCC">
+          {syncing ? <RefreshCw size={13} /> : <Cloud size={13} />}{syncing ? ' Menyinkronkan…' : ' Sinkronkan Proyek, Scene, Shot & Floorplan'}
         </button>
       )}
       {session && projects.length > 0 && selectedProjectId && (

@@ -122,7 +122,11 @@ export async function initializeCloudBaseline(projectId, workspace) {
   const remote = await fetchRemoteWorkspace(projectId)
   const localScenes = new Map((workspace.scenes || []).map(scene => [scene.id, scene]))
   const localShots = new Map((workspace.scenes || []).flatMap(scene => (scene.shots || []).map(shot => [shot.id, shot])))
-  const baseline = { version: 1, scenes: {}, shots: {}, entities: {}, initializedAt: new Date().toISOString() }
+  const remoteProjects = await supabaseClient.selectRows('cineblock_projects', { id: 'eq.' + projectId }, 'id,name,payload,revision,owner_id,updated_at')
+  const remoteProject = remoteProjects[0]
+  if (!remoteProject) throw new Error('Proyek cloud tidak ditemukan atau tidak dapat diakses.')
+  if (stable(remoteProject.payload || {}) !== stable(workspace.project || {})) throw new Error('Info Proyek lokal dan cloud belum sama; baseline OCC tidak dibuat.')
+  const baseline = { version: 1, project: { revision: remoteProject.revision, local: workspace.project || {} }, scenes: {}, shots: {}, entities: {}, initializedAt: new Date().toISOString() }
 
   for (const row of remote.scenes) {
     const local = localScenes.get(row.id)
@@ -161,6 +165,9 @@ export async function syncLocalScenesAndShots(projectId, workspace) {
   const baseline = readBaseline(projectId)
   if (!baseline) throw new Error('Baseline sinkronisasi belum tersedia di perangkat ini. Gunakan impor awal pada proyek cloud kosong atau muat data cloud terlebih dahulu.')
   const remote = await fetchRemoteWorkspace(projectId)
+  const remoteProjectRows = await supabaseClient.selectRows('cineblock_projects', { id: 'eq.' + projectId }, 'id,name,payload,revision,owner_id,updated_at')
+  const remoteProject = remoteProjectRows[0]
+  if (!remoteProject) throw new Error('Proyek cloud tidak ditemukan atau tidak dapat diakses.')
   const remoteScenes = new Map(remote.scenes.map(row => [row.id, row]))
   const remoteShots = new Map(remote.shots.map(row => [row.id, row]))
   const localScenes = new Map((workspace.scenes || []).map(scene => [scene.id, scene]))
@@ -169,6 +176,32 @@ export async function syncLocalScenesAndShots(projectId, workspace) {
   let updated = 0
   let inserted = 0
   let unchanged = 0
+
+  const projectBase = baseline.project
+  const localProject = workspace.project && typeof workspace.project === 'object' ? workspace.project : {}
+  if (!projectBase) {
+    conflicts.push('Baseline Info Proyek belum tersedia; tidak ada perubahan cloud yang ditimpa.')
+  } else {
+    const projectChanged = stable(localProject) !== stable(projectBase.local)
+    if (!projectChanged && remoteProject.revision !== projectBase.revision) {
+      conflicts.push('Info Proyek berubah di cloud; sinkronisasi ditahan untuk mencegah konflik.')
+    } else if (projectChanged && remoteProject.revision !== projectBase.revision) {
+      conflicts.push('Info Proyek diubah bersamaan. Perubahan lokal dipertahankan.')
+    } else if (projectChanged) {
+      try {
+        const title = String(localProject.title || '').trim().slice(0, 200) || 'Proyek tanpa judul'
+        const result = await supabaseClient.updateProjectVersioned({
+          id: projectId, expectedRevision: projectBase.revision, changes: { name: title, payload: localProject },
+        })
+        baseline.project = { revision: result.revision, local: localProject }
+        updated += 1
+      } catch (error) {
+        conflicts.push('Info Proyek: ' + error.message)
+      }
+    } else {
+      unchanged += 1
+    }
+  }
 
   for (const id of Object.keys(baseline.scenes)) {
     if (!localScenes.has(id)) conflicts.push('Scene ' + id + ' dihapus lokal; penghapusan cloud belum diaktifkan.')
