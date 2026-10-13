@@ -37,6 +37,33 @@ export function requireVersionedUpdate(table, id, expectedVersion, rows) {
   return rows[0]
 }
 
+/**
+ * Reads Supabase's implicit-flow auth callback from either the query string or URL fragment.
+ * Returns null for ordinary URLs. Never logs or returns the raw URL.
+ */
+export function parseAuthCallbackUrl(input) {
+  const url = new URL(input)
+  const query = new URLSearchParams(url.search)
+  const fragment = new URLSearchParams(url.hash.replace(/^#/, ''))
+  const params = new URLSearchParams([...query.entries(), ...fragment.entries()])
+  const accessToken = params.get('access_token')
+  const type = params.get('type')
+  const hasAuthError = params.has('error') || params.has('error_description')
+  const isAuthCallback = Boolean(accessToken || hasAuthError || ['invite', 'signup', 'recovery', 'magiclink', 'email'].includes(type))
+  if (!isAuthCallback) return null
+
+  return {
+    access_token: accessToken || '',
+    refresh_token: params.get('refresh_token') || '',
+    token_type: params.get('token_type') || 'bearer',
+    expires_in: Number(params.get('expires_in') || 3600),
+    type: type || '',
+    error: params.get('error') || '',
+    error_description: params.get('error_description') || '',
+    cleanUrl: url.origin + url.pathname,
+  }
+}
+
 function readSession() {
   try {
     const raw = globalThis.localStorage?.getItem(SESSION_KEY)
@@ -84,17 +111,61 @@ async function authRequest(path, body, token) {
   return decodeResponse(response)
 }
 
+let callbackPromise
+async function consumeAuthCallback() {
+  if (typeof window === 'undefined' || !window.location || !window.history) return null
+  if (callbackPromise) return callbackPromise
+  callbackPromise = (async () => {
+    const callback = parseAuthCallbackUrl(window.location.href)
+    if (!callback) return null
+
+    // Remove credentials from browser history immediately, even if token validation later fails.
+    window.history.replaceState(window.history.state, '', callback.cleanUrl)
+
+    if (callback.error) {
+      throw new SupabaseRequestError(callback.error_description || 'Undangan tidak dapat diverifikasi.', 400, callback.error)
+    }
+    if (!callback.access_token) {
+      throw new SupabaseRequestError('Tautan autentikasi tidak memuat token sesi. Minta undangan baru.', 400, 'AUTH_CALLBACK_TOKEN_MISSING')
+    }
+    if (callback.type && !['invite', 'signup', 'magiclink', 'email'].includes(callback.type)) {
+      throw new SupabaseRequestError('Jenis tautan autentikasi tidak didukung untuk login.', 400, 'AUTH_CALLBACK_TYPE_UNSUPPORTED')
+    }
+
+    const session = {
+      access_token: callback.access_token,
+      refresh_token: callback.refresh_token,
+      token_type: callback.token_type,
+      expires_in: callback.expires_in,
+      expires_at: Math.floor(Date.now() / 1000) + callback.expires_in,
+    }
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` },
+    })
+    session.user = await decodeResponse(response)
+    writeSession(session)
+    return session
+  })()
+  try {
+    return await callbackPromise
+  } finally {
+    callbackPromise = null
+  }
+}
+
 async function getFreshSession() {
-  const session = readSession()
-  if (!session?.access_token) return null
-  const expiresAt = Number(session.expires_at || 0)
-  if (!expiresAt || expiresAt * 1000 > Date.now() + 60_000) return session
-  if (!session.refresh_token) {
+  const session = await consumeAuthCallback()
+  if (session) return session
+  const storedSession = readSession()
+  if (!storedSession?.access_token) return null
+  const expiresAt = Number(storedSession.expires_at || 0)
+  if (!expiresAt || expiresAt * 1000 > Date.now() + 60_000) return storedSession
+  if (!storedSession.refresh_token) {
     writeSession(null)
     return null
   }
   try {
-    const refreshed = await authRequest('token?grant_type=refresh_token', { refresh_token: session.refresh_token })
+    const refreshed = await authRequest('token?grant_type=refresh_token', { refresh_token: storedSession.refresh_token })
     const next = { ...refreshed, expires_at: refreshed.expires_at || Math.floor(Date.now() / 1000) + Number(refreshed.expires_in || 3600) }
     writeSession(next)
     return next
