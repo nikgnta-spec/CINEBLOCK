@@ -1,10 +1,10 @@
 const ENV = import.meta.env || {}
-const SUPABASE_URL = String(ENV.VITE_SUPABASE_URL || '').replace(/\/+$/, '')
-const SUPABASE_KEY = ENV.VITE_SUPABASE_PUBLISHABLE_KEY || ENV.VITE_SUPABASE_ANON_KEY || ''
+const SUPABASE_URL = String(ENV.VITE_SUPABASE_URL || 'https://pycxqqghkpkoqqgatprv.supabase.co').replace(/\/+$/, '')
+const SUPABASE_KEY = ENV.VITE_SUPABASE_PUBLISHABLE_KEY || ENV.VITE_SUPABASE_ANON_KEY || 'sb_publishable_GRixB_y1fBvVfa777zhjXw_O7LCmSS_'
 const SESSION_KEY = 'cineblock.supabase.session.v1'
 const AUTH_EVENT = 'cineblock:supabase-auth'
 
-export const supabaseConfig = Object.freeze({
+// The fallback is a Supabase publishable key, intended for browser exposure. Never put a service_role key here.\nexport const supabaseConfig = Object.freeze({
   configured: Boolean(SUPABASE_URL && SUPABASE_KEY),
   url: SUPABASE_URL,
 })
