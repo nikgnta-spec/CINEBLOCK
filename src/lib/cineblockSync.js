@@ -378,3 +378,108 @@ export async function syncLocalScenesAndShots(projectId, workspace) {
 
   return { updated, inserted, unchanged, conflicts }
 }
+
+export async function loadCloudWorkspace(projectId) {
+  const projectRows = await supabaseClient.selectRows('cineblock_projects', { id: 'eq.' + projectId }, 'id,name,payload,revision,owner_id,updated_at')
+  const cloudProject = projectRows[0]
+  if (!cloudProject) throw new Error('Proyek cloud tidak ditemukan atau tidak dapat diakses.')
+  const remote = await fetchRemoteWorkspace(projectId)
+  const entities = await fetchRemoteEntities(remote.scenes, remote.shots)
+  const movementsByShot = new Map()
+  for (const movement of entities.cineblock_movements) {
+    if (!movementsByShot.has(movement.shot_id)) movementsByShot.set(movement.shot_id, [])
+    movementsByShot.get(movement.shot_id).push(movement)
+  }
+  for (const list of movementsByShot.values()) list.sort((a, b) => a.position - b.position)
+
+  const scenes = remote.scenes.map(sceneRow => ({
+    id: sceneRow.id,
+    name: sceneRow.name,
+    location: sceneRow.location,
+    intExt: sceneRow.int_ext,
+    dayNight: sceneRow.day_night,
+    shots: remote.shots.filter(row => row.scene_id === sceneRow.id).map(row => ({
+      id: row.id,
+      num: String(row.position + 1).padStart(3, '0'),
+      subject: row.subject,
+      size: row.size,
+      camera: row.camera,
+      angle: row.angle,
+      lens: row.lens,
+      movements: (movementsByShot.get(row.id) || []).map(item => item.movement_type),
+      equipment: Array.isArray(row.equipment) ? row.equipment : [],
+      status: row.status,
+      storyboardImage: row.storyboard_image || '',
+      sound: row.sound,
+      take: row.take,
+      script: row.script,
+      setup: row.setup,
+      estShoot: row.est_shoot,
+      notes: row.notes,
+    })),
+  }))
+
+  const floorplans = {}
+  for (const scene of remote.scenes) {
+    const data = { rooms: [], walls: [], props: [], actors: [], cameras: [], lights: [] }
+    floorplans[scene.id] = data
+    const sceneElements = entities.cineblock_floorplan_elements.filter(row => row.scene_id === scene.id)
+    const byId = new Map()
+    for (const row of sceneElements) {
+      if (row.element_type === 'room') {
+        const room = { id: row.id, x: row.x, y: row.y, width: row.width, height: row.height, label: row.label, openings: [] }
+        data.rooms.push(room)
+        byId.set(row.id, { type: 'room', value: room })
+      } else if (row.element_type === 'wall') {
+        const wall = {
+          id: row.id,
+          x1: Number(row.properties?.x1) || 0,
+          y1: Number(row.properties?.y1) || 0,
+          x2: Number(row.properties?.x2) || 0,
+          y2: Number(row.properties?.y2) || 0,
+          thickness: Number(row.properties?.thickness) || 6,
+          openings: [],
+        }
+        data.walls.push(wall)
+        byId.set(row.id, { type: 'wall', value: wall })
+      }
+    }
+    for (const row of sceneElements.filter(item => item.element_type === 'opening')) {
+      const host = byId.get(row.properties?.host_id)
+      if (!host) continue
+      host.value.openings.push({
+        id: row.id,
+        type: row.properties?.opening_type === 'window' ? 'window' : 'door',
+        offset: Number(row.properties?.offset) || 0.5,
+        width: Number(row.properties?.width ?? row.width) || 48,
+        ...(host.type === 'room' ? { side: ['top', 'right', 'bottom', 'left'].includes(row.properties?.side) ? row.properties.side : 'bottom' } : {}),
+      })
+    }
+    data.cameras = entities.cineblock_cameras.filter(row => row.scene_id === scene.id).map(row => ({
+      id: row.id, shotId: row.shot_id || '', label: row.label, x: row.x, y: row.y,
+      angle: row.angle, movement: row.movement, path: Array.isArray(row.path) ? row.path : [],
+    }))
+    data.actors = entities.cineblock_actors.filter(row => row.scene_id === scene.id).map(row => ({
+      id: row.id, label: row.label, x: row.x, y: row.y, angle: row.angle,
+      movement: String(row.properties?.movement || 'Blocking'), path: Array.isArray(row.path) ? row.path : [],
+    }))
+    data.lights = entities.cineblock_lighting.filter(row => row.scene_id === scene.id).map(row => ({
+      id: row.id, label: row.label, x: row.x, y: row.y, angle: row.angle,
+      lightType: row.light_type, movement: String(row.properties?.movement || 'Static'),
+      path: Array.isArray(row.properties?.path) ? row.properties.path : [],
+    }))
+    data.props = entities.cineblock_props.filter(row => row.scene_id === scene.id).map(row => ({
+      id: row.id, label: row.label, propType: row.prop_type, x: row.x, y: row.y,
+      width: row.width, height: row.height, angle: row.angle, locked: row.locked,
+    }))
+  }
+
+  const workspace = {
+    project: cloudProject.payload && typeof cloudProject.payload === 'object' ? cloudProject.payload : {},
+    scenes,
+    floorplans,
+    activeSceneId: scenes[0]?.id || '',
+  }
+  await initializeCloudBaseline(projectId, workspace)
+  return workspace
+}

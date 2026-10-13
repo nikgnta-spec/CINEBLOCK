@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { LogIn, LogOut, Cloud, RefreshCw } from 'lucide-react'
 import { supabaseClient, supabaseConfig } from '../lib/supabaseClient.js'
 import { importLocalWorkspaceToCloud } from '../lib/cineblockImport.js'
-import { syncLocalScenesAndShots } from '../lib/cineblockSync.js'
+import { syncLocalScenesAndShots, loadCloudWorkspace } from '../lib/cineblockSync.js'
 
-export default function AuthWorkspace({ localWorkspace }) {
+export default function AuthWorkspace({ localWorkspace, onApplyCloudWorkspace, onBeforeLoadCloud }) {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -17,6 +17,7 @@ export default function AuthWorkspace({ localWorkspace }) {
   const [notice, setNotice] = useState('')
   const [importing, setImporting] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [loadingCloud, setLoadingCloud] = useState(false)
 
   const loadProjects = async () => {
     const rows = await supabaseClient.listProjects()
@@ -122,6 +123,25 @@ export default function AuthWorkspace({ localWorkspace }) {
     }
   }
 
+
+  const loadCloud = async () => {
+    if (!selectedProjectId) return
+    if (!window.confirm('Ganti workspace lokal aktif dengan versi proyek cloud terpilih? Backup lokal akan diunduh lebih dulu.')) return
+    setLoadingCloud(true)
+    setError('')
+    setNotice('')
+    try {
+      if (typeof onBeforeLoadCloud === 'function') onBeforeLoadCloud()
+      const workspace = await loadCloudWorkspace(selectedProjectId)
+      if (typeof onApplyCloudWorkspace === 'function') onApplyCloudWorkspace(workspace)
+      setNotice('Workspace cloud dimuat ke perangkat. Backup lokal dibuat sebelum penggantian; baseline OCC disiapkan.')
+    } catch (err) {
+      setError(err.message || 'Workspace cloud tidak dapat dimuat. Data lokal tidak diganti.')
+    } finally {
+      setLoadingCloud(false)
+    }
+  }
+
   const signOut = async () => {
     setBusy(true)
     setError('')
@@ -185,6 +205,12 @@ export default function AuthWorkspace({ localWorkspace }) {
       )}
 
 
+
+      {session && projects.length > 0 && selectedProjectId && (
+        <button className="btn btn-secondary" type="button" onClick={loadCloud} disabled={busy || importing || syncing || loadingCloud} title="Unduh backup lokal lalu muat versi cloud">
+          {loadingCloud ? <RefreshCw size={13} /> : <Cloud size={13} />}{loadingCloud ? ' Memuat cloud…' : ' Muat cloud ke lokal'}
+        </button>
+      )}
       {session && projects.length > 0 && selectedProjectId && (
         <button className="btn btn-secondary" type="button" onClick={syncScenesAndShots} disabled={busy || importing || syncing} title="Sinkronkan Info Proyek, Scene, Shot, Floorplan, dan Movement dengan OCC">
           {syncing ? <RefreshCw size={13} /> : <Cloud size={13} />}{syncing ? ' Menyinkronkan…' : ' Sinkronkan Proyek, Scene, Shot & Floorplan'}

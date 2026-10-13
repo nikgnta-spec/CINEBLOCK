@@ -769,7 +769,18 @@ export default function App() {
           </details>
         </div>
         <div className="topbar-right">
-          <AuthWorkspace localWorkspace={{ project, scenes, floorplans, activeSceneId, activeProjectId }} />
+          <AuthWorkspace
+            localWorkspace={{ project, scenes, floorplans, activeSceneId, activeProjectId }}
+            onBeforeLoadCloud={downloadBackup}
+            onApplyCloudWorkspace={cloudWorkspace => {
+              setProject(cloudWorkspace.project)
+              setScenes(cloudWorkspace.scenes)
+              setFloorplans(cloudWorkspace.floorplans)
+              setActiveSceneId(cloudWorkspace.activeSceneId)
+              setSelectedShotId('')
+              setTab('floorplan')
+            }}
+          />
           <span
             className={`save-status${saveStatus === 'saving' || saveStatus === 'loading' ? ' is-saving' : saveStatus === 'error' || saveStatus === 'conflict' ? ' is-error' : ''}`}
             aria-live="polite"
