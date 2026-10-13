@@ -24,8 +24,8 @@ create index if not exists cineblock_projects_owner_updated_idx on public.cinebl
 create index if not exists cineblock_project_members_user_idx on public.cineblock_project_members(user_id);
 
 create or replace function public.cineblock_touch_project()
-returns trigger language plpgsql set search_path = '' as $
-begin new.updated_at := pg_catalog.now(); new.revision := old.revision + 1; return new; end; $;
+returns trigger language plpgsql set search_path = '' as $$
+begin new.updated_at := pg_catalog.now(); new.revision := old.revision + 1; return new; end; $$;
 drop trigger if exists cineblock_projects_touch on public.cineblock_projects;
 create trigger cineblock_projects_touch before update on public.cineblock_projects
 for each row execute function public.cineblock_touch_project();
