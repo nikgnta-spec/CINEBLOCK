@@ -186,6 +186,14 @@ export const supabaseClient = Object.freeze({
     const rows = await request(table, { method: 'POST', body: row, prefer: 'return=representation' })
     return rows?.[0] || null
   },
+  async deleteVersionedRow(table, { id, expectedVersion }) {
+    assertTable(table)
+    if (!id || !Number.isInteger(expectedVersion) || expectedVersion < 1) throw new TypeError('id dan expectedVersion yang valid wajib diisi untuk OCC.')
+    const params = new URLSearchParams({ id: 'eq.' + id, version: 'eq.' + expectedVersion, select: 'id,version' })
+    const rows = await request(table + '?' + params.toString(), { method: 'DELETE', prefer: 'return=representation' })
+    if (!Array.isArray(rows) || rows.length !== 1) throw new OptimisticConflictError(table, id, expectedVersion)
+    return rows[0]
+  },
   async updateVersionedRow(table, { id, expectedVersion, changes }) {
     assertTable(table)
     if (!id || !Number.isInteger(expectedVersion) || expectedVersion < 1) {

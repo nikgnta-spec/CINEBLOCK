@@ -114,7 +114,7 @@ export default function AuthWorkspace({ localWorkspace }) {
       const result = await syncLocalScenesAndShots(selectedProjectId, localWorkspace)
       const summary = 'Sinkronisasi Scene/Shot selesai: ' + result.updated + ' diperbarui, ' + result.inserted + ' ditambahkan, ' + result.unchanged + ' tidak berubah.'
       if (result.conflicts.length) setError(summary + ' Konflik: ' + result.conflicts.slice(0, 4).join(' '))
-      else setNotice(summary + ' Movement list pada shot masih perlu tahap sinkronisasi terpisah.')
+      else setNotice(summary + ' Sinkronisasi memakai OCC per baris; konflik cloud dilaporkan tanpa menimpa perubahan.')
     } catch (err) {
       setError(err.message || 'Sinkronisasi gagal. Data lokal tetap tersimpan.')
     } finally {
