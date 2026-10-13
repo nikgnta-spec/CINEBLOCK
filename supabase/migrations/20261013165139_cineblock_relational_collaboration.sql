@@ -1,5 +1,34 @@
 -- CineBlock relational collaboration schema.
 -- Additive migration. Legacy public.projects and local-first browser storage are preserved.
+-- These two tables were initially created outside version-controlled migrations, so
+-- include their baseline definitions here for reproducible setup on a fresh Supabase project.
+create table if not exists public.cineblock_projects (
+ id uuid primary key default gen_random_uuid(),
+ owner_id uuid not null references auth.users(id) on delete cascade,
+ name text not null default 'Proyek tanpa judul' check (char_length(name) between 1 and 200),
+ payload jsonb not null default '{}'::jsonb,
+ revision bigint not null default 1 check (revision > 0),
+ created_at timestamptz not null default now(),
+ updated_at timestamptz not null default now()
+);
+create table if not exists public.cineblock_project_members (
+ project_id uuid not null references public.cineblock_projects(id) on delete cascade,
+ user_id uuid not null references auth.users(id) on delete cascade,
+ role text not null default 'editor' check (role in ('owner','editor','viewer')),
+ created_at timestamptz not null default now(),
+ primary key (project_id,user_id)
+);
+alter table public.cineblock_projects enable row level security;
+alter table public.cineblock_project_members enable row level security;
+create index if not exists cineblock_projects_owner_updated_idx on public.cineblock_projects(owner_id,updated_at desc);
+create index if not exists cineblock_project_members_user_idx on public.cineblock_project_members(user_id);
+
+create or replace function public.cineblock_touch_project()
+returns trigger language plpgsql set search_path = '' as $
+begin new.updated_at := pg_catalog.now(); new.revision := old.revision + 1; return new; end; $;
+drop trigger if exists cineblock_projects_touch on public.cineblock_projects;
+create trigger cineblock_projects_touch before update on public.cineblock_projects
+for each row execute function public.cineblock_touch_project();
 
 create table if not exists public.cineblock_scenes (
  id uuid primary key default gen_random_uuid(),
