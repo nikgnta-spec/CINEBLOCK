@@ -99,11 +99,11 @@ export async function syncLocalScenesAndShots(projectId, workspace) {
   let inserted = 0
   let unchanged = 0
 
-  for (const [id, base] of Object.entries(baseline.scenes)) {
+  for (const id of Object.keys(baseline.scenes)) {
     if (!localScenes.has(id)) conflicts.push('Scene ' + id + ' dihapus lokal; penghapusan cloud belum diaktifkan.')
     if (!remoteScenes.has(id)) conflicts.push('Scene ' + id + ' hilang dari cloud; perubahan lokal dipertahankan.')
   }
-  for (const [id, base] of Object.entries(baseline.shots)) {
+  for (const id of Object.keys(baseline.shots)) {
     if (!localShots.has(id)) conflicts.push('Shot ' + id + ' dihapus lokal; penghapusan cloud belum diaktifkan.')
     if (!remoteShots.has(id)) conflicts.push('Shot ' + id + ' hilang dari cloud; perubahan lokal dipertahankan.')
   }
