@@ -29,6 +29,13 @@ export class OptimisticConflictError extends Error {
   }
 }
 
+export function requireVersionedUpdate(table, id, expectedVersion, rows) {
+  if (!Array.isArray(rows) || rows.length !== 1) {
+    throw new OptimisticConflictError(table, id, expectedVersion)
+  }
+  return rows[0]
+}
+
 function readSession() {
   try {
     const raw = globalThis.localStorage?.getItem(SESSION_KEY)
@@ -189,10 +196,7 @@ export const supabaseClient = Object.freeze({
       body: changes,
       prefer: 'return=representation',
     })
-    if (!Array.isArray(rows) || rows.length !== 1) {
-      throw new OptimisticConflictError(table, id, expectedVersion)
-    }
-    return rows[0]
+    return requireVersionedUpdate(table, id, expectedVersion, rows)
   },
 })
 
