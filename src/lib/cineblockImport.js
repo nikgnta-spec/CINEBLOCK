@@ -19,6 +19,18 @@ export function mapLocalWorkspaceToRelational(workspace) {
   if (localScenes.some(scene => !UUID.test(String(scene.id || '')) || (scene.shots || []).some(shot => !UUID.test(String(shot.id || ''))))) {
     throw new Error('ID Scene/Shot lokal tidak valid sebagai UUID. Impor dihentikan agar relasi dan OCC tetap konsisten.')
   }
+  for (const scene of localScenes) {
+    const fp = workspace?.floorplans?.[scene.id] || {}
+    const entities = [
+      ...(fp.rooms || []), ...(fp.walls || []), ...(fp.cameras || []),
+      ...(fp.actors || []), ...(fp.lights || []), ...(fp.props || []),
+      ...(fp.rooms || []).flatMap(item => item.openings || []),
+      ...(fp.walls || []).flatMap(item => item.openings || []),
+    ]
+    if (entities.some(item => !UUID.test(String(item.id || '')))) {
+      throw new Error('ID elemen Floorplan harus UUID. Impor dihentikan agar pembaruan OCC tetap konsisten.')
+    }
+  }
   const sceneId = idMapper()
   const shotId = idMapper()
   const elementId = idMapper()

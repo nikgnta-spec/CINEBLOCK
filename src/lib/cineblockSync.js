@@ -1,10 +1,14 @@
 import { supabaseClient, OptimisticConflictError } from './supabaseClient.js'
 import { cineblockRepository } from './cineblockRepository.js'
+import { mapLocalWorkspaceToRelational } from './cineblockImport.js'
 
 const BASELINE_PREFIX = 'cineblock.cloud-baseline.v1:'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const ENTITY_TABLES = ['cineblock_floorplan_elements', 'cineblock_cameras', 'cineblock_actors', 'cineblock_lighting', 'cineblock_props']
 
 function stable(value) {
+  if (Array.isArray(value)) return '[' + value.map(stable).join(',') + ']'
+  if (value && typeof value === 'object') return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + stable(value[key])).join(',') + '}'
   return JSON.stringify(value)
 }
 
@@ -38,6 +42,38 @@ function shotProjection(shot, position) {
   }
 }
 
+
+function entityProjection(row) {
+  const result = { ...row }
+  delete result.id
+  delete result.created_at
+  delete result.updated_at
+  delete result.updated_by
+  delete result.version
+  return result
+}
+
+async function fetchRemoteEntities(remoteScenes) {
+  const result = Object.fromEntries(ENTITY_TABLES.map(table => [table, []]))
+  for (const scene of remoteScenes) {
+    for (const table of ENTITY_TABLES) {
+      result[table].push(...await supabaseClient.selectRows(table, { scene_id: 'eq.' + scene.id }))
+    }
+  }
+  return result
+}
+
+function localEntities(workspace) {
+  const mapped = mapLocalWorkspaceToRelational(workspace)
+  return {
+    cineblock_floorplan_elements: mapped.floorplan,
+    cineblock_cameras: mapped.cameras,
+    cineblock_actors: mapped.actors,
+    cineblock_lighting: mapped.lighting,
+    cineblock_props: mapped.props,
+  }
+}
+
 function readBaseline(projectId) {
   try {
     const value = localStorage.getItem(BASELINE_PREFIX + projectId)
@@ -66,7 +102,7 @@ export async function initializeCloudBaseline(projectId, workspace) {
   const remote = await fetchRemoteWorkspace(projectId)
   const localScenes = new Map((workspace.scenes || []).map(scene => [scene.id, scene]))
   const localShots = new Map((workspace.scenes || []).flatMap(scene => (scene.shots || []).map(shot => [shot.id, shot])))
-  const baseline = { version: 1, scenes: {}, shots: {}, initializedAt: new Date().toISOString() }
+  const baseline = { version: 1, scenes: {}, shots: {}, entities: {}, initializedAt: new Date().toISOString() }
 
   for (const row of remote.scenes) {
     const local = localScenes.get(row.id)
@@ -77,6 +113,20 @@ export async function initializeCloudBaseline(projectId, workspace) {
     const local = localShots.get(row.id)
     if (!local) throw new Error('ID shot cloud tidak cocok dengan proyek lokal; baseline tidak dibuat.')
     baseline.shots[row.id] = { version: row.version, local: shotProjection(local, row.position), movements: [...(local.movements || [])] }
+  }
+  const localEntityRows = localEntities(workspace)
+  const remoteEntityRows = await fetchRemoteEntities(remote.scenes)
+  for (const table of ENTITY_TABLES) {
+    const localById = new Map(localEntityRows[table].map(row => [row.id, row]))
+    baseline.entities[table] = {}
+    for (const row of remoteEntityRows[table]) {
+      const local = localById.get(row.id)
+      if (!local) throw new Error('ID elemen ' + table + ' di cloud tidak cocok dengan denah lokal; baseline tidak dibuat.')
+      baseline.entities[table][row.id] = { version: row.version, local: entityProjection(local) }
+    }
+    if (remoteEntityRows[table].length !== localEntityRows[table].length) {
+      throw new Error('Jumlah elemen ' + table + ' lokal dan cloud berbeda; baseline tidak dibuat.')
+    }
   }
   if (remote.scenes.length !== localScenes.size || remote.shots.length !== localShots.size) {
     throw new Error('Jumlah scene/shot lokal dan cloud berbeda; baseline tidak dibuat.')
@@ -204,20 +254,60 @@ export async function syncLocalScenesAndShots(projectId, workspace) {
     }
   }
 
+  const localEntityRows = localEntities(workspace)
+  const remoteEntityRows = await fetchRemoteEntities(projectId, remote.scenes)
+  baseline.entities ||= {}
+  for (const table of ENTITY_TABLES) {
+    const localById = new Map(localEntityRows[table].map(row => [row.id, row]))
+    const remoteById = new Map(remoteEntityRows[table].map(row => [row.id, row]))
+    baseline.entities[table] ||= {}
+    for (const id of Object.keys(baseline.entities[table])) {
+      if (!localById.has(id)) conflicts.push('Elemen ' + id + ' pada ' + table + ' dihapus lokal; penghapusan cloud belum diaktifkan.')
+      if (!remoteById.has(id)) conflicts.push('Elemen ' + id + ' pada ' + table + ' hilang dari cloud.')
+    }
+    for (const row of remoteEntityRows[table]) {
+      if (!baseline.entities[table][row.id] && !localById.has(row.id)) conflicts.push('Elemen baru ditemukan di cloud pada ' + table + '; pemuatan cloud belum diaktifkan.')
+    }
+    for (const row of localEntityRows[table]) {
+      const id = row.id
+      const base = baseline.entities[table][id]
+      const remoteRow = remoteById.get(id)
+      const projection = entityProjection(row)
+      if (!base && !remoteRow) {
+        try {
+          const insertedRow = await supabaseClient.insertRow(table, row)
+          baseline.entities[table][id] = { version: insertedRow.version, local: projection }
+          inserted += 1
+        } catch (error) {
+          conflicts.push('Elemen ' + id + ' pada ' + table + ': ' + error.message)
+        }
+      } else if (!base && remoteRow) {
+        conflicts.push('Elemen ' + id + ' pada ' + table + ' sudah ada di cloud tanpa baseline.')
+      } else if (base && !remoteRow) {
+        // The earlier deletion check reports this; preserve the local element.
+      } else if (base && remoteRow) {
+        const localChanged = stable(projection) !== stable(base.local)
+        if (!localChanged && remoteRow.version !== base.version) {
+          conflicts.push('Elemen ' + id + ' pada ' + table + ' berubah di cloud; tidak ada perubahan yang ditimpa.')
+        } else if (localChanged && remoteRow.version !== base.version) {
+          conflicts.push('Elemen ' + id + ' pada ' + table + ' konflik OCC; perubahan lokal dipertahankan.')
+        } else if (localChanged) {
+          try {
+            const result = await supabaseClient.updateVersionedRow(table, { id, expectedVersion: base.version, changes: projection })
+            baseline.entities[table][id] = { version: result.version, local: projection }
+            updated += 1
+          } catch (error) {
+            conflicts.push('Elemen ' + id + ' pada ' + table + ': ' + error.message)
+          }
+        } else {
+          unchanged += 1
+        }
+      }
+    }
+  }
+
   if (conflicts.length === 0) {
-    const refreshed = await fetchRemoteWorkspace(projectId)
-    const scenesById = new Map((workspace.scenes || []).map(scene => [scene.id, scene]))
-    const shotsById = new Map((workspace.scenes || []).flatMap(scene => (scene.shots || []).map(shot => [shot.id, shot])))
-    const nextBaseline = { version: 1, scenes: {}, shots: {}, initializedAt: new Date().toISOString() }
-    for (const row of refreshed.scenes) {
-      const local = scenesById.get(row.id)
-      if (local) nextBaseline.scenes[row.id] = { version: row.version, local: sceneProjection(local, row.position) }
-    }
-    for (const row of refreshed.shots) {
-      const local = shotsById.get(row.id)
-      if (local) nextBaseline.shots[row.id] = { version: row.version, local: shotProjection(local, row.position), movements: [...(local.movements || [])] }
-    }
-    writeBaseline(projectId, nextBaseline)
+    await initializeCloudBaseline(projectId, workspace)
   } else {
     writeBaseline(projectId, baseline)
   }

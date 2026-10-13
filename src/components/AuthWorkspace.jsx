@@ -114,7 +114,7 @@ export default function AuthWorkspace({ localWorkspace }) {
       const result = await syncLocalScenesAndShots(selectedProjectId, localWorkspace)
       const summary = 'Sinkronisasi Scene/Shot selesai: ' + result.updated + ' diperbarui, ' + result.inserted + ' ditambahkan, ' + result.unchanged + ' tidak berubah.'
       if (result.conflicts.length) setError(summary + ' Konflik: ' + result.conflicts.slice(0, 4).join(' '))
-      else setNotice(summary + ' Floorplan belum disinkronkan pada tahap ini.')
+      else setNotice(summary + ' Movement list pada shot masih perlu tahap sinkronisasi terpisah.')
     } catch (err) {
       setError(err.message || 'Sinkronisasi gagal. Data lokal tetap tersimpan.')
     } finally {
@@ -186,8 +186,8 @@ export default function AuthWorkspace({ localWorkspace }) {
 
 
       {session && projects.length > 0 && selectedProjectId && (
-        <button className="btn btn-secondary" type="button" onClick={syncScenesAndShots} disabled={busy || importing || syncing} title="Sinkronkan Scene dan Shot dengan OCC">
-          {syncing ? <RefreshCw size={13} /> : <Cloud size={13} />}{syncing ? ' Menyinkronkan…' : ' Sinkronkan Scene & Shot'}
+        <button className="btn btn-secondary" type="button" onClick={syncScenesAndShots} disabled={busy || importing || syncing} title="Sinkronkan Scene, Shot, dan elemen Floorplan dengan OCC">
+          {syncing ? <RefreshCw size={13} /> : <Cloud size={13} />}{syncing ? ' Menyinkronkan…' : ' Sinkronkan Scene, Shot & Floorplan'}
         </button>
       )}
       {session && projects.length > 0 && selectedProjectId && (
