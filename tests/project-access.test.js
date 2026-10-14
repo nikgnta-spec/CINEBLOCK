@@ -86,3 +86,17 @@ test('project sharing control is visible only to the CineBlock owner account', (
   assert.match(workspace, /isCineBlockOwner && projects\.length > 0 && selectedProjectId/)
   assert.match(workspace, /Bagikan proyek/)
 })
+
+
+test('project sharing supports viewer/editor links, revocation, and authenticated redemption', () => {
+  assert.match(edge, /action === "create_link"/)
+  assert.match(edge, /action === "revoke_link"/)
+  assert.match(edge, /action === "list_links"/)
+  assert.match(edge, /action === "redeem_link"/)
+  assert.match(edge, /cineblock_share_links/)
+  assert.match(workspace, /Bagikan dengan link/)
+  assert.match(workspace, /Viewer — hanya melihat/)
+  assert.match(workspace, /Editor — dapat mengubah proyek/)
+  assert.match(workspace, /Salin link/)
+  assert.match(workspace, /Cabut/)
+})
