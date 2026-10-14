@@ -58,3 +58,19 @@ test('new users can sign up and existing users can log in or recover password', 
   assert.match(authGate, /setAuthMode\('signup'\)/)
   assert.match(authGate, /setAuthMode\('login'\)/)
 })
+
+test('cloud project creation uses server-verified owner identity and never sends ownerId from the browser', () => {
+  assert.match(edge, /action === "create_project"/)
+  assert.match(edge, /caller\.id !== "cf4a51e8-825e-4db4-8b8a-037d3908663c"/)
+  assert.match(edge, /\.insert\(\{ name, owner_id: caller\.id, payload: \{\}, revision: 1 \}\)/)
+  assert.match(client, /functions\/v1\/cineblock-project-access/)
+  assert.doesNotMatch(client, /createProject\(\{\s*name,\s*ownerId\s*\}\)/)
+  assert.match(workspace, /supabaseClient\.createProject\(\{ name: newProjectName\.trim\(\)\.slice\(0, 160\) \}\)/)
+})
+
+test('CineBlock keeps the auth session in persistent browser storage and refreshes it when needed', () => {
+  assert.match(client, /SESSION_KEY = 'cineblock\.supabase\.session\.v1'/)
+  assert.match(client, /localStorage\?\.getItem\(SESSION_KEY\)/)
+  assert.match(client, /localStorage\?\.setItem\(SESSION_KEY, JSON\.stringify\(session\)\)/)
+  assert.match(client, /token\?grant_type=refresh_token/)
+})
