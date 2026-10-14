@@ -1799,3 +1799,19 @@ button:focus-visible,
   .auth-gate-card { padding: 24px 20px; }
   .auth-gate-card h1 { font-size: 21px; }
 }
+
+.auth-gate-form select {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+}
+.auth-gate-empty {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
