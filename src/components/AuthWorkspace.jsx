@@ -236,7 +236,7 @@ export default function AuthWorkspace({ initialProjectId = '', localWorkspace, o
     setBusy(true)
     setError('')
     try {
-      const project = await supabaseClient.createProject({ name: newProjectName.trim().slice(0, 160), ownerId: session.user.id })
+      const project = await supabaseClient.createProject({ name: newProjectName.trim().slice(0, 160) })
       if (!project) throw new Error('Supabase tidak mengembalikan proyek yang dibuat.')
       setProjects(previous => [project, ...previous.filter(item => item.id !== project.id)])
       setSelectedProjectId(project.id)
