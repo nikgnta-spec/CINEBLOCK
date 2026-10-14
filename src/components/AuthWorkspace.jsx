@@ -289,7 +289,7 @@ export default function AuthWorkspace({ initialProjectId = '', localWorkspace, o
 
       {isCineBlockOwner && projects.length > 0 && selectedProjectId && (
         <button className="btn btn-secondary" type="button" onClick={() => { const next = !accessOpen; setAccessOpen(next); if (next) manageAccess('list') }} disabled={accessBusy} title="Undang dan kelola akses anggota proyek">
-          <Users size={13} /> {accessOpen ? 'Tutup kelola akses' : 'Kelola akses proyek'}
+          <Users size={13} /> {accessOpen ? 'Tutup bagikan proyek' : 'Bagikan proyek'}
         </button>
       )}
       {accessOpen && isCineBlockOwner && selectedProjectId && (
