@@ -10,7 +10,7 @@ test('CineBlock entry point gates the workspace behind authentication', () => {
   assert.match(gate, /loadCloudWorkspace\(projectId\)/)
   assert.match(gate, /cloneElement\(children, \{ initialWorkspace: cloudWorkspace, cloudProjectId \}\)/)
   assert.match(gate, /setSelectedCloudProjectId/)
-  assert.match(gate, /if \(localMode && !session\) return children/)
+  assert.match(gate, /local-mode-shell/)
 })
 
 test('invitation activation requires a valid session and confirmed password input', () => {
