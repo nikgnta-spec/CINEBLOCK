@@ -196,6 +196,19 @@ export const supabaseClient = Object.freeze({
     async getSession() {
       return getFreshSession()
     },
+    async signUpWithPassword({ email, password, redirectTo }) {
+      const normalizedEmail = String(email || '').trim().toLowerCase()
+      if (!normalizedEmail || !normalizedEmail.includes('@')) throw new SupabaseRequestError('Masukkan alamat email yang valid.', 400, 'INVALID_EMAIL')
+      if (typeof password !== 'string' || password.length < 8) throw new SupabaseRequestError('Kata sandi harus minimal 8 karakter.', 400, 'PASSWORD_TOO_SHORT')
+      const options = redirectTo ? { emailRedirectTo: redirectTo } : {}
+      const result = await authRequest('signup', { email: normalizedEmail, password, options })
+      if (result?.access_token) {
+        const next = { ...result, expires_at: result.expires_at || Math.floor(Date.now() / 1000) + Number(result.expires_in || 3600) }
+        writeSession(next)
+        return { session: next, user: next.user || result.user }
+      }
+      return { session: null, user: result?.user || result }
+    },
     async signInWithPassword({ email, password }) {
       const session = await authRequest('token?grant_type=password', { email: email.trim(), password })
       const next = { ...session, expires_at: session.expires_at || Math.floor(Date.now() / 1000) + Number(session.expires_in || 3600) }
