@@ -7,7 +7,9 @@ function friendlyAuthError(error, flow = 'login') {
   const code = String(error?.code || '')
   const message = String(error?.message || '')
   if (code === 'otp_expired' || code === 'access_denied' || /expired|invalid.*token|token.*invalid/i.test(message)) {
-    return 'Tautan undangan sudah kedaluwarsa atau tidak berlaku. Minta pemilik CineBlock mengirim undangan baru.'
+    return flow === 'recovery'
+      ? 'Tautan pengaturan kata sandi sudah kedaluwarsa atau tidak berlaku. Minta tautan baru dari halaman masuk.'
+      : 'Tautan undangan sudah kedaluwarsa atau tidak berlaku. Minta pemilik CineBlock mengirim undangan baru.'
   }
   if (code === 'AUTH_SESSION_MISSING') return 'Sesi undangan tidak ditemukan. Buka tautan undangan terbaru lagi.'
   if (flow === 'login' && /invalid login credentials/i.test(message)) {
@@ -69,7 +71,7 @@ export default function AuthGate({ children }) {
   }, [])
 
   useEffect(() => {
-    if (!session?.access_token || session.auth_flow === 'invite') return undefined
+    if (!session?.access_token || ['invite', 'recovery'].includes(session.auth_flow)) return undefined
     let cancelled = false
     setCloudLoading(true)
     setCloudProjects([])
@@ -192,7 +194,7 @@ export default function AuthGate({ children }) {
     return <main className="auth-gate"><div className="auth-gate-card"><div className="auth-gate-brand"><Cloud size={22} /> CINEBLOCK</div><p role="status">Memeriksa sesi akun…</p></div></main>
   }
 
-  if (session?.access_token && session.auth_flow !== 'invite' && cloudWorkspace && cloudProjectId) {
+  if (session?.access_token && !['invite', 'recovery'].includes(session.auth_flow) && cloudWorkspace && cloudProjectId) {
     return cloneElement(children, { initialWorkspace: cloudWorkspace, cloudProjectId })
   }
   if (localMode && !session) return <div className="local-mode-shell"><div className="local-mode-banner">Mode lokal aktif — data hanya tersimpan di perangkat ini, bukan di cloud.<button type="button" onClick={() => setLocalMode(false)}>Kembali ke login</button></div>{children}</div>
@@ -200,7 +202,7 @@ export default function AuthGate({ children }) {
   const isInvitation = session?.auth_flow === 'invite'
   const isRecovery = session?.auth_flow === 'recovery'
   const isPasswordSetup = isInvitation || isRecovery
-  const needsProjectSelection = Boolean(session?.access_token && !isInvitation)
+  const needsProjectSelection = Boolean(session?.access_token && !isPasswordSetup)
 
   return (
     <main className="auth-gate">
