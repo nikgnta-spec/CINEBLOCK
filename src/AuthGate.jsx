@@ -28,6 +28,8 @@ export default function AuthGate({ children }) {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showRecovery, setShowRecovery] = useState(false)
+  const [authMode, setAuthMode] = useState('login')
+  const [confirmSignupPassword, setConfirmSignupPassword] = useState('')
   const [newProjectName, setNewProjectName] = useState('')
   const [busy, setBusy] = useState(false)
   const [cloudLoading, setCloudLoading] = useState(false)
@@ -105,6 +107,39 @@ export default function AuthGate({ children }) {
       setPassword('')
     } catch (err) {
       setError(friendlyAuthError(err, 'login'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const signUp = async event => {
+    event.preventDefault()
+    setBusy(true)
+    setError('')
+    setNotice('')
+    if (password.length < 8) {
+      setError('Kata sandi harus minimal 8 karakter.')
+      setBusy(false)
+      return
+    }
+    if (password !== confirmSignupPassword) {
+      setError('Konfirmasi kata sandi tidak sama.')
+      setBusy(false)
+      return
+    }
+    try {
+      const result = await supabaseClient.auth.signUpWithPassword({ email, password, redirectTo: window.location.origin })
+      setPassword('')
+      setConfirmSignupPassword('')
+      if (result.session?.access_token) {
+        setSession(result.session)
+        setNotice('Akun berhasil dibuat. Kamu sudah masuk ke CineBlock.')
+      } else {
+        setAuthMode('login')
+        setNotice('Pendaftaran berhasil. Periksa email untuk memverifikasi akun sebelum masuk.')
+      }
+    } catch (err) {
+      setError(friendlyAuthError(err, 'signup'))
     } finally {
       setBusy(false)
     }
@@ -203,14 +238,15 @@ export default function AuthGate({ children }) {
   const isRecovery = session?.auth_flow === 'recovery'
   const isPasswordSetup = isInvitation || isRecovery
   const needsProjectSelection = Boolean(session?.access_token && !isPasswordSetup)
+  const isLoginMode = authMode === 'login'
 
   return (
     <main className="auth-gate">
       <section className="auth-gate-card" aria-labelledby="auth-gate-title">
         <div className="auth-gate-brand"><Cloud size={24} strokeWidth={1.8} /><span>CINEBLOCK</span></div>
         <div className="auth-gate-icon">{isInvitation ? <ShieldCheck size={25} /> : needsProjectSelection ? <FolderOpen size={25} /> : <LockKeyhole size={25} />}</div>
-        <h1 id="auth-gate-title">{isPasswordSetup ? (isRecovery ? 'Atur kata sandi CineBlock' : 'Aktifkan akun CineBlock') : needsProjectSelection ? 'Pilih proyek cloud' : showRecovery ? 'Atur ulang kata sandi' : 'Masuk ke CineBlock'}</h1>
-        <p className="auth-gate-subtitle">{isPasswordSetup ? (isRecovery ? 'Buat kata sandi baru untuk akun CineBlock kamu.' : 'Undangan terverifikasi. Buat kata sandi khusus untuk akun CineBlock.') : needsProjectSelection ? 'Pilih proyek yang diberikan kepadamu. Workspace lokal tidak akan dibuka sebagai pengganti proyek cloud.' : showRecovery ? 'Masukkan email akunmu. Kami akan mengirim tautan untuk membuat kata sandi baru.' : 'Workspace cloud hanya tersedia setelah kamu masuk dengan akun yang diizinkan.'}</p>
+        <h1 id="auth-gate-title">{isPasswordSetup ? (isRecovery ? 'Atur kata sandi CineBlock' : 'Aktifkan akun CineBlock') : needsProjectSelection ? 'Pilih proyek cloud' : showRecovery ? 'Atur ulang kata sandi' : isLoginMode ? 'Masuk ke CineBlock' : 'Buat akun CineBlock'}</h1>
+        <p className="auth-gate-subtitle">{isPasswordSetup ? (isRecovery ? 'Buat kata sandi baru untuk akun CineBlock kamu.' : 'Undangan terverifikasi. Buat kata sandi khusus untuk akun CineBlock.') : needsProjectSelection ? 'Pilih proyek yang diberikan kepadamu. Workspace lokal tidak akan dibuka sebagai pengganti proyek cloud.' : showRecovery ? 'Masukkan email akunmu. Kami akan mengirim tautan untuk membuat kata sandi baru.' : isLoginMode ? 'Masuk dengan akun CineBlock yang sudah kamu miliki.' : 'Buat akun dengan email dan kata sandi. Akses ke proyek orang lain tetap memerlukan undangan pemilik proyek.'}</p>
 
         {!supabaseConfig.configured ? (
           <p className="auth-gate-error" role="alert">Layanan cloud belum dikonfigurasi. Hubungi pengelola CineBlock.</p>
@@ -253,18 +289,37 @@ export default function AuthGate({ children }) {
             <button type="button" className="auth-gate-secondary-action" onClick={() => { setShowRecovery(false); setError(''); setNotice('') }}>Kembali ke masuk</button>
           </form>
         ) : (
-          <form className="auth-gate-form" onSubmit={signIn}>
-            <label htmlFor="cineblock-gate-email">Email akun CineBlock</label>
-            <input id="cineblock-gate-email" type="email" autoComplete="username" required value={email} onChange={event => setEmail(event.target.value)} placeholder="nama@email.com" />
-            <label htmlFor="cineblock-gate-password">Kata sandi CineBlock</label>
-            <input id="cineblock-gate-password" type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} placeholder="Kata sandi akun CineBlock" />
-            <button type="submit" disabled={busy}><LogIn size={16} /> {busy ? 'Memverifikasi…' : 'Masuk'}</button>
-          </form>
+          <>
+            <div className="auth-mode-switch" role="tablist" aria-label="Jenis akses akun">
+              <button type="button" role="tab" aria-selected={isLoginMode} className={isLoginMode ? 'active' : ''} onClick={() => { setAuthMode('login'); setShowRecovery(false); setError(''); setNotice('') }}>Log in</button>
+              <button type="button" role="tab" aria-selected={!isLoginMode} className={!isLoginMode ? 'active' : ''} onClick={() => { setAuthMode('signup'); setShowRecovery(false); setError(''); setNotice('') }}>Sign up</button>
+            </div>
+            {showRecovery ? (
+              <form className="auth-gate-form" onSubmit={requestPasswordRecovery}>
+                <label htmlFor="cineblock-recovery-email">Email akun CineBlock</label>
+                <input id="cineblock-recovery-email" type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="nama@email.com" />
+                <button type="submit" disabled={busy}>{busy ? 'Mengirim tautan…' : 'Kirim tautan pengaturan kata sandi'}</button>
+                <button type="button" className="auth-gate-secondary-action" onClick={() => { setShowRecovery(false); setError(''); setNotice('') }}>Kembali ke masuk</button>
+              </form>
+            ) : (
+              <form className="auth-gate-form" onSubmit={isLoginMode ? signIn : signUp}>
+                <label htmlFor="cineblock-gate-email">Email</label>
+                <input id="cineblock-gate-email" type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="nama@email.com" />
+                <label htmlFor="cineblock-gate-password">Kata sandi</label>
+                <input id="cineblock-gate-password" type="password" autoComplete={isLoginMode ? 'current-password' : 'new-password'} minLength={isLoginMode ? undefined : 8} required value={password} onChange={event => setPassword(event.target.value)} placeholder={isLoginMode ? 'Kata sandi akun CineBlock' : 'Minimal 8 karakter'} />
+                {!isLoginMode && <>
+                  <label htmlFor="cineblock-gate-confirm-signup-password">Ulangi kata sandi</label>
+                  <input id="cineblock-gate-confirm-signup-password" type="password" autoComplete="new-password" minLength={8} required value={confirmSignupPassword} onChange={event => setConfirmSignupPassword(event.target.value)} placeholder="Ketik ulang kata sandi" />
+                </>}
+                <button type="submit" disabled={busy}>{busy ? (isLoginMode ? 'Memverifikasi…' : 'Membuat akun…') : isLoginMode ? <><LogIn size={16} /> Log in</> : 'Sign up'}</button>
+              </form>
+            )}
+          </>
         )}
 
         {error && <p className="auth-gate-error" role="alert">{error}</p>}
         {notice && <p className="auth-gate-notice" role="status">{notice}</p>}
-        {!needsProjectSelection && !isPasswordSetup && !showRecovery && <button type="button" className="auth-gate-secondary-action" onClick={() => { setShowRecovery(true); setError(''); setNotice('') }}>Lupa / belum pernah mengatur kata sandi?</button>}
+        {!needsProjectSelection && !isPasswordSetup && !showRecovery && isLoginMode && <button type="button" className="auth-gate-secondary-action" onClick={() => { setShowRecovery(true); setError(''); setNotice('') }}>Lupa kata sandi?</button>}
         {!needsProjectSelection && !isPasswordSetup && <div className="auth-gate-footer"><LockKeyhole size={14} /><span>Akses proyek ditentukan oleh izin akun, bukan sekadar tautan aplikasi.</span></div>}
         {!needsProjectSelection && !isPasswordSetup && !showRecovery && <button type="button" className="auth-gate-local" onClick={() => { setError(''); setLocalMode(true) }}><Monitor size={15} /> Buka mode lokal di perangkat ini</button>}
         {localMode && <p className="auth-gate-local-note">Mode lokal hanya memakai data yang tersimpan di browser ini; mode ini bukan sesi cloud.</p>}
