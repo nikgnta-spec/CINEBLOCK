@@ -206,10 +206,10 @@ export default function AuthWorkspace({ initialProjectId = '', localWorkspace, o
       if (action === 'list') {
         setMembers(Array.isArray(result.members) ? result.members : [])
         const links = await supabaseClient.manageProjectAccess({ action: 'list_links', project_id: selectedProjectId })
-        setShareLinks(Array.isArray(links.links) ? links.links : [])
+        setShareLinks(Array.isArray(links.links) ? links.links.map(link => ({ ...link, url: `${window.location.origin}/?share=${link.token}` })) : [])
       }
       if (action === 'create_link') {
-        setShareLinks(current => [result, ...current])
+        setShareLinks(current => [{ ...result, url: `${window.location.origin}/?share=${result.token}` }, ...current])
         setNotice('Tautan berbagi berhasil dibuat.')
       }
       if (action === 'revoke_link') {
