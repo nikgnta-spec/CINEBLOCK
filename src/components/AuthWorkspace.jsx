@@ -10,6 +10,8 @@ export default function AuthWorkspace({ localWorkspace, onApplyCloudWorkspace, o
   const [busy, setBusy] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [projects, setProjects] = useState([])
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [newProjectName, setNewProjectName] = useState('')
@@ -87,6 +89,32 @@ export default function AuthWorkspace({ localWorkspace, onApplyCloudWorkspace, o
     }
   }
 
+
+  const completeInvitation = async event => {
+    event.preventDefault()
+    setError('')
+    setNotice('')
+    if (newPassword.length < 8) {
+      setError('Kata sandi baru minimal 8 karakter.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Konfirmasi kata sandi tidak sama.')
+      return
+    }
+    setBusy(true)
+    try {
+      const next = await supabaseClient.auth.updatePassword({ password: newPassword })
+      setSession(next)
+      setNewPassword('')
+      setConfirmPassword('')
+      setNotice('Undangan selesai. Kata sandi akun CineBlock berhasil dibuat; kamu sudah masuk ke akun cloud.')
+    } catch (err) {
+      setError(err.message || 'Kata sandi akun belum berhasil dibuat. Buka tautan undangan terbaru jika sesi sudah kedaluwarsa.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const importLocal = async () => {
     if (!selectedProjectId) return
@@ -190,6 +218,15 @@ export default function AuthWorkspace({ localWorkspace, onApplyCloudWorkspace, o
           <label className="sr-only" htmlFor="cineblock-cloud-password">Kata sandi akun CineBlock</label>
           <input id="cineblock-cloud-password" type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)} placeholder="Kata sandi" />
           <button className="btn btn-secondary" type="submit" disabled={busy}><LogIn size={14} /> Masuk</button>
+        </form>
+      ) : session.auth_flow === 'invite' ? (
+        <form className="cloud-login-form" onSubmit={completeInvitation} aria-label="Buat kata sandi akun CineBlock">
+          <span className="cloud-user"><Cloud size={14} /> Undangan: {session.user?.email || 'akun cloud'}</span>
+          <label className="sr-only" htmlFor="cineblock-new-password">Kata sandi baru</label>
+          <input id="cineblock-new-password" type="password" autoComplete="new-password" minLength={8} required value={newPassword} onChange={event => setNewPassword(event.target.value)} placeholder="Buat kata sandi (min. 8 karakter)" />
+          <label className="sr-only" htmlFor="cineblock-confirm-password">Konfirmasi kata sandi baru</label>
+          <input id="cineblock-confirm-password" type="password" autoComplete="new-password" minLength={8} required value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} placeholder="Ulangi kata sandi" />
+          <button className="btn btn-secondary" type="submit" disabled={busy}>{busy ? 'Menyimpan…' : 'Buat kata sandi'}</button>
         </form>
       ) : (
         <div className="cloud-session">
