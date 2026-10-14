@@ -796,6 +796,7 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
         </div>
         <div className="topbar-right">
           <AuthWorkspace
+            initialProjectId={cloudProjectId}
             localWorkspace={{ project, scenes, floorplans, activeSceneId, activeProjectId }}
             onBeforeLoadCloud={downloadBackup}
             onApplyCloudWorkspace={cloudWorkspace => {
