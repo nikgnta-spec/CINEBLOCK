@@ -26,6 +26,8 @@ export default function AuthWorkspace({ initialProjectId = '', localWorkspace, o
   const [inviteRole, setInviteRole] = useState('editor')
   const [members, setMembers] = useState([])
 
+  const isCineBlockOwner = session?.user?.id === 'cf4a51e8-825e-4db4-8b8a-037d3908663c'
+
   const loadProjects = async () => {
     const rows = await supabaseClient.listProjects()
     setProjects(Array.isArray(rows) ? rows : [])
@@ -285,12 +287,12 @@ export default function AuthWorkspace({ initialProjectId = '', localWorkspace, o
 
 
 
-      {session && projects.length > 0 && selectedProjectId && (
+      {isCineBlockOwner && projects.length > 0 && selectedProjectId && (
         <button className="btn btn-secondary" type="button" onClick={() => { const next = !accessOpen; setAccessOpen(next); if (next) manageAccess('list') }} disabled={accessBusy} title="Undang dan kelola akses anggota proyek">
           <Users size={13} /> {accessOpen ? 'Tutup kelola akses' : 'Kelola akses proyek'}
         </button>
       )}
-      {accessOpen && session && selectedProjectId && (
+      {accessOpen && isCineBlockOwner && selectedProjectId && (
         <div className="cloud-access-manager" aria-label="Kelola akses proyek">
           <div className="cloud-access-heading">
             <strong>Anggota proyek</strong>
@@ -336,10 +338,14 @@ export default function AuthWorkspace({ initialProjectId = '', localWorkspace, o
         </button>
       )}
       {session && projects.length === 0 && !busy && (
-        <form className="cloud-create-form" onSubmit={createProject}>
-          <input aria-label="Nama proyek cloud baru" value={newProjectName} onChange={event => setNewProjectName(event.target.value)} maxLength={160} placeholder="Nama proyek cloud baru" required />
-          <button className="btn btn-secondary" type="submit" disabled={busy}>Buat</button>
-        </form>
+        isCineBlockOwner ? (
+          <form className="cloud-create-form" onSubmit={createProject}>
+            <input aria-label="Nama proyek cloud baru" value={newProjectName} onChange={event => setNewProjectName(event.target.value)} maxLength={160} placeholder="Nama proyek cloud baru" required />
+            <button className="btn btn-secondary" type="submit" disabled={busy}>Buat proyek cloud</button>
+          </form>
+        ) : (
+          <p className="cloud-muted">Belum ada proyek yang dibagikan ke akun ini. Hubungi pemilik CineBlock untuk meminta akses.</p>
+        )
       )}
       {error && <p className="cloud-feedback is-error" role="alert">{error}</p>}
       {notice && <p className="cloud-feedback" role="status">{notice}</p>}
