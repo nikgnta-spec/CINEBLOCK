@@ -76,11 +76,9 @@ test('CineBlock keeps the auth session in persistent browser storage and refresh
 })
 
 
-test('owner session automatically opens the owner-owned cloud project', () => {
-  assert.match(authGate, /const isOperator = session\.user\?\.id === 'cf4a51e8-825e-4db4-8b8a-037d3908663c'/)
-  assert.match(authGate, /projects\.find\(project => project\.owner_id === session\.user\.id\)/)
-  assert.match(authGate, /setCloudWorkspace\(workspace\)/)
-  assert.match(authGate, /setCloudProjectId\(defaultProject\.id\)/)
+test('owner session can enter local workspace when cloud project is empty', () => {
+  assert.match(authGate, /session\.user\?\.id === 'cf4a51e8-825e-4db4-8b8a-037d3908663c'.*!\['invite', 'recovery'\]\.includes\(session\.auth_flow\).*!cloudWorkspace/s)
+  assert.match(authGate, /Do not force an empty cloud/)
 })
 
 test('project sharing control is visible only to the CineBlock owner account', () => {
