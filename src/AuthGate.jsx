@@ -212,7 +212,7 @@ export default function AuthGate({ children }) {
     setError('')
     setNotice('')
     try {
-      const project = await supabaseClient.createProject({ name, ownerId: session.user.id })
+      const project = await supabaseClient.createProject({ name })
       if (!project?.id) throw new Error('Proyek cloud tidak dapat dibuat.')
       setCloudProjects(previous => [project, ...previous.filter(item => item.id !== project.id)])
       setSelectedCloudProjectId(project.id)
