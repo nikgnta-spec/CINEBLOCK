@@ -1741,6 +1741,31 @@ button:focus-visible,
 }
 .auth-gate-card h1 { margin-bottom: 8px; font-size: 23px; line-height: 1.25; letter-spacing: -.035em; }
 .auth-gate-subtitle { margin-bottom: 24px; color: var(--text-muted); font-size: 13px; line-height: 1.6; }
+.auth-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 0 0 16px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.auth-mode-switch button {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.auth-mode-switch button.active {
+  border-color: var(--border);
+  background: var(--bg-subtle);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+}
+.auth-mode-switch button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 .auth-gate-form { display: flex; flex-direction: column; gap: 8px; }
 .auth-gate-form label { margin-top: 5px; color: var(--text-muted); font-size: 12px; font-weight: 600; }
 .auth-gate-form input {
