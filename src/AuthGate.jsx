@@ -25,6 +25,7 @@ export default function AuthGate({ children }) {
   const [password, setPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showRecovery, setShowRecovery] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [busy, setBusy] = useState(false)
   const [cloudLoading, setCloudLoading] = useState(false)
@@ -107,6 +108,22 @@ export default function AuthGate({ children }) {
     }
   }
 
+  const requestPasswordRecovery = async event => {
+    event.preventDefault()
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      await supabaseClient.auth.requestPasswordRecovery({ email, redirectTo: window.location.origin })
+      setNotice('Jika email terdaftar, tautan untuk mengatur kata sandi akan dikirim. Periksa inbox dan folder spam.')
+      setShowRecovery(false)
+    } catch (err) {
+      setError(err.message || 'Email pemulihan belum dapat dikirim. Coba lagi nanti.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const completeInvitation = async event => {
     event.preventDefault()
     setError('')
@@ -181,6 +198,8 @@ export default function AuthGate({ children }) {
   if (localMode && !session) return <div className="local-mode-shell"><div className="local-mode-banner">Mode lokal aktif — data hanya tersimpan di perangkat ini, bukan di cloud.<button type="button" onClick={() => setLocalMode(false)}>Kembali ke login</button></div>{children}</div>
 
   const isInvitation = session?.auth_flow === 'invite'
+  const isRecovery = session?.auth_flow === 'recovery'
+  const isPasswordSetup = isInvitation || isRecovery
   const needsProjectSelection = Boolean(session?.access_token && !isInvitation)
 
   return (
@@ -188,12 +207,12 @@ export default function AuthGate({ children }) {
       <section className="auth-gate-card" aria-labelledby="auth-gate-title">
         <div className="auth-gate-brand"><Cloud size={24} strokeWidth={1.8} /><span>CINEBLOCK</span></div>
         <div className="auth-gate-icon">{isInvitation ? <ShieldCheck size={25} /> : needsProjectSelection ? <FolderOpen size={25} /> : <LockKeyhole size={25} />}</div>
-        <h1 id="auth-gate-title">{isInvitation ? 'Aktifkan akun CineBlock' : needsProjectSelection ? 'Pilih proyek cloud' : 'Masuk ke CineBlock'}</h1>
-        <p className="auth-gate-subtitle">{isInvitation ? 'Undangan terverifikasi. Buat kata sandi khusus untuk akun CineBlock.' : needsProjectSelection ? 'Pilih proyek yang diberikan kepadamu. Workspace lokal tidak akan dibuka sebagai pengganti proyek cloud.' : 'Workspace cloud hanya tersedia setelah kamu masuk dengan akun yang diizinkan.'}</p>
+        <h1 id="auth-gate-title">{isPasswordSetup ? (isRecovery ? 'Atur kata sandi CineBlock' : 'Aktifkan akun CineBlock') : needsProjectSelection ? 'Pilih proyek cloud' : showRecovery ? 'Atur ulang kata sandi' : 'Masuk ke CineBlock'}</h1>
+        <p className="auth-gate-subtitle">{isPasswordSetup ? (isRecovery ? 'Buat kata sandi baru untuk akun CineBlock kamu.' : 'Undangan terverifikasi. Buat kata sandi khusus untuk akun CineBlock.') : needsProjectSelection ? 'Pilih proyek yang diberikan kepadamu. Workspace lokal tidak akan dibuka sebagai pengganti proyek cloud.' : showRecovery ? 'Masukkan email akunmu. Kami akan mengirim tautan untuk membuat kata sandi baru.' : 'Workspace cloud hanya tersedia setelah kamu masuk dengan akun yang diizinkan.'}</p>
 
         {!supabaseConfig.configured ? (
           <p className="auth-gate-error" role="alert">Layanan cloud belum dikonfigurasi. Hubungi pengelola CineBlock.</p>
-        ) : isInvitation ? (
+        ) : isPasswordSetup ? (
           <form className="auth-gate-form" onSubmit={completeInvitation}>
             <label>Email undangan</label>
             <input type="email" value={session.user?.email || ''} readOnly aria-readonly="true" />
@@ -224,6 +243,13 @@ export default function AuthGate({ children }) {
               </>
             )}
           </div>
+        ) : showRecovery ? (
+          <form className="auth-gate-form" onSubmit={requestPasswordRecovery}>
+            <label htmlFor="cineblock-recovery-email">Email akun CineBlock</label>
+            <input id="cineblock-recovery-email" type="email" autoComplete="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="nama@email.com" />
+            <button type="submit" disabled={busy}>{busy ? 'Mengirim tautan…' : 'Kirim tautan pengaturan kata sandi'}</button>
+            <button type="button" className="auth-gate-secondary-action" onClick={() => { setShowRecovery(false); setError(''); setNotice('') }}>Kembali ke masuk</button>
+          </form>
         ) : (
           <form className="auth-gate-form" onSubmit={signIn}>
             <label htmlFor="cineblock-gate-email">Email akun CineBlock</label>
@@ -236,8 +262,9 @@ export default function AuthGate({ children }) {
 
         {error && <p className="auth-gate-error" role="alert">{error}</p>}
         {notice && <p className="auth-gate-notice" role="status">{notice}</p>}
-        {!needsProjectSelection && !isInvitation && <div className="auth-gate-footer"><LockKeyhole size={14} /><span>Akses proyek ditentukan oleh izin akun, bukan sekadar tautan aplikasi.</span></div>}
-        {!needsProjectSelection && !isInvitation && <button type="button" className="auth-gate-local" onClick={() => { setError(''); setLocalMode(true) }}><Monitor size={15} /> Buka mode lokal di perangkat ini</button>}
+        {!needsProjectSelection && !isPasswordSetup && !showRecovery && <button type="button" className="auth-gate-secondary-action" onClick={() => { setShowRecovery(true); setError(''); setNotice('') }}>Lupa / belum pernah mengatur kata sandi?</button>}
+        {!needsProjectSelection && !isPasswordSetup && <div className="auth-gate-footer"><LockKeyhole size={14} /><span>Akses proyek ditentukan oleh izin akun, bukan sekadar tautan aplikasi.</span></div>}
+        {!needsProjectSelection && !isPasswordSetup && !showRecovery && <button type="button" className="auth-gate-local" onClick={() => { setError(''); setLocalMode(true) }}><Monitor size={15} /> Buka mode lokal di perangkat ini</button>}
         {localMode && <p className="auth-gate-local-note">Mode lokal hanya memakai data yang tersimpan di browser ini; mode ini bukan sesi cloud.</p>}
       </section>
     </main>
