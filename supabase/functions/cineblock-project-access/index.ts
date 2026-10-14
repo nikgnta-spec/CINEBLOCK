@@ -60,6 +60,20 @@ Deno.serve(async (req: Request) => {
     return reply(201, { project: created });
   }
 
+  if (action === "redeem_link") {
+    const token = String(body.token ?? "").trim();
+    if (!/^[a-f0-9]{48}$/.test(token)) return reply(400, { error: "Tautan berbagi tidak valid." });
+    const { data: link, error: linkError } = await admin.from("cineblock_share_links")
+      .select("id,project_id,role,revoked_at").eq("token", token).maybeSingle();
+    if (linkError || !link || link.revoked_at) return reply(404, { error: "Tautan berbagi tidak berlaku atau sudah dicabut." });
+    if (caller.id === "cf4a51e8-825e-4db4-8b8a-037d3908663c") return reply(200, { ok: true, project_id: link.project_id, role: "owner" });
+    const { error: memberError } = await admin.from("cineblock_project_members").upsert({
+      project_id: link.project_id, user_id: caller.id, role: link.role,
+    }, { onConflict: "project_id,user_id" });
+    if (memberError) return reply(500, { error: "Akses proyek dari tautan gagal diberikan." });
+    return reply(200, { ok: true, project_id: link.project_id, role: link.role });
+  }
+
   const projectId = String(body.project_id ?? "");
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(projectId)) {
     return reply(400, { error: "ID proyek tidak valid." });
@@ -74,6 +88,32 @@ Deno.serve(async (req: Request) => {
   const isCineBlockOperator = caller.id === "cf4a51e8-825e-4db4-8b8a-037d3908663c";
   const isOwner = isCineBlockOperator && project.owner_id === caller.id;
   if (!isOwner) return reply(403, { error: "Hanya pemilik CineBlock yang boleh membagikan proyek dan mengelola anggota." });
+
+  if (action === "create_link") {
+    const role = String(body.role ?? "");
+    if (role !== "editor" && role !== "viewer") return reply(400, { error: "Pilih akses Viewer atau Editor." });
+    const { data: link, error } = await admin.from("cineblock_share_links")
+      .insert({ project_id: projectId, role, created_by: caller.id })
+      .select("token,role,created_at").single();
+    if (error || !link) return reply(500, { error: "Tautan berbagi gagal dibuat." });
+    return reply(201, { ...link, url: "https://cineblock-nu.vercel.app/?share=" + link.token });
+  }
+
+  if (action === "revoke_link") {
+    const token = String(body.token ?? "").trim();
+    const { error } = await admin.from("cineblock_share_links")
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("project_id", projectId).eq("token", token).is("revoked_at", null);
+    if (error) return reply(500, { error: "Tautan berbagi gagal dicabut." });
+    return reply(200, { ok: true });
+  }
+
+  if (action === "list_links") {
+    const { data: links, error } = await admin.from("cineblock_share_links")
+      .select("token,role,created_at,revoked_at").eq("project_id", projectId).order("created_at", { ascending: false });
+    if (error) return reply(500, { error: "Daftar tautan berbagi gagal dimuat." });
+    return reply(200, { links: (links ?? []).map(link => ({ ...link, url: "https://cineblock-nu.vercel.app/?share=" + link.token })) });
+  }
 
   if (action === "list") {
     const { data: members, error } = await admin.from("cineblock_project_members")
