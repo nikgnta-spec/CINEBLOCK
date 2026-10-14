@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { LogIn, LogOut, Cloud, RefreshCw } from 'lucide-react'
+import { LogIn, LogOut, Cloud, RefreshCw, Users, UserPlus, UserMinus, X } from 'lucide-react'
 import { supabaseClient, supabaseConfig } from '../lib/supabaseClient.js'
 import { importLocalWorkspaceToCloud } from '../lib/cineblockImport.js'
 import { syncLocalScenesAndShots, loadCloudWorkspace } from '../lib/cineblockSync.js'
@@ -20,6 +20,11 @@ export default function AuthWorkspace({ initialProjectId = '', localWorkspace, o
   const [importing, setImporting] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [loadingCloud, setLoadingCloud] = useState(false)
+  const [accessOpen, setAccessOpen] = useState(false)
+  const [accessBusy, setAccessBusy] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState('editor')
+  const [members, setMembers] = useState([])
 
   const loadProjects = async () => {
     const rows = await supabaseClient.listProjects()
@@ -170,6 +175,43 @@ export default function AuthWorkspace({ initialProjectId = '', localWorkspace, o
     }
   }
 
+  const manageAccess = async (action, extra = {}) => {
+    if (!selectedProjectId) return
+    setAccessBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const result = await supabaseClient.manageProjectAccess({ action, project_id: selectedProjectId, ...extra })
+      if (action === 'list') setMembers(Array.isArray(result.members) ? result.members : [])
+      if (action === 'invite') {
+        setInviteEmail('')
+        setNotice(result.message || 'Akses proyek diperbarui.')
+        const refreshed = await supabaseClient.manageProjectAccess({ action: 'list', project_id: selectedProjectId })
+        setMembers(Array.isArray(refreshed.members) ? refreshed.members : [])
+      }
+      if (action === 'remove') {
+        setNotice('Akses anggota berhasil dicabut.')
+        const refreshed = await supabaseClient.manageProjectAccess({ action: 'list', project_id: selectedProjectId })
+        setMembers(Array.isArray(refreshed.members) ? refreshed.members : [])
+      }
+    } catch (err) {
+      setError(err.message || 'Pengelolaan akses proyek gagal.')
+    } finally {
+      setAccessBusy(false)
+    }
+  }
+
+  const inviteMember = event => {
+    event.preventDefault()
+    if (!inviteEmail.trim()) return
+    manageAccess('invite', { email: inviteEmail.trim(), role: inviteRole })
+  }
+
+  const removeMember = member => {
+    if (!window.confirm('Cabut akses ' + (member.email || 'anggota ini') + ' dari proyek?')) return
+    manageAccess('remove', { user_id: member.user_id })
+  }
+
   const signOut = async () => {
     setBusy(true)
     setError('')
@@ -243,6 +285,41 @@ export default function AuthWorkspace({ initialProjectId = '', localWorkspace, o
 
 
 
+      {session && projects.length > 0 && selectedProjectId && (
+        <button className="btn btn-secondary" type="button" onClick={() => { const next = !accessOpen; setAccessOpen(next); if (next) manageAccess('list') }} disabled={accessBusy} title="Undang dan kelola akses anggota proyek">
+          <Users size={13} /> {accessOpen ? 'Tutup kelola akses' : 'Kelola akses proyek'}
+        </button>
+      )}
+      {accessOpen && session && selectedProjectId && (
+        <div className="cloud-access-manager" aria-label="Kelola akses proyek">
+          <div className="cloud-access-heading">
+            <strong>Anggota proyek</strong>
+            <button type="button" className="btn btn-secondary cloud-icon-button" onClick={() => setAccessOpen(false)} aria-label="Tutup kelola akses"><X size={14} /></button>
+          </div>
+          <p className="cloud-muted">Hanya owner yang dapat mengundang atau mencabut akses. Tautan undangan harus diterima melalui email.</p>
+          <form className="cloud-invite-form" onSubmit={inviteMember}>
+            <label htmlFor="cineblock-invite-email">Email orang yang diundang</label>
+            <input id="cineblock-invite-email" type="email" required maxLength={254} value={inviteEmail} onChange={event => setInviteEmail(event.target.value)} placeholder="nama@email.com" />
+            <label htmlFor="cineblock-invite-role">Hak akses</label>
+            <select id="cineblock-invite-role" value={inviteRole} onChange={event => setInviteRole(event.target.value)}>
+              <option value="editor">Editor — dapat mengubah proyek</option>
+              <option value="viewer">Viewer — hanya dapat melihat</option>
+            </select>
+            <button className="btn btn-secondary" type="submit" disabled={accessBusy || !inviteEmail.trim()}><UserPlus size={13} /> {accessBusy ? 'Memproses…' : 'Undang melalui email'}</button>
+          </form>
+          <div className="cloud-access-members">
+            {members.map(member => (
+              <div className="cloud-access-member" key={member.user_id}>
+                <div><strong>{member.email}</strong><span>{member.role === 'owner' ? 'Owner' : member.role === 'editor' ? 'Editor' : 'Viewer'}</span></div>
+                {member.role !== 'owner' && member.user_id !== session.user?.id && (
+                  <button type="button" className="btn btn-secondary cloud-icon-button" onClick={() => removeMember(member)} disabled={accessBusy} title="Cabut akses anggota" aria-label={'Cabut akses ' + member.email}><UserMinus size={14} /></button>
+                )}
+              </div>
+            ))}
+            {!accessBusy && members.length === 0 && <p className="cloud-muted">Belum ada data anggota atau akses kelola anggota ditolak.</p>}
+          </div>
+        </div>
+      )}
       {session && projects.length > 0 && selectedProjectId && (
         <button className="btn btn-secondary" type="button" onClick={loadCloud} disabled={busy || importing || syncing || loadingCloud} title="Unduh backup lokal lalu muat versi cloud">
           {loadingCloud ? <RefreshCw size={13} /> : <Cloud size={13} />}{loadingCloud ? ' Memuat cloud…' : ' Muat cloud ke lokal'}
