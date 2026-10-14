@@ -81,11 +81,29 @@ export default function AuthGate({ children }) {
     setCloudWorkspace(null)
     setCloudProjectId('')
     supabaseClient.listProjects()
-      .then(rows => {
+      .then(async rows => {
         if (cancelled) return
         const projects = Array.isArray(rows) ? rows : []
         setCloudProjects(projects)
-        setSelectedCloudProjectId(current => projects.some(project => project.id === current) ? current : (projects[0]?.id || ''))
+
+        // The verified CineBlock operator goes straight into their own project.
+        // Other accounts keep the explicit project picker and only see shared projects.
+        const isOperator = session.user?.id === 'cf4a51e8-825e-4db4-8b8a-037d3908663c'
+        const defaultProject = isOperator
+          ? projects.find(project => project.owner_id === session.user.id)
+          : null
+        const selectedProject = defaultProject || projects[0] || null
+        setSelectedCloudProjectId(selectedProject?.id || '')
+        if (defaultProject) {
+          try {
+            const workspace = await loadCloudWorkspace(defaultProject.id)
+            if (cancelled) return
+            setCloudWorkspace(workspace)
+            setCloudProjectId(defaultProject.id)
+          } catch (err) {
+            if (!cancelled) setError(err.message || 'Proyek cloud pemilik tidak dapat dimuat.')
+          }
+        }
       })
       .catch(err => {
         if (!cancelled) setError(friendlyAuthError(err, 'projects'))
