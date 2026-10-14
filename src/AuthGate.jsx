@@ -178,7 +178,7 @@ export default function AuthGate({ children }) {
   if (session?.access_token && session.auth_flow !== 'invite' && cloudWorkspace && cloudProjectId) {
     return cloneElement(children, { initialWorkspace: cloudWorkspace, cloudProjectId })
   }
-  if (localMode && !session) return children
+  if (localMode && !session) return <div className="local-mode-shell"><div className="local-mode-banner">Mode lokal aktif — data hanya tersimpan di perangkat ini, bukan di cloud.<button type="button" onClick={() => setLocalMode(false)}>Kembali ke login</button></div>{children}</div>
 
   const isInvitation = session?.auth_flow === 'invite'
   const needsProjectSelection = Boolean(session?.access_token && !isInvitation)
