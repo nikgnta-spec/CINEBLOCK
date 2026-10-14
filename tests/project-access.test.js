@@ -39,7 +39,7 @@ test('workspace exposes invite, role selection, member listing and access revoca
 })
 
 
-test('first account can recover or set a password without public signup', () => {
+test('new users can sign up and existing users can log in or recover password', () => {
   assert.match(client, /requestPasswordRecovery/)
   assert.match(client, /authRequest\('recover'/)
   assert.match(client, /\['invite', 'signup', 'recovery', 'magiclink', 'email'\]/)
