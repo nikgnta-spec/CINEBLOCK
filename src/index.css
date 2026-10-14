@@ -1832,3 +1832,42 @@ button:focus-visible,
   text-align: center;
 }
 .local-mode-banner button { color: var(--text); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+
+
+/* Project access management */
+.cloud-access-manager {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 520px);
+  padding: 14px;
+  border: 1px solid var(--border, #3b3b3b);
+  border-radius: 10px;
+  background: var(--panel, #171717);
+  color: var(--text, #f5f5f5);
+}
+.cloud-access-heading,
+.cloud-access-member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cloud-access-heading strong { font-size: 13px; }
+.cloud-invite-form { display: grid; gap: 7px; }
+.cloud-invite-form label { font-size: 12px; color: var(--muted, #aaa); }
+.cloud-invite-form input,
+.cloud-invite-form select {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border, #444);
+  border-radius: 6px;
+  background: var(--bg, #111);
+  color: inherit;
+}
+.cloud-access-members { display: grid; gap: 7px; }
+.cloud-access-member { padding: 8px 0; border-top: 1px solid var(--border, #333); }
+.cloud-access-member > div { display: grid; gap: 3px; min-width: 0; }
+.cloud-access-member strong { font-size: 12px; overflow-wrap: anywhere; }
+.cloud-access-member span { font-size: 11px; color: var(--muted, #aaa); }
+.cloud-access-manager .cloud-muted { margin: 0; font-size: 12px; line-height: 1.45; }
