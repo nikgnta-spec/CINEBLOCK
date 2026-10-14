@@ -340,16 +340,7 @@ export default function AuthWorkspace({ initialProjectId = '', localWorkspace, o
             <button type="button" className="btn btn-secondary cloud-icon-button" onClick={() => setAccessOpen(false)} aria-label="Tutup kelola akses"><X size={14} /></button>
           </div>
           <p className="cloud-muted">Bagikan lewat undangan email atau tautan. Penerima tautan perlu masuk atau membuat akun CineBlock agar akses proyek tercatat.</p>
-          <form className="cloud-invite-form" onSubmit={inviteMember}>
-            <label htmlFor="cineblock-invite-email">Email orang yang diundang</label>
-            <input id="cineblock-invite-email" type="email" required maxLength={254} value={inviteEmail} onChange={event => setInviteEmail(event.target.value)} placeholder="nama@email.com" />
-            <label htmlFor="cineblock-invite-role">Hak akses</label>
-            <select id="cineblock-invite-role" value={inviteRole} onChange={event => setInviteRole(event.target.value)}>
-              <option value="editor">Editor — dapat mengubah proyek</option>
-              <option value="viewer">Viewer — hanya dapat melihat</option>
-            </select>
-            <button className="btn btn-secondary" type="submit" disabled={accessBusy || !inviteEmail.trim()}><UserPlus size={13} /> {accessBusy ? 'Memproses…' : 'Undang melalui email'}</button>
-          </form>
+          <div className="cloud-muted">Bagikan proyek melalui tautan. Penerima harus masuk atau membuat akun CineBlock untuk mendapatkan akses.</div>
           <div className="cloud-invite-form">
             <strong>Bagikan dengan link</strong>
             <label htmlFor="cineblock-share-role">Siapa saja yang memiliki link</label>
