@@ -39,6 +39,27 @@ Deno.serve(async (req: Request) => {
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return reply(400, { error: "Permintaan tidak valid." }); }
   const action = String(body.action ?? "");
+
+  // Project creation is performed server-side after validating the real Supabase user.
+  // The service key never reaches the browser; only the single operator may create projects.
+  if (action === "create_project") {
+    if (caller.id !== "cf4a51e8-825e-4db4-8b8a-037d3908663c") {
+      return reply(403, { error: "Hanya pemilik CineBlock yang boleh membuat proyek cloud." });
+    }
+    const name = String(body.name ?? "").trim().slice(0, 160);
+    if (!name) return reply(400, { error: "Nama proyek wajib diisi." });
+    const { data: created, error: createError } = await admin
+      .from("cineblock_projects")
+      .insert({ name, owner_id: caller.id, payload: {}, revision: 1 })
+      .select("id,name,owner_id,updated_at")
+      .single();
+    if (createError || !created) {
+      console.error("CineBlock project creation failed", createError?.code ?? "unknown");
+      return reply(500, { error: "Database menolak pembuatan proyek. Kode: " + (createError?.code ?? "unknown") });
+    }
+    return reply(201, { project: created });
+  }
+
   const projectId = String(body.project_id ?? "");
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(projectId)) {
     return reply(400, { error: "ID proyek tidak valid." });
