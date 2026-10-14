@@ -128,7 +128,7 @@ async function consumeAuthCallback() {
     if (!callback.access_token) {
       throw new SupabaseRequestError('Tautan autentikasi tidak memuat token sesi. Minta undangan baru.', 400, 'AUTH_CALLBACK_TOKEN_MISSING')
     }
-    if (callback.type && !['invite', 'signup', 'magiclink', 'email'].includes(callback.type)) {
+    if (callback.type && !['invite', 'signup', 'recovery', 'magiclink', 'email'].includes(callback.type)) {
       throw new SupabaseRequestError('Jenis tautan autentikasi tidak didukung untuk login.', 400, 'AUTH_CALLBACK_TYPE_UNSUPPORTED')
     }
 
@@ -201,6 +201,13 @@ export const supabaseClient = Object.freeze({
       const next = { ...session, expires_at: session.expires_at || Math.floor(Date.now() / 1000) + Number(session.expires_in || 3600) }
       writeSession(next)
       return { session: next, user: next.user }
+    },
+    async requestPasswordRecovery({ email, redirectTo }) {
+      const normalizedEmail = String(email || '').trim().toLowerCase()
+      if (!normalizedEmail || !normalizedEmail.includes('@')) throw new SupabaseRequestError('Masukkan alamat email yang valid.', 400, 'INVALID_EMAIL')
+      const body = { email: normalizedEmail }
+      if (redirectTo) body.redirect_to = redirectTo
+      await authRequest('recover', body)
     },
     async updatePassword({ password }) {
       if (typeof password !== 'string' || password.length < 8) {
