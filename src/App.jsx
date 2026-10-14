@@ -419,7 +419,7 @@ function normalizeWorkspaceProjects(savedProjects) {
     })
 }
 
-export default function App() {
+export default function App({ initialWorkspace = null, cloudProjectId = '' } = {}) {
   const [theme, setTheme] = useState(() => {
     try {
       return window.localStorage.getItem('cineblock.ui-theme') === 'light' ? 'light' : 'dark'
@@ -502,6 +502,32 @@ export default function App() {
   useEffect(() => {
     let cancelled = false
 
+    if (initialWorkspace && cloudProjectId) {
+      const restoredProject = normalizeSavedProject(initialWorkspace.project)
+      const restoredScenes = normalizeSavedScenes(initialWorkspace.scenes) || [defaultScene(1)]
+      const restoredActiveSceneId = restoredScenes.some(scene => scene.id === initialWorkspace.activeSceneId)
+        ? initialWorkspace.activeSceneId
+        : restoredScenes[0]?.id || ''
+      const restoredFloorplans = normalizeSavedFloorplans(initialWorkspace.floorplans, restoredScenes)
+      const cloudRecord = createProjectRecord(
+        cloudProjectId,
+        restoredProject,
+        restoredScenes,
+        restoredActiveSceneId,
+        restoredFloorplans,
+      )
+      setTab('floorplan')
+      setProject(restoredProject)
+      setScenes(restoredScenes)
+      setActiveSceneId(restoredActiveSceneId)
+      setFloorplans(restoredFloorplans)
+      setProjects([cloudRecord])
+      setActiveProjectId(cloudProjectId)
+      setSaveStatus('saved')
+      setHydrated(true)
+      return () => { cancelled = true }
+    }
+
     loadAppState()
       .then(savedState => {
         if (cancelled) return
@@ -556,7 +582,7 @@ export default function App() {
     }
   // Initial scene state is deliberately used when no saved project exists.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [initialWorkspace, cloudProjectId])
 
   useEffect(() => {
     if (!hydrated) return undefined
