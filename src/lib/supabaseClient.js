@@ -263,6 +263,20 @@ export const supabaseClient = Object.freeze({
   async listProjectMemberships(projectId) {
     return request(`cineblock_project_members?select=project_id,user_id,role&project_id=eq.${encodeURIComponent(projectId)}`)
   },
+  async manageProjectAccess(payload) {
+    const session = await getFreshSession()
+    if (!session?.access_token) throw new SupabaseRequestError('Login diperlukan untuk mengelola akses proyek.', 401, 'AUTH_SESSION_MISSING')
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/cineblock-project-access`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
+    return decodeResponse(response)
+  },
   async selectRows(table, filters = {}, select = '*') {
     assertTable(table)
     const params = new URLSearchParams({ select })
