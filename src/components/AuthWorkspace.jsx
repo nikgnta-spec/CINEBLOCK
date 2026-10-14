@@ -25,6 +25,8 @@ export default function AuthWorkspace({ initialProjectId = '', localWorkspace, o
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('editor')
   const [members, setMembers] = useState([])
+  const [shareRole, setShareRole] = useState('viewer')
+  const [shareLinks, setShareLinks] = useState([])
 
   const isCineBlockOwner = session?.user?.id === 'cf4a51e8-825e-4db4-8b8a-037d3908663c'
 
@@ -177,6 +179,23 @@ export default function AuthWorkspace({ initialProjectId = '', localWorkspace, o
     }
   }
 
+  useEffect(() => {
+    if (!session?.access_token || typeof window === 'undefined') return
+    const token = new URLSearchParams(window.location.search).get('share')
+    if (!token) return
+    let cancelled = false
+    supabaseClient.manageProjectAccess({ action: 'redeem_link', token })
+      .then(async result => {
+        if (cancelled) return
+        window.history.replaceState({}, '', window.location.pathname + window.location.hash)
+        await loadProjects()
+        setSelectedProjectId(result.project_id || '')
+        setNotice('Akses tautan berhasil diterima. Proyek tersedia di daftar proyek cloud.')
+      })
+      .catch(err => { if (!cancelled) setError(err.message || 'Tautan berbagi tidak dapat digunakan.') })
+    return () => { cancelled = true }
+  }, [session?.access_token])
+
   const manageAccess = async (action, extra = {}) => {
     if (!selectedProjectId) return
     setAccessBusy(true)
@@ -184,7 +203,19 @@ export default function AuthWorkspace({ initialProjectId = '', localWorkspace, o
     setNotice('')
     try {
       const result = await supabaseClient.manageProjectAccess({ action, project_id: selectedProjectId, ...extra })
-      if (action === 'list') setMembers(Array.isArray(result.members) ? result.members : [])
+      if (action === 'list') {
+        setMembers(Array.isArray(result.members) ? result.members : [])
+        const links = await supabaseClient.manageProjectAccess({ action: 'list_links', project_id: selectedProjectId })
+        setShareLinks(Array.isArray(links.links) ? links.links : [])
+      }
+      if (action === 'create_link') {
+        setShareLinks(current => [result, ...current])
+        setNotice('Tautan berbagi berhasil dibuat.')
+      }
+      if (action === 'revoke_link') {
+        setShareLinks(current => current.map(link => link.token === extra.token ? { ...link, revoked_at: new Date().toISOString() } : link))
+        setNotice('Tautan berbagi berhasil dicabut.')
+      }
       if (action === 'invite') {
         setInviteEmail('')
         setNotice(result.message || 'Akses proyek diperbarui.')
@@ -200,6 +231,16 @@ export default function AuthWorkspace({ initialProjectId = '', localWorkspace, o
       setError(err.message || 'Pengelolaan akses proyek gagal.')
     } finally {
       setAccessBusy(false)
+    }
+  }
+
+  const createShareLink = () => manageAccess('create_link', { role: shareRole })
+  const copyShareLink = async url => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setNotice('Tautan berhasil disalin.')
+    } catch {
+      setError('Gagal menyalin otomatis. Salin tautan yang tampil secara manual.')
     }
   }
 
@@ -298,7 +339,7 @@ export default function AuthWorkspace({ initialProjectId = '', localWorkspace, o
             <strong>Anggota proyek</strong>
             <button type="button" className="btn btn-secondary cloud-icon-button" onClick={() => setAccessOpen(false)} aria-label="Tutup kelola akses"><X size={14} /></button>
           </div>
-          <p className="cloud-muted">Hanya owner yang dapat mengundang atau mencabut akses. Tautan undangan harus diterima melalui email.</p>
+          <p className="cloud-muted">Bagikan lewat undangan email atau tautan. Penerima tautan perlu masuk atau membuat akun CineBlock agar akses proyek tercatat.</p>
           <form className="cloud-invite-form" onSubmit={inviteMember}>
             <label htmlFor="cineblock-invite-email">Email orang yang diundang</label>
             <input id="cineblock-invite-email" type="email" required maxLength={254} value={inviteEmail} onChange={event => setInviteEmail(event.target.value)} placeholder="nama@email.com" />
@@ -309,6 +350,33 @@ export default function AuthWorkspace({ initialProjectId = '', localWorkspace, o
             </select>
             <button className="btn btn-secondary" type="submit" disabled={accessBusy || !inviteEmail.trim()}><UserPlus size={13} /> {accessBusy ? 'Memproses…' : 'Undang melalui email'}</button>
           </form>
+          <div className="cloud-invite-form">
+            <strong>Bagikan dengan link</strong>
+            <label htmlFor="cineblock-share-role">Siapa saja yang memiliki link</label>
+            <select id="cineblock-share-role" value={shareRole} onChange={event => setShareRole(event.target.value)}>
+              <option value="viewer">Viewer — hanya melihat</option>
+              <option value="editor">Editor — dapat mengubah proyek</option>
+            </select>
+            <button className="btn btn-secondary" type="button" onClick={createShareLink} disabled={accessBusy}>
+              {accessBusy ? 'Memproses…' : 'Buat link berbagi'}
+            </button>
+          </div>
+          <div className="cloud-access-members">
+            <strong>Link berbagi</strong>
+            {shareLinks.map(link => (
+              <div className="cloud-access-member" key={link.token}>
+                <div>
+                  <strong>{link.role === 'editor' ? 'Editor link' : 'Viewer link'}{link.revoked_at ? ' — Dicabut' : ''}</strong>
+                  {!link.revoked_at && <input aria-label="Link berbagi proyek" readOnly value={link.url} onFocus={event => event.target.select()} />}
+                </div>
+                {!link.revoked_at && <div className="cloud-share-actions">
+                  <button type="button" className="btn btn-secondary" onClick={() => copyShareLink(link.url)}>Salin link</button>
+                  <button type="button" className="btn btn-secondary" onClick={() => manageAccess('revoke_link', { token: link.token })} disabled={accessBusy}>Cabut</button>
+                </div>}
+              </div>
+            ))}
+            {!accessBusy && shareLinks.length === 0 && <p className="cloud-muted">Belum ada link berbagi.</p>}
+          </div>
           <div className="cloud-access-members">
             {members.map(member => (
               <div className="cloud-access-member" key={member.user_id}>
