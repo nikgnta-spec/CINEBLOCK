@@ -272,13 +272,20 @@ export const supabaseClient = Object.freeze({
   async listProjects() {
     return request('cineblock_projects?select=id,name,owner_id,updated_at&order=updated_at.desc')
   },
-  async createProject({ name, ownerId }) {
-    const rows = await request('cineblock_projects?select=id,name,owner_id,updated_at', {
+  async createProject({ name }) {
+    const session = await getFreshSession()
+    if (!session?.access_token) throw new SupabaseRequestError('Login diperlukan untuk membuat proyek cloud.', 401, 'AUTH_SESSION_MISSING')
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/cineblock-project-access`, {
       method: 'POST',
-      body: { name: name.trim(), owner_id: ownerId, payload: {}, revision: 1 },
-      prefer: 'return=representation',
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'create_project', name: String(name || '').trim() }),
     })
-    return rows?.[0] || null
+    const result = await decodeResponse(response)
+    return result?.project || null
   },
   async listProjectMemberships(projectId) {
     return request(`cineblock_project_members?select=project_id,user_id,role&project_id=eq.${encodeURIComponent(projectId)}`)
