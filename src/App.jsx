@@ -822,7 +822,7 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
                   ? 'Data berubah di tab lain — muat ulang'
                   : saveStatus === 'error'
                     ? 'Gagal menyimpan'
-                    : 'Tersimpan di perangkat ini'}
+                    : (cloudProjectId ? 'Cache lokal · sinkronisasi manual' : 'Tersimpan di perangkat ini')}
           </span>
           <button
             className="btn btn-secondary theme-toggle"
