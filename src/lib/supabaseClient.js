@@ -138,6 +138,7 @@ async function consumeAuthCallback() {
       token_type: callback.token_type,
       expires_in: callback.expires_in,
       expires_at: Math.floor(Date.now() / 1000) + callback.expires_in,
+      auth_flow: callback.type === 'invite' || callback.type === 'recovery' ? callback.type : '',
     }
     const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
       headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}` },
@@ -200,6 +201,22 @@ export const supabaseClient = Object.freeze({
       const next = { ...session, expires_at: session.expires_at || Math.floor(Date.now() / 1000) + Number(session.expires_in || 3600) }
       writeSession(next)
       return { session: next, user: next.user }
+    },
+    async updatePassword({ password }) {
+      if (typeof password !== 'string' || password.length < 8) {
+        throw new SupabaseRequestError('Kata sandi harus minimal 8 karakter.', 400, 'PASSWORD_TOO_SHORT')
+      }
+      const session = await getFreshSession()
+      if (!session?.access_token) throw new SupabaseRequestError('Sesi undangan tidak ditemukan. Buka tautan undangan terbaru lagi.', 401, 'AUTH_SESSION_MISSING')
+      const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        method: 'PUT',
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      const user = await decodeResponse(response)
+      const next = { ...session, user, auth_flow: '' }
+      writeSession(next)
+      return next
     },
     async signOut() {
       const session = await getFreshSession()
