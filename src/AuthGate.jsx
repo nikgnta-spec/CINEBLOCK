@@ -86,6 +86,28 @@ export default function AuthGate({ children }) {
         const projects = Array.isArray(rows) ? rows : []
         setCloudProjects(projects)
 
+        // Redeem share links only after authentication, then open the linked cloud
+        // workspace directly instead of leaving the recipient on the local workspace.
+        const shareToken = typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('share')
+          : null
+        if (shareToken) {
+          const redeemed = await supabaseClient.manageProjectAccess({ action: 'redeem_link', token: shareToken })
+          if (cancelled) return
+          if (!redeemed?.project_id) throw new Error('Tautan berbagi tidak memberikan proyek yang valid.')
+          const workspace = await loadCloudWorkspace(redeemed.project_id)
+          if (cancelled) return
+          setCloudProjects(current => current.some(project => project.id === redeemed.project_id)
+            ? current
+            : [...current, { id: redeemed.project_id, name: 'Proyek dibagikan', owner_id: null }])
+          setSelectedCloudProjectId(redeemed.project_id)
+          setCloudWorkspace(workspace)
+          setCloudProjectId(redeemed.project_id)
+          window.history.replaceState({}, '', window.location.pathname + window.location.hash)
+          setNotice('Proyek dari tautan berbagi berhasil dibuka.')
+          return
+        }
+
         // The verified CineBlock operator goes straight into their own project.
         // Other accounts keep the explicit project picker and only see shared projects.
         const isOperator = session.user?.id === 'cf4a51e8-825e-4db4-8b8a-037d3908663c'
