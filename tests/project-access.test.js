@@ -6,6 +6,7 @@ const edge = await readFile(new URL('../supabase/functions/cineblock-project-acc
 const client = await readFile(new URL('../src/lib/supabaseClient.js', import.meta.url), 'utf8')
 const workspace = await readFile(new URL('../src/components/AuthWorkspace.jsx', import.meta.url), 'utf8')
 const quotaMigration = await readFile(new URL('../supabase/migrations/20261014121000_cineblock_atomic_invitation_quota.sql', import.meta.url), 'utf8')
+const authGate = await readFile(new URL('../src/AuthGate.jsx', import.meta.url), 'utf8')
 
 test('project access endpoint requires a valid session and project owner role', () => {
   assert.match(edge, /auth\.getUser\(jwt\)/)
@@ -35,4 +36,15 @@ test('workspace exposes invite, role selection, member listing and access revoca
   assert.match(workspace, /value="viewer"/)
   assert.match(workspace, /manageAccess\('remove'/)
   assert.match(client, /functions\/v1\/cineblock-project-access/)
+})
+
+
+test('first account can recover or set a password without public signup', () => {
+  assert.match(client, /requestPasswordRecovery/)
+  assert.match(client, /authRequest\('recover'/)
+  assert.match(client, /\['invite', 'signup', 'recovery', 'magiclink', 'email'\]/)
+  assert.match(authGate, /Lupa \/ belum pernah mengatur kata sandi\?/)
+  assert.match(authGate, /isPasswordSetup = isInvitation \|\| isRecovery/)
+  assert.match(authGate, /showRecovery \? 'Atur ulang kata sandi'/)
+  assert.doesNotMatch(authGate, /signUp\(|create_user:\s*true/)
 })
