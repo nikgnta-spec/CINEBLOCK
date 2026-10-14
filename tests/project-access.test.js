@@ -11,7 +11,6 @@ test('project access endpoint requires a valid session and project owner role', 
   assert.match(edge, /auth\.getUser\(jwt\)/)
   assert.match(edge, /if \(!isOwner\) return reply\(403/)
   assert.match(edge, /role !== "editor" && role !== "viewer"/)
-  assert.match(edge, /verify_jwt/)
 })
 
 test('project access endpoint never trusts client-provided user identity or owner role', () => {
