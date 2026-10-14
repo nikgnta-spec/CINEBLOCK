@@ -4,7 +4,7 @@ import { supabaseClient, supabaseConfig } from '../lib/supabaseClient.js'
 import { importLocalWorkspaceToCloud } from '../lib/cineblockImport.js'
 import { syncLocalScenesAndShots, loadCloudWorkspace } from '../lib/cineblockSync.js'
 
-export default function AuthWorkspace({ localWorkspace, onApplyCloudWorkspace, onBeforeLoadCloud }) {
+export default function AuthWorkspace({ initialProjectId = '', localWorkspace, onApplyCloudWorkspace, onBeforeLoadCloud }) {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -13,7 +13,7 @@ export default function AuthWorkspace({ localWorkspace, onApplyCloudWorkspace, o
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [projects, setProjects] = useState([])
-  const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId)
   const [newProjectName, setNewProjectName] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
