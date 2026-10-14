@@ -94,16 +94,8 @@ export default function AuthGate({ children }) {
           : null
         const selectedProject = defaultProject || projects[0] || null
         setSelectedCloudProjectId(selectedProject?.id || '')
-        if (defaultProject) {
-          try {
-            const workspace = await loadCloudWorkspace(defaultProject.id)
-            if (cancelled) return
-            setCloudWorkspace(workspace)
-            setCloudProjectId(defaultProject.id)
-          } catch (err) {
-            if (!cancelled) setError(err.message || 'Proyek cloud pemilik tidak dapat dimuat.')
-          }
-        }
+        // Owner's local workspace is the entry point. Do not force an empty cloud
+        // project to replace it; the owner can explicitly import/share from the workspace UI.
       })
       .catch(err => {
         if (!cancelled) setError(friendlyAuthError(err, 'projects'))
@@ -247,6 +239,9 @@ export default function AuthGate({ children }) {
     return <main className="auth-gate"><div className="auth-gate-card"><div className="auth-gate-brand"><Cloud size={22} /> CINEBLOCK</div><p role="status">Memeriksa sesi akun…</p></div></main>
   }
 
+  if (session?.access_token && session.user?.id === 'cf4a51e8-825e-4db4-8b8a-037d3908663c' && !['invite', 'recovery'].includes(session.auth_flow) && !cloudWorkspace) {
+    return cloneElement(children, {})
+  }
   if (session?.access_token && !['invite', 'recovery'].includes(session.auth_flow) && cloudWorkspace && cloudProjectId) {
     return cloneElement(children, { initialWorkspace: cloudWorkspace, cloudProjectId })
   }
