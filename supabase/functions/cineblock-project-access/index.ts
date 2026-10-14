@@ -48,13 +48,11 @@ Deno.serve(async (req: Request) => {
     .from("cineblock_projects").select("id,owner_id").eq("id", projectId).maybeSingle();
   if (projectError || !project) return reply(404, { error: "Proyek tidak ditemukan." });
 
-  let isOwner = project.owner_id === caller.id;
-  if (!isOwner) {
-    const { data: membership } = await admin.from("cineblock_project_members")
-      .select("role").eq("project_id", projectId).eq("user_id", caller.id).maybeSingle();
-    isOwner = membership?.role === "owner";
-  }
-  if (!isOwner) return reply(403, { error: "Hanya owner proyek yang boleh mengelola undangan dan anggota." });
+  // Sharing authority belongs to the single CineBlock operator account.
+  // Project membership must never grant the ability to invite or remove other users.
+  const isCineBlockOperator = caller.id === "cf4a51e8-825e-4db4-8b8a-037d3908663c";
+  const isOwner = isCineBlockOperator && project.owner_id === caller.id;
+  if (!isOwner) return reply(403, { error: "Hanya pemilik CineBlock yang boleh membagikan proyek dan mengelola anggota." });
 
   if (action === "list") {
     const { data: members, error } = await admin.from("cineblock_project_members")
