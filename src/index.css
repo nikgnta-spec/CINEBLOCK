@@ -1815,3 +1815,20 @@ button:focus-visible,
   font-size: 12px;
   line-height: 1.55;
 }
+
+.local-mode-shell { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.local-mode-shell > .app { flex: 1; min-height: 0; height: auto; }
+.local-mode-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--text);
+  font-size: 11px;
+  text-align: center;
+}
+.local-mode-banner button { color: var(--text); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
