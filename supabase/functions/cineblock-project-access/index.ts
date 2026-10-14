@@ -90,11 +90,13 @@ Deno.serve(async (req: Request) => {
   if (role !== "editor" && role !== "viewer") return reply(400, { error: "Role undangan hanya boleh editor atau viewer." });
   if (caller.email?.toLowerCase() === email) return reply(400, { error: "Email owner tidak perlu diundang ke proyeknya sendiri." });
 
-  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const { count, error: countError } = await admin.from("cineblock_invitation_events")
-    .select("id", { count: "exact", head: true }).eq("inviter_id", caller.id).gte("created_at", since);
-  if (countError) return reply(500, { error: "Batas undangan tidak dapat diverifikasi; coba lagi nanti." });
-  if ((count ?? 0) >= 8) return reply(429, { error: "Batas keamanan tercapai: maksimal 8 undangan per jam per akun." });
+  const { data: quotaAllowed, error: quotaError } = await admin.rpc("cineblock_consume_invitation_quota", {
+    p_inviter_id: caller.id,
+    p_project_id: projectId,
+    p_invitee_email: email,
+  });
+  if (quotaError) return reply(500, { error: "Batas undangan tidak dapat diverifikasi; coba lagi nanti." });
+  if (quotaAllowed !== true) return reply(429, { error: "Batas keamanan tercapai: maksimal 8 percobaan undangan per jam per akun." });
 
   const { data: existingMembership } = await admin.from("cineblock_project_members")
     .select("user_id,role").eq("project_id", projectId);
@@ -112,7 +114,7 @@ Deno.serve(async (req: Request) => {
   }
 
   if (!targetUser) {
-    const redirectTo = `${url.replace(/\/$/, "")}`;
+    const redirectTo = "https://cineblock-nu.vercel.app";
     const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
       redirectTo: redirectTo,
       data: { cineblock_invited_project: projectId, cineblock_invited_role: role },
@@ -125,11 +127,6 @@ Deno.serve(async (req: Request) => {
     project_id: projectId, user_id: targetUser.id, role,
   }, { onConflict: "project_id,user_id" });
   if (membershipError) return reply(500, { error: "Akun ditemukan, tetapi penetapan akses gagal. Hubungi pengelola sebelum mencoba ulang." });
-
-  const { error: eventError } = await admin.from("cineblock_invitation_events").insert({
-    project_id: projectId, inviter_id: caller.id, invitee_email: email,
-  });
-  if (eventError) return reply(500, { error: "Akses telah disiapkan, tetapi pencatatan batas undangan gagal." });
 
   return reply(200, {
     ok: true,
