@@ -272,12 +272,18 @@ export default function AuthGate({ children }) {
               </>
             ) : (
               <>
-                <p className="auth-gate-empty">Akun ini belum memiliki proyek cloud yang dapat diakses.</p>
-                <form className="auth-gate-form" onSubmit={createCloudProject}>
-                  <label htmlFor="cineblock-new-cloud-project">Nama proyek baru</label>
-                  <input id="cineblock-new-cloud-project" value={newProjectName} onChange={event => setNewProjectName(event.target.value)} maxLength={160} required placeholder="Nama proyek CineBlock" />
-                  <button type="submit" disabled={busy}>{busy ? 'Membuat…' : 'Buat proyek cloud'}</button>
-                </form>
+                {session?.user?.id === 'cf4a51e8-825e-4db4-8b8a-037d3908663c' ? (
+                  <>
+                    <p className="auth-gate-empty">Akun pemilik CineBlock belum memiliki proyek cloud. Buat proyek pertama untuk mulai bekerja.</p>
+                    <form className="auth-gate-form" onSubmit={createCloudProject}>
+                      <label htmlFor="cineblock-new-cloud-project">Nama proyek baru</label>
+                      <input id="cineblock-new-cloud-project" value={newProjectName} onChange={event => setNewProjectName(event.target.value)} maxLength={160} required placeholder="Nama proyek CineBlock" />
+                      <button type="submit" disabled={busy}>{busy ? 'Membuat…' : 'Buat proyek cloud'}</button>
+                    </form>
+                  </>
+                ) : (
+                  <p className="auth-gate-empty">Akun ini belum memiliki proyek cloud yang dibagikan kepadamu. Hubungi pemilik CineBlock untuk meminta akses. Hanya pemilik CineBlock yang dapat membuat dan membagikan proyek.</p>
+                )}
               </>
             )}
           </div>
