@@ -1187,6 +1187,7 @@ export default function Floorplan({
       type,
       offset: 0.5,
       width: type === 'door' ? 48 : 58,
+      height: type === 'door' ? 210 : 120,
       ...(type === 'door' ? { swingDirection: 'in', doorType: 'single' } : {}),
       ...(selectedType === 'room' ? { edgeIndex: Math.max(0, getRoomPoints(selectedEntity).length - 1) } : {}),
     }
@@ -2934,6 +2935,14 @@ export default function Floorplan({
                               updateOpening(opening.id, { width: Math.round(meters * 100) })
                             }} />
                           </div>
+                          <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-height'}>Tinggi (m)</label>
+                            <input id={opening.id + '-height'} className="floorplan-field" type="number" min="0.30" max="4.00" step="0.01" value={(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                              const meters = Number(event.target.value)
+                              if (!Number.isFinite(meters) || meters < 0.3 || meters > 4) return
+                              updateOpening(opening.id, { height: Math.round(meters * 100) })
+                            }} />
+                          </div>
                           {opening.type === 'door' && <>
                             <div className="floorplan-dimension-input">
                               <label htmlFor={opening.id + '-swing'}>Arah buka</label>
@@ -2992,6 +3001,14 @@ export default function Floorplan({
                               const meters = Number(event.target.value)
                               if (!Number.isFinite(meters) || meters < 0.3 || meters > 5) return
                               updateOpening(opening.id, { width: Math.round(meters * 100) })
+                            }} />
+                          </div>
+                          <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-height'}>Tinggi (m)</label>
+                            <input id={opening.id + '-height'} className="floorplan-field" type="number" min="0.30" max="4.00" step="0.01" value={(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                              const meters = Number(event.target.value)
+                              if (!Number.isFinite(meters) || meters < 0.3 || meters > 4) return
+                              updateOpening(opening.id, { height: Math.round(meters * 100) })
                             }} />
                           </div>
                           {opening.type === 'door' && <>
