@@ -98,6 +98,19 @@ const getRoomEdges = room => getRoomPoints(room).map((point, index, points) => {
   const dy = next.y - point.y
   return { edgeIndex: index, x1: point.x, y1: point.y, x2: next.x, y2: next.y, length: Math.hypot(dx, dy), angle: Math.atan2(dy, dx) * 180 / Math.PI }
 })
+const getRoomDimensionGeometry = (room, edge) => {
+  const points = getRoomPoints(room)
+  const center = points.reduce((sum, point) => ({ x: sum.x + point.x / points.length, y: sum.y + point.y / points.length }), { x: 0, y: 0 })
+  const dx = edge.x2 - edge.x1, dy = edge.y2 - edge.y1
+  const length = Math.hypot(dx, dy) || 1
+  let nx = dy / length, ny = -dx / length
+  const midpoint = { x: (edge.x1 + edge.x2) / 2, y: (edge.y1 + edge.y2) / 2 }
+  if ((center.x - midpoint.x) * nx + (center.y - midpoint.y) * ny > 0) { nx *= -1; ny *= -1 }
+  const offset = 22
+  const x1 = edge.x1 + nx * offset, y1 = edge.y1 + ny * offset
+  const x2 = edge.x2 + nx * offset, y2 = edge.y2 + ny * offset
+  return { x1, y1, x2, y2, mx: (x1 + x2) / 2, my: (y1 + y2) / 2, length: edge.length, angle: Math.atan2(dy, dx) * 180 / Math.PI }
+}
 const pointInPolygon = (point, points) => {
   let inside = false
   for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
@@ -370,6 +383,8 @@ export default function Floorplan({
   const [roomLengthInputOpen, setRoomLengthInputOpen] = useState(false)
   const [roomLengthInput, setRoomLengthInput] = useState('')
   const [roomDrawMessage, setRoomDrawMessage] = useState('')
+  const [showRoomDimensions, setShowRoomDimensions] = useState(true)
+  const [hoveredRoomEdge, setHoveredRoomEdge] = useState(null)
   const [previewPoint, setPreviewPoint] = useState(null)
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: MAP_WIDTH, height: MAP_HEIGHT })
   const [historyRevision, setHistoryRevision] = useState(0)
@@ -1916,6 +1931,7 @@ export default function Floorplan({
         )}
         <div className="floorplan-structure-group" role="group" aria-label="Struktur">
           <span className="floorplan-structure-label">Struktur</span>
+          <button type="button" className={'floorplan-tool-button' + (showRoomDimensions ? ' active' : '')} onClick={() => setShowRoomDimensions(value => !value)} title={showRoomDimensions ? 'Sembunyikan dimensi Room' : 'Tampilkan dimensi Room'} aria-pressed={showRoomDimensions}><Ruler size={18} /><span>Dimensi</span></button>
           <button className={'floorplan-tool-button' + (tool === 'room' ? ' active' : '')} onClick={() => setTool('room')} title="Buat Room baru dengan drag" aria-label="Buat Room baru" aria-pressed={tool === 'room'}>
             <Square size={18} /><span>Ruang</span>
           </button>
@@ -2040,6 +2056,17 @@ export default function Floorplan({
                         </g>
                       )
                     })}
+                    {showRoomDimensions && (active || hoveredRoomEdge?.roomId === room.id) && edges.map(edge => {
+                      const d = getRoomDimensionGeometry(room, edge)
+                      const label = (edge.length / 100).toFixed(2) + ' m'
+                      return <g key={'dimension-' + edge.edgeIndex} pointerEvents="none">
+                        <line x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2} stroke="var(--text-muted)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                        <path d={'M ' + (d.x1 + (d.x2 - d.x1) * 0.035) + ' ' + (d.y1 + (d.y2 - d.y1) * 0.035) + ' L ' + d.x1 + ' ' + d.y1 + ' L ' + (d.x1 + (d.x2 - d.x1) * 0.035 + (d.y1 - d.y2) * 0.012) + ' ' + (d.y1 + (d.y2 - d.y1) * 0.035 + (d.x2 - d.x1) * 0.012)} fill="var(--text-muted)" />
+                        <path d={'M ' + (d.x2 - (d.x2 - d.x1) * 0.035) + ' ' + (d.y2 - (d.y2 - d.y1) * 0.035) + ' L ' + d.x2 + ' ' + d.y2} fill="none" stroke="var(--text-muted)" strokeWidth="1" />
+                        <text x={d.mx} y={d.my - 4} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" transform={'rotate(' + (d.angle > 90 || d.angle < -90 ? d.angle + 180 : d.angle) + ' ' + d.mx + ' ' + d.my + ')'}>{label}</text>
+                      </g>
+                    })}
+                    {active && edges.map(edge => <line key={'edge-hit-' + edge.edgeIndex} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} stroke="transparent" strokeWidth="14" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerEnter={() => setHoveredRoomEdge({ roomId: room.id, edgeIndex: edge.edgeIndex })} onPointerLeave={() => setHoveredRoomEdge(current => current?.roomId === room.id && current.edgeIndex === edge.edgeIndex ? null : current)} onPointerDown={event => beginRoomEdgeDrag(room, edge.edgeIndex, event)} />)}
                     {active && points.map((point, index) => (
                       <circle key={'vertex-' + index} cx={point.x} cy={point.y} r="6" fill="var(--bg)" stroke="var(--accent)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerDown={event => beginRoomVertexDrag(room, index, event)} />
                     ))}
