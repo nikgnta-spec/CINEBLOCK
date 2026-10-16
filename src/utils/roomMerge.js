@@ -199,7 +199,14 @@ export function mergeAdjacentRoomPolygons(movingRoom, targetRoom, candidate) {
   const targetOpenings = remapOpenings(targetRoom, targetPoints, ti, shift)
   const movingOpenings = remapOpenings(movingRoom, movingPoints, mi)
   if ([...targetOpenings, ...movingOpenings].some(opening => opening.needsReposition)) return null
-  return { ...targetRoom, points: mergedPoints, openings: [...targetOpenings, ...movingOpenings] }
+  const sharedStart = addScaled(movingEdge.a, overlap.av, sharedRange.low)
+  const sharedEnd = addScaled(movingEdge.a, overlap.av, sharedRange.high)
+  const internalWalls = [
+    ...(Array.isArray(targetRoom.internalWalls) ? targetRoom.internalWalls : []),
+    ...(Array.isArray(movingRoom.internalWalls) ? movingRoom.internalWalls : []),
+    { x1: sharedStart.x, y1: sharedStart.y, x2: sharedEnd.x, y2: sharedEnd.y },
+  ]
+  return { ...targetRoom, points: mergedPoints, openings: [...targetOpenings, ...movingOpenings], internalWalls }
 }
 
 
