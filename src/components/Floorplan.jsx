@@ -122,23 +122,22 @@ const getRoomDimensionGeometry = (room, edge) => {
   const negativeProbe = { x: midpoint.x - nx * probeDistance, y: midpoint.y - ny * probeDistance }
   if (pointInPolygon(positiveProbe, points) && !pointInPolygon(negativeProbe, points)) { nx *= -1; ny *= -1 }
   const offset = 72
-  // Dimension guides stay perfectly horizontal/vertical instead of inheriting
-  // small vertex inaccuracies or the wall's diagonal angle.
-  let x1, y1, x2, y2, angle
+  // Dimension lines are always axis-aligned. For horizontal-ish edges,
+  // draw a horizontal dimension; for vertical-ish edges, draw a vertical one.
+  // Keep the measured label based on the actual edge length.
+  let x1, y1, x2, y2
   if (Math.abs(dx) >= Math.abs(dy)) {
     const guideY = midpoint.y + ny * offset
     x1 = Math.min(edge.x1, edge.x2)
     x2 = Math.max(edge.x1, edge.x2)
     y1 = y2 = guideY
-    angle = 0
   } else {
     const guideX = midpoint.x + nx * offset
     y1 = Math.min(edge.y1, edge.y2)
     y2 = Math.max(edge.y1, edge.y2)
     x1 = x2 = guideX
-    angle = 0
   }
-  return { x1, y1, x2, y2, mx: (x1 + x2) / 2, my: (y1 + y2) / 2, length: edge.length, angle }
+  return { x1, y1, x2, y2, mx: (x1 + x2) / 2, my: (y1 + y2) / 2, length: edge.length, angle: 0 }
 }
 const snapRoomPoint = (point, origin, anchors, tolerance) => {
   if (!origin) return { point, guides: [] }
