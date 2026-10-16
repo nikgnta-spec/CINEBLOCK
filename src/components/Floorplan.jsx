@@ -486,31 +486,32 @@ export default function Floorplan({
 
   const updateLayout = updater => {
     if (!scene) return
-    onFloorplansChange(previous => {
-      const stored = previous?.[scene.id] || EMPTY_LAYOUT
-      const currentLayout = { ...stored, rooms: layoutRef.current?.rooms || [] }
-      const nextLayout = updater(currentLayout)
-      if (reusableRoomMode && JSON.stringify(nextLayout.rooms || []) !== JSON.stringify(currentLayout.rooms || [])) {
-        const beforeRooms = currentLayout.rooms || []
-        const afterRooms = nextLayout.rooms || []
-        const beforeIds = new Set(beforeRooms.map(room => room.id))
-        const afterIds = new Set(afterRooms.map(room => room.id))
-        const nextRoomIds = (scene.roomIds || []).filter(id => afterIds.has(id))
-        afterRooms.forEach(room => {
-          if (!beforeIds.has(room.id)) nextRoomIds.push(room.id)
-        })
-        onProjectRoomsChange?.(previousRooms => {
-          const roomMap = new Map((previousRooms || []).map(room => [room.id, room]))
-          afterRooms.forEach(room => roomMap.set(room.id, room))
-          return [...roomMap.values()]
-        })
-        onChange?.(previousScenes => previousScenes.map(item => item.id === scene.id
-          ? { ...item, roomIds: [...new Set(nextRoomIds)] }
-          : item))
-      }
-      const { rooms: ignoredRooms, ...persistedLayout } = nextLayout
-      return { ...previous, [scene.id]: reusableRoomMode ? persistedLayout : nextLayout }
-    })
+    const stored = floorplans?.[scene.id] || EMPTY_LAYOUT
+    const currentLayout = { ...stored, rooms: layoutRef.current?.rooms || [] }
+    const nextLayout = updater(currentLayout)
+    if (reusableRoomMode && JSON.stringify(nextLayout.rooms || []) !== JSON.stringify(currentLayout.rooms || [])) {
+      const beforeRooms = currentLayout.rooms || []
+      const afterRooms = nextLayout.rooms || []
+      const beforeIds = new Set(beforeRooms.map(room => room.id))
+      const afterIds = new Set(afterRooms.map(room => room.id))
+      const nextRoomIds = (scene.roomIds || []).filter(id => afterIds.has(id))
+      afterRooms.forEach(room => {
+        if (!beforeIds.has(room.id)) nextRoomIds.push(room.id)
+      })
+      onProjectRoomsChange?.(previousRooms => {
+        const roomMap = new Map((previousRooms || []).map(room => [room.id, room]))
+        afterRooms.forEach(room => roomMap.set(room.id, room))
+        return [...roomMap.values()]
+      })
+      onChange?.(previousScenes => previousScenes.map(item => item.id === scene.id
+        ? { ...item, roomIds: [...new Set(nextRoomIds)] }
+        : item))
+    }
+    const { rooms: ignoredRooms, ...persistedLayout } = nextLayout
+    onFloorplansChange(previous => ({
+      ...previous,
+      [scene.id]: reusableRoomMode ? persistedLayout : nextLayout,
+    }))
   }
 
   const applyEntitySelection = (items, primary = null) => {
