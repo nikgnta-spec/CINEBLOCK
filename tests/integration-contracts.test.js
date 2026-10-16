@@ -39,7 +39,7 @@ test('deleting a scene removes its floorplan layout as well as its shots', async
 test('project and planning data are included in the print report input', async () => {
   const source = await readSource('../src/App.jsx')
 
-  assert.match(source, /<PrintReport project={project} scenes={scenes} floorplans={resolvedFloorplans}/)
+  assert.match(source, /<PrintReport project=\\{project\\} scenes=\\{scenes\\} floorplans=\\{resolvedFloorplans\\}/)
 })
 
 test('backup import has a pre-read size limit and validates before replacing active state', async () => {
