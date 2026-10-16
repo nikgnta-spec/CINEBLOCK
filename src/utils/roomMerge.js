@@ -95,22 +95,45 @@ function splitAndCancelEdges(roomPoints, otherPoints, tolerance = 1.5) {
 
 function tracePolygon(edges) {
   if (edges.length < 3) return null
-  const polygon = []
+  // Trace only edge-to-edge connections. Do not silently bridge a missing
+  // segment with a diagonal: that creates self-crossing/notched Rooms when
+  // the shared wall is only partially overlapping.
   const remaining = [...edges]
-  let edge = remaining.shift()
-  polygon.push(edge.a)
-  let end = edge.b
+  const first = remaining.shift()
+  const polygon = [{ ...first.a }]
+  let current = first.b
+  let previousDirection = subtract(first.b, first.a)
   let guard = 0
-  while (remaining.length && guard++ < edges.length + 2) {
-    const index = remaining.findIndex(item => samePoint(item.a, end, 1.5) || samePoint(item.b, end, 1.5))
-    if (index < 0) return null
-    edge = remaining.splice(index, 1)[0]
-    if (samePoint(edge.b, end, 1.5)) edge = { a: edge.b, b: edge.a }
-    if (!samePoint(edge.a, end, 1.5)) return null
-    end = edge.b
-    if (!samePoint(end, polygon[0], 1.5)) polygon.push(end)
+
+  while (guard++ < edges.length + 2) {
+    if (samePoint(current, polygon[0], 1.5)) break
+    const candidates = []
+    for (let i = 0; i < remaining.length; i++) {
+      const edge = remaining[i]
+      if (samePoint(edge.a, current, 1.5)) candidates.push({ i, edge, reverse: false })
+      if (samePoint(edge.b, current, 1.5)) candidates.push({ i, edge, reverse: true })
+    }
+    if (!candidates.length) return null
+    // At a T-junction, choose the continuation that follows the exterior
+    // boundary with the smallest turn rather than whichever edge appears first.
+    candidates.sort((left, right) => {
+      const direction = item => {
+        const a = item.reverse ? item.edge.b : item.edge.a
+        const b = item.reverse ? item.edge.a : item.edge.b
+        return subtract(b, a)
+      }
+      const turn = v => Math.atan2(cross(previousDirection, v), dot(previousDirection, v))
+      return turn(direction(left)) - turn(direction(right))
+    })
+    const chosen = candidates[0]
+    remaining.splice(chosen.i, 1)
+    const next = chosen.reverse ? chosen.edge.a : chosen.edge.b
+    if (!samePoint(current, polygon[polygon.length - 1], 1.5)) polygon.push({ ...current })
+    previousDirection = subtract(next, current)
+    current = next
   }
-  if (remaining.length || !samePoint(end, polygon[0], 1.5) || polygon.length < 3) return null
+
+  if (remaining.length || !samePoint(current, polygon[0], 1.5) || polygon.length < 3) return null
   const cleaned = polygon.filter((p, i) => i === 0 || !samePoint(p, polygon[i - 1], 1))
   if (cleaned.length < 3) return null
   const area = cleaned.reduce((sum, p, i) => { const n = cleaned[(i + 1) % cleaned.length]; return sum + p.x * n.y - n.x * p.y }, 0) / 2
