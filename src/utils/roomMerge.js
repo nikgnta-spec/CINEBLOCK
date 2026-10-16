@@ -161,24 +161,25 @@ export function mergeAdjacentRoomPolygons(movingRoom, targetRoom, candidate) {
   const shift = { x: -normal.x * signed, y: -normal.y * signed }
   const alignedTarget = targetPoints.map(p => ({ x: p.x + shift.x, y: p.y + shift.y }))
 
-  const sharedHasOpening = (room, edgeIndex) => (room.openings || []).some(opening => Number(opening.edgeIndex) === edgeIndex)
-  // Any opening on the removed shared segment cannot survive as a wall opening.
+  // Openings on the shared segment become internal and are intentionally
+  // removed during the merge. Openings outside that segment are preserved.
   const sharedRange = overlapOnLine(movingEdge, { a: { x: targetEdge.a.x + shift.x, y: targetEdge.a.y + shift.y }, b: { x: targetEdge.b.x + shift.x, y: targetEdge.b.y + shift.y } }, 1.5)
   if (!sharedRange) return null
-  const openingOnSharedOverlap = (room, points, edgeIndex, range, source) => (room.openings || []).some(opening => {
+  const isOpeningOnSharedSegment = (opening, roomPoints, edgeIndex) => {
     if (Number(opening.edgeIndex) !== edgeIndex) return false
+    const edge = edgesOf({ points: roomPoints })[edgeIndex]
+    if (!edge) return false
     const offset = Math.max(0, Math.min(1, Number(opening.offset ?? 0.5)))
-    const edge = edgesOf({ points })[edgeIndex]
-    const coordinate = dot(subtract(addScaled(edge.a, subtract(edge.b, edge.a), offset), movingEdge.a), overlap.av)
-    return coordinate >= range.low - 1 && coordinate <= range.high + 1
-  })
-  if (openingOnSharedOverlap(movingRoom, movingPoints, mi, sharedRange, 0) || openingOnSharedOverlap(targetRoom, alignedTarget, ti, sharedRange, 1)) return null
+    const center = addScaled(edge.a, subtract(edge.b, edge.a), offset)
+    const coordinate = dot(subtract(center, movingEdge.a), overlap.av)
+    return coordinate >= sharedRange.low - 1 && coordinate <= sharedRange.high + 1
+  }
 
   const rawEdges = splitAndCancelEdges(movingPoints, alignedTarget)
   const mergedPoints = tracePolygon(rawEdges)
   if (!mergedPoints) return null
 
-  const remapOpenings = (room, originalPoints, shiftBy = { x: 0, y: 0 }) => (room.openings || []).map(opening => {
+  const remapOpenings = (room, originalPoints, sharedEdgeIndex, shiftBy = { x: 0, y: 0 }) => (room.openings || []).filter(opening => !isOpeningOnSharedSegment(opening, originalPoints, sharedEdgeIndex)).map(opening => {
     const oldIndex = Number(opening.edgeIndex)
     if (!Number.isInteger(oldIndex) || oldIndex < 0 || oldIndex >= originalPoints.length) return { ...opening }
     const originalEdge = edgesOf({ points: originalPoints })[oldIndex]
@@ -195,8 +196,8 @@ export function mergeAdjacentRoomPolygons(movingRoom, targetRoom, candidate) {
     if (!nearest || nearest.distance > 3) return { ...opening, edgeIndex: -1, needsReposition: true }
     return { ...opening, edgeIndex: nearest.edgeIndex, offset: nearest.offset }
   })
-  const targetOpenings = remapOpenings(targetRoom, targetPoints, shift)
-  const movingOpenings = remapOpenings(movingRoom, movingPoints)
+  const targetOpenings = remapOpenings(targetRoom, targetPoints, ti, shift)
+  const movingOpenings = remapOpenings(movingRoom, movingPoints, mi)
   if ([...targetOpenings, ...movingOpenings].some(opening => opening.needsReposition)) return null
   return { ...targetRoom, points: mergedPoints, openings: [...targetOpenings, ...movingOpenings] }
 }
