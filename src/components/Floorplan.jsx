@@ -4,7 +4,7 @@ import {
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
 import { snapRoomPoint } from '../utils/roomSnapping'
-import { findRoomMergeCandidate, mergeAdjacentRoomPolygons } from '../utils/roomMerge'
+import { findRoomMergeCandidate } from '../utils/roomMerge'
 import {
   SIZES as SHOT_SIZES,
   ANGLES as SHOT_ANGLES,
