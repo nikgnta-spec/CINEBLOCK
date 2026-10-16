@@ -260,7 +260,7 @@ function FloorplanObjectIcon({ type, size = 20 }) {
     <svg
       width={size}
       height={size}
-      viewBox={type === 'camera' ? '-36 -25 72 50' : type === 'light' ? '-26 -28 52 56' : ['door', 'window', 'prop', 'room', 'wall'].includes(type) ? '-26 -22 52 44' : '-50 -42 100 84'}
+      viewBox={type === 'camera' ? '-36 -25 72 50' : type === 'light' ? '-26 -28 52 56' : ['door', 'doorway', 'window', 'prop', 'room', 'wall'].includes(type) ? '-26 -22 52 44' : '-50 -42 100 84'}
       fill="none"
       stroke="currentColor"
       strokeWidth="3.5"
@@ -273,6 +273,10 @@ function FloorplanObjectIcon({ type, size = 20 }) {
         <rect x="-17" y="-13" width="34" height="26" />
       ) : type === 'wall' ? (
         <path d="M-20 0 H20" strokeWidth="5" />
+      ) : type === 'doorway' ? (
+        <g>
+          <path d="M-20 -5 H-8 M8 -5 H20 M-20 5 H-8 M8 5 H20" />
+        </g>
       ) : type === 'door' ? (
         <g>
           <path d="M-16 -5 H16 M-16 5 H16" />
@@ -2926,7 +2930,7 @@ export default function Floorplan({
                     <div className="floorplan-section-title">Bukaan</div>
                     <div className="floorplan-opening-actions">
                       <button className="floorplan-opening-add" onClick={() => addOpening('door')}><FloorplanObjectIcon type="door" size={18} /> Tambah pintu</button>
-                       <button className="floorplan-opening-add" onClick={() => addOpening('doorway')}><FloorplanObjectIcon type="door" size={18} /> Tambah pintu tanpa daun</button>
+                       <button className="floorplan-opening-add" onClick={() => addOpening('doorway')}><FloorplanObjectIcon type="doorway" size={18} /> Tambah pintu tanpa daun</button>
                       <button className="floorplan-opening-add" onClick={() => addOpening('window')}><FloorplanObjectIcon type="window" size={18} /> Tambah jendela</button>
                     </div>
                     {(selectedEntity.openings || []).map(opening => (
@@ -3024,7 +3028,7 @@ export default function Floorplan({
                     <div className="floorplan-section-title">Bukaan</div>
                     <div className="floorplan-opening-actions">
                       <button className="floorplan-opening-add" onClick={() => addOpening('door')}><FloorplanObjectIcon type="door" size={18} /> Tambah pintu</button>
-                       <button className="floorplan-opening-add" onClick={() => addOpening('doorway')}><FloorplanObjectIcon type="door" size={18} /> Tambah pintu tanpa daun</button>
+                       <button className="floorplan-opening-add" onClick={() => addOpening('doorway')}><FloorplanObjectIcon type="doorway" size={18} /> Tambah pintu tanpa daun</button>
                       <button className="floorplan-opening-add" onClick={() => addOpening('window')}><FloorplanObjectIcon type="window" size={18} /> Tambah jendela</button>
                     </div>
                     {(selectedEntity.openings || []).map(opening => (
