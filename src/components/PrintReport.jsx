@@ -31,13 +31,24 @@ function wallMetrics(wall) {
   return { dx, dy, length, ux: dx / (length || 1), uy: dy / (length || 1), angle: Math.atan2(dy, dx) * 180 / Math.PI }
 }
 
+function roomPoints(room) {
+  if (Array.isArray(room.points) && room.points.length >= 3) return room.points
+  return [{ x: room.x, y: room.y }, { x: room.x + room.width, y: room.y }, { x: room.x + room.width, y: room.y + room.height }, { x: room.x, y: room.y + room.height }]
+}
+
+function roomEdges(room) {
+  return roomPoints(room).map((point, index, points) => {
+    const next = points[(index + 1) % points.length]
+    const dx = next.x - point.x, dy = next.y - point.y
+    return { edgeIndex: index, x1: point.x, y1: point.y, x2: next.x, y2: next.y, length: Math.hypot(dx, dy), angle: Math.atan2(dy, dx) * 180 / Math.PI }
+  })
+}
+
 function roomOpeningPlacement(room, opening) {
-  const side = opening.side || 'bottom'
+  const edges = roomEdges(room)
+  const edge = edges[Math.max(0, Math.min(edges.length - 1, Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)))] || edges[0]
   const offset = Math.max(0.02, Math.min(0.98, Number(opening.offset) || 0.5))
-  if (side === 'top') return { x: room.x + offset * room.width, y: room.y, angle: 180, length: room.width }
-  if (side === 'right') return { x: room.x + room.width, y: room.y + offset * room.height, angle: -90, length: room.height }
-  if (side === 'left') return { x: room.x, y: room.y + offset * room.height, angle: 90, length: room.height }
-  return { x: room.x + offset * room.width, y: room.y + room.height, angle: 0, length: room.width }
+  return { x: edge.x1 + (edge.x2 - edge.x1) * offset, y: edge.y1 + (edge.y2 - edge.y1) * offset, angle: edge.angle, length: edge.length }
 }
 
 function focalLength(value) {
@@ -99,7 +110,7 @@ function PrintFloorplan({ scene, layout }) {
         ))}
 
         {rooms.map(room => (
-          <rect key={'room-fill-' + room.id} x={room.x} y={room.y} width={room.width} height={room.height} fill="#fafafa" stroke="none" />
+          <polygon key={'room-fill-' + room.id} points={roomPoints(room).map(point => point.x + ',' + point.y).join(' ')} fill="#fafafa" stroke="none" />
         ))}
 
         {lights.map(light => (
@@ -125,27 +136,18 @@ function PrintFloorplan({ scene, layout }) {
 
         {rooms.map(room => {
           const openings = room.openings || []
-          const edges = [
-            { side: 'top', x: room.x, y: room.y, length: room.width, horizontal: true },
-            { side: 'right', x: room.x + room.width, y: room.y, length: room.height, horizontal: false },
-            { side: 'bottom', x: room.x, y: room.y + room.height, length: room.width, horizontal: true },
-            { side: 'left', x: room.x, y: room.y, length: room.height, horizontal: false },
-          ]
+          const points = roomPoints(room)
+          const edges = roomEdges(room)
+          const bounds = { x: Math.min(...points.map(point => point.x)), y: Math.min(...points.map(point => point.y)) }
           return (
             <g key={'room-outline-' + room.id}>
-              {edges.flatMap(edge => openingSegments(edge.length, openings.filter(opening => (opening.side || 'bottom') === edge.side)).map((segment, index) => (
-                <line
-                  key={edge.side + index}
-                  x1={edge.horizontal ? room.x + segment.start : edge.x}
-                  y1={edge.horizontal ? edge.y : room.y + segment.start}
-                  x2={edge.horizontal ? room.x + segment.end : edge.x}
-                  y2={edge.horizontal ? edge.y : room.y + segment.end}
-                  stroke="#111827"
-                  strokeWidth="3"
-                />
-              )))}
-              <text x={room.x + 9} y={room.y + 20} fontSize="16" fontWeight="700" fill="#111827">{room.label || 'Room'}</text>
-              <text x={room.x + 9} y={room.y + 37} fontSize="12" fill="#374151">{meters(room.width)} × {meters(room.height)}</text>
+              {edges.flatMap(edge => openingSegments(edge.length, openings.filter(opening => (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)) === edge.edgeIndex)).map((segment, index) => {
+                const ux = (edge.x2 - edge.x1) / (edge.length || 1)
+                const uy = (edge.y2 - edge.y1) / (edge.length || 1)
+                return <line key={edge.edgeIndex + '-' + index} x1={edge.x1 + ux * segment.start} y1={edge.y1 + uy * segment.start} x2={edge.x1 + ux * segment.end} y2={edge.y1 + uy * segment.end} stroke="#111827" strokeWidth="3" />
+              }))}
+              <text x={bounds.x + 9} y={bounds.y + 20} fontSize="16" fontWeight="700" fill="#111827">{room.label || 'Room'}</text>
+              {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && <text x={bounds.x + 9} y={bounds.y + 37} fontSize="12" fill="#374151">{Number(room.ceilingHeight).toFixed(1) + ' m ceiling'}</text>}
               {openings.map(opening => {
                 const p = roomOpeningPlacement(room, opening)
                 const width = Math.min(Number(opening.width) || 48, p.length)
