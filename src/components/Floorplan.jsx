@@ -1087,7 +1087,7 @@ export default function Floorplan({
     // Path mode must intercept object pointer handlers: rooms and props can
     // visually cover the selected actor, but must never steal a waypoint click.
     if (tool === 'path' && event.button === 0) {
-      event.preventDefault()
+      // Keep the click event alive; only prevent object selection/drag handlers.
       event.stopPropagation()
       return
     }
