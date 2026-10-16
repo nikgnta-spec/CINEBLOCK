@@ -229,7 +229,7 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
         id: safeId(opening),
         type: opening.type === 'window' ? 'window' : 'door',
         offset: Math.max(0.02, Math.min(0.98, Number.isFinite(Number(opening.offset)) ? Number(opening.offset) : 0.5)),
-        width: Math.max(12, Math.min(300, Number(opening.width) || (opening.type === 'window' ? 58 : 48))),
+        width: Math.max(12, Math.min(500, Number(opening.width) || (opening.type === 'window' ? 58 : 48))),
         ...(allowSide ? { side: ['top', 'right', 'bottom', 'left'].includes(opening.side) ? opening.side : 'bottom' } : {}),
       }))
     const projectToSegment = (point, x1, y1, x2, y2) => {
