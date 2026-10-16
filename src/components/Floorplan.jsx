@@ -1198,7 +1198,7 @@ export default function Floorplan({
   }
 
   const handleCanvasPointerDownCapture = event => {
-    if (tool === 'room' && event.button === 0 && !spaceHeld) {
+    if (tool === 'room' && event.button === 0 && !spaceHeld && !event.target?.closest?.('foreignObject')) {
       event.preventDefault()
       event.stopPropagation()
       addRoomDrawingPoint(getPoint(event))
