@@ -466,3 +466,16 @@ test('Room vertex insertion uses a persistent selected edge, not transient hover
   assert.match(source, /if \(!room \|\| room\.locked \|\| selectedRoomEdge\?\.roomId !== room\.id\) return/)
   assert.match(source, /disabled=\{Boolean\(selectedEntity\.locked\) \|\| selectedRoomEdge\?\.roomId !== selectedEntity\.id\}/)
 })
+
+test('connecting adjacent Rooms preserves both Room records, labels, walls, and openings', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  const start = source.indexOf('const confirmRoomMerge = () => {')
+  const end = source.indexOf('\n  const addRoomVertexAtEdgeMidpoint', start)
+  assert.ok(start >= 0 && end > start, 'Room connection handler should exist')
+  const handler = source.slice(start, end)
+  assert.match(handler, /applyEntitySelection/)
+  assert.match(handler, /setRoomMergePrompt\(null\)/)
+  assert.doesNotMatch(handler, /mergeAdjacentRoomPolygons/)
+  assert.doesNotMatch(handler, /rooms: previous\.rooms\.filter/)
+  assert.match(source, /mọi dinding|semua dinding|dinding, pintu, dan jendela/i)
+})
