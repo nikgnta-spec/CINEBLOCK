@@ -1,5 +1,5 @@
 import { cloneElement, useEffect, useState } from 'react'
-import { Cloud, LockKeyhole, LogIn, Monitor, ShieldCheck, FolderOpen } from 'lucide-react'
+import { Cloud, LockKeyhole, LogIn, Monitor, ShieldCheck, FolderOpen, Users } from 'lucide-react'
 import { supabaseClient, supabaseConfig } from './lib/supabaseClient.js'
 import { loadCloudWorkspace } from './lib/cineblockSync.js'
 
