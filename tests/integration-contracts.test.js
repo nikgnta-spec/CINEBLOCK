@@ -117,6 +117,14 @@ test('Room dimensions are shown outside every polygon edge and can be toggled', 
   assert.match(source, /\(edge\.length \/ 100\)\.toFixed\(2\) \+ ' m'/)
 })
 
+test('Room dimensions distinguish individual wall lengths from overall bounds and keep openings draggable', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /m total/)
+  assert.match(source, /bounds\.x \+ bounds\.width \+ 48/)
+  const roomRender = source.slice(source.indexOf('layout.rooms.map(room => {'), source.indexOf('layout\.walls\.map'))
+  assert.ok(roomRender.indexOf("key={'edge-hit-'") < roomRender.indexOf("onPointerDown={event => beginOpeningDrag('room', room, opening, event)}"))
+})
+
 test('Dragging a Room edge translates both endpoint vertices in parallel', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /const beginRoomEdgeDrag =/)
