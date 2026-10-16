@@ -506,8 +506,9 @@ test('Room tool switches to move mode when dragging an existing Room and inspect
   assert.match(source, /connectedRoomIds: \(room\.connectedRoomIds \|\| \[\]\)\.filter\(id => id !== selectedEntity\.id\)/)
 })
 
-test('dragging a selected connected Room prioritizes its connected group over generic multi-selection', async () => {
+test('dragging a connected Room moves only the selected Room', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
-  assert.match(source, /if \(type !== 'room' && alreadySelected && currentSelection\.length > 1\)/)
-  assert.match(source, /const connectedIds = new Set\(\[item\.id, \.\.\.\(item\.connectedRoomIds \|\| \[\]\)\]\)/)
+  assert.match(source, /A Room connection is a logical relationship, not a rigid group/)
+  assert.match(source, /dragRef\.current = \{ mode: 'move', type, id: item\.id, start: point, original: item \}/)
+  assert.doesNotMatch(source, /const connectedIds = new Set\(\[item\.id, \.\.\.\(item\.connectedRoomIds \|\| \[\]\)\]\)/)
 })
