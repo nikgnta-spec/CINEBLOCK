@@ -958,6 +958,7 @@ export default function Floorplan({
   const beginObjectDrag = (type, item, event) => {
     event.stopPropagation()
     if (tool === 'pan') return
+    if (type === 'room' && !pointInPolygon(getPoint(event), getRoomPoints(item))) return
 
     if (event.shiftKey) {
       const wasSelected = selectionRef.current.some(entry => entry.type === type && entry.id === item.id)
