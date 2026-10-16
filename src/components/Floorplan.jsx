@@ -1735,7 +1735,6 @@ export default function Floorplan({
       const candidate = movedRoom && findRoomMergeCandidate(movedRoom, layout.rooms, 18)
       if (candidate) setRoomMergePrompt(candidate)
     }
-    const completedDrag = dragRef.current
     if (completedDrag?.mode === 'room-vertex') setRoomSnapGuides([])
     if (completedDrag?.mode === 'selection-box') {
       const end = completedDrag.current || completedDrag.start
