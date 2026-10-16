@@ -2010,7 +2010,7 @@ export default function Floorplan({
 
   useEffect(() => {
     if (!isActive) return undefined
-    const deleteSelectedRoomVertex = () => {
+  const deleteSelectedRoomVertex = () => {
     if (!selectedRoomVertex) return false
     const { roomId, vertexIndex } = selectedRoomVertex
     const room = (layoutRef.current?.rooms || layout.rooms).find(item => item.id === roomId)
@@ -2043,6 +2043,7 @@ export default function Floorplan({
     applyEntitySelection([{ type: 'room', id: roomId }], { type: 'room', id: roomId })
     return true
   }
+
 
   const handleFloorplanShortcut = event => {
       const target = event.target
