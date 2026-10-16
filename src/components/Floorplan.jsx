@@ -1007,7 +1007,7 @@ export default function Floorplan({
   }, [tool, selectedCanHavePath])
 
   const appendWaypoint = point => {
-    if (!selectedEntity || !selectedType || (selectedType === 'camera' && !selectedCameraCanHavePath) || selectedType === 'light' || selectedType === 'room' || selectedType === 'wall') return
+    if (!selectedEntity || selectedEntity.locked || !selectedType || (selectedType === 'camera' && !selectedCameraCanHavePath) || selectedType === 'light' || selectedType === 'room' || selectedType === 'wall') return
     setSelectedWaypoint(null)
     updateLayout(previous => ({
       ...previous,
@@ -1424,7 +1424,7 @@ export default function Floorplan({
   }
 
   const deleteSelectedWaypoint = () => {
-    if (!selectedWaypoint || !selected || selectedWaypoint.type !== selected.type || selectedWaypoint.id !== selected.id) return
+    if (!selectedWaypoint || !selected || selectedEntity?.locked || selectedWaypoint.type !== selected.type || selectedWaypoint.id !== selected.id) return
     const { type, id, index } = selectedWaypoint
     const item = (layout[type + 's'] || []).find(entry => entry.id === id)
     if (!item || !Array.isArray(item.path) || !item.path[index]) return
