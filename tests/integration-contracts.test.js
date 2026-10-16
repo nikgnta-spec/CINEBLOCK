@@ -301,6 +301,7 @@ test('Floorplan navigation supports shared cursor-anchored zoom, pinch, and expl
   assert.match(source, /const resetZoom = \(\) => setViewBox/)
   assert.match(source, /Reset zoom ke 100% \(1:1\)/)
   assert.match(source, /Muat seluruh denah ke kanvas/)
+  assert.match(source, /<aside className="floorplan-inspector" onWheel=\{event => event\.stopPropagation\(\)\} style=\{\{ overscrollBehavior: 'contain' \}\}>/)
 })
 
 test('Floorplan pan capture takes priority over object interactions and select-box is blank-canvas only', async () => {
