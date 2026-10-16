@@ -2615,7 +2615,7 @@ export default function Floorplan({
           </div>
         </div>
 
-        <aside className="floorplan-inspector">
+        <aside className="floorplan-inspector" onWheel={event => event.stopPropagation()} style={{ overscrollBehavior: 'contain' }}>
           {selectedEntity && selectedType ? (
             <>
               <div className="floorplan-inspector-head">
