@@ -142,46 +142,35 @@ const getRoomDimensionGeometry = (room, edge) => {
 const snapRoomPoint = (point, origin, anchors, tolerance) => {
   if (!origin) return { point, guides: [] }
 
-  // Resolve X and Y independently in canvas units. The caller converts the
-  // pixel tolerance using the live SVG rect and current viewBox scale.
-  // Independent axis checks allow true left/right AND up/down alignment,
-  // including both at once when the cursor is near an intersection.
-  const targets = [
-    { axis: 'x', value: origin.x, x: origin.x, y: point.y },
-    { axis: 'y', value: origin.y, x: point.x, y: origin.y },
-    ...anchors.flatMap(anchor => [
-      { axis: 'x', value: anchor.x, x: anchor.x, y: point.y, anchor },
-      { axis: 'y', value: anchor.y, x: point.x, y: anchor.y, anchor },
-    ]),
-  ]
-  let snappedX = point.x
-  let snappedY = point.y
-  let bestXDistance = tolerance
-  let bestYDistance = tolerance
-  let xAnchor = null
-  let yAnchor = null
+  // Snap each axis independently. Never let a successful X snap short-circuit
+  // the Y search (or vice versa): the final point may combine two different
+  // anchor vertices into one aligned intersection.
+  const xTargets = [origin, ...anchors]
+    .map(anchor => ({ value: anchor.x, anchor }))
+    .filter(target => Number.isFinite(target.value))
+  const yTargets = [origin, ...anchors]
+    .map(anchor => ({ value: anchor.y, anchor }))
+    .filter(target => Number.isFinite(target.value))
 
-  for (const target of targets) {
-    if (target.axis === 'x') {
-      const distance = Math.abs(point.x - target.value)
-      if (distance <= bestXDistance) {
-        bestXDistance = distance
-        snappedX = target.value
-        xAnchor = target.anchor || origin
-      }
-    } else {
-      const distance = Math.abs(point.y - target.value)
-      if (distance <= bestYDistance) {
-        bestYDistance = distance
-        snappedY = target.value
-        yAnchor = target.anchor || origin
-      }
-    }
+  const nearestX = xTargets.reduce((best, target) => {
+    const distance = Math.abs(point.x - target.value)
+    return distance <= best.distance ? { ...target, distance } : best
+  }, { value: point.x, distance: tolerance, anchor: null })
+  const nearestY = yTargets.reduce((best, target) => {
+    const distance = Math.abs(point.y - target.value)
+    return distance <= best.distance ? { ...target, distance } : best
+  }, { value: point.y, distance: tolerance, anchor: null })
+
+  const snappedX = nearestX.anchor ? nearestX.value : point.x
+  const snappedY = nearestY.anchor ? nearestY.value : point.y
+  const guides = []
+  if (nearestX.anchor) {
+    guides.push({ axis: 'vertical', x: snappedX, y: nearestX.anchor.y })
+  }
+  if (nearestY.anchor) {
+    guides.push({ axis: 'horizontal', x: nearestY.anchor.x, y: snappedY })
   }
 
-  const guides = []
-  if (xAnchor) guides.push({ axis: 'vertical', x: snappedX, y: xAnchor.y })
-  if (yAnchor) guides.push({ axis: 'horizontal', x: yAnchor.x, y: snappedY })
   return { point: { x: snappedX, y: snappedY }, guides }
 }
 const pointInPolygon = (point, points) => {
