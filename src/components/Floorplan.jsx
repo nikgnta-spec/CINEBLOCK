@@ -3,6 +3,7 @@ import {
   MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Undo2, Redo2, Lock, Unlock, Ruler,
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
+import { snapRoomPoint } from '../utils/roomSnapping'
 import {
   SIZES as SHOT_SIZES,
   ANGLES as SHOT_ANGLES,
@@ -139,40 +140,7 @@ const getRoomDimensionGeometry = (room, edge) => {
   }
   return { x1, y1, x2, y2, mx: (x1 + x2) / 2, my: (y1 + y2) / 2, length: edge.length, angle: 0 }
 }
-const snapRoomPoint = (point, origin, anchors, tolerance) => {
-  if (!origin) return { point, guides: [] }
 
-  // Snap each axis independently. Never let a successful X snap short-circuit
-  // the Y search (or vice versa): the final point may combine two different
-  // anchor vertices into one aligned intersection.
-  const xTargets = [origin, ...anchors]
-    .map(anchor => ({ value: anchor.x, anchor }))
-    .filter(target => Number.isFinite(target.value))
-  const yTargets = [origin, ...anchors]
-    .map(anchor => ({ value: anchor.y, anchor }))
-    .filter(target => Number.isFinite(target.value))
-
-  const nearestX = xTargets.reduce((best, target) => {
-    const distance = Math.abs(point.x - target.value)
-    return distance <= best.distance ? { ...target, distance } : best
-  }, { value: point.x, distance: tolerance, anchor: null })
-  const nearestY = yTargets.reduce((best, target) => {
-    const distance = Math.abs(point.y - target.value)
-    return distance <= best.distance ? { ...target, distance } : best
-  }, { value: point.y, distance: tolerance, anchor: null })
-
-  const snappedX = nearestX.anchor ? nearestX.value : point.x
-  const snappedY = nearestY.anchor ? nearestY.value : point.y
-  const guides = []
-  if (nearestX.anchor) {
-    guides.push({ axis: 'vertical', x: snappedX, y: nearestX.anchor.y })
-  }
-  if (nearestY.anchor) {
-    guides.push({ axis: 'horizontal', x: nearestY.anchor.x, y: snappedY })
-  }
-
-  return { point: { x: snappedX, y: snappedY }, guides }
-}
 const pointInPolygon = (point, points) => {
   let inside = false
   for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
