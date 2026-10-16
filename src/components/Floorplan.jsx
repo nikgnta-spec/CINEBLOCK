@@ -1038,6 +1038,21 @@ export default function Floorplan({
     updateSelected({ openings: (selectedEntity.openings || []).filter(opening => opening.id !== openingId) })
   }
 
+  const updateOpening = (openingId, patch) => {
+    if (!selectedEntity || selectedEntity.locked || !['room', 'wall'].includes(selectedType)) return
+    const openings = (selectedEntity.openings || []).map(opening => {
+      if (opening.id !== openingId) return opening
+      const next = { ...opening, ...patch }
+      const length = selectedType === 'room'
+        ? (['left', 'right'].includes(next.side) ? selectedEntity.height : selectedEntity.width)
+        : getWallMetrics(selectedEntity).length
+      const openingWidth = Math.min(Math.max(1, Number(next.width) || 1), Math.max(1, length))
+      const minimumOffset = Math.min(0.49, openingWidth / (2 * Math.max(1, length)))
+      return { ...next, width: openingWidth, offset: clamp(next.offset, minimumOffset, 1 - minimumOffset) }
+    })
+    updateSelected({ openings })
+  }
+
   const beginOpeningDrag = (hostType, host, opening, event) => {
     if (tool === 'pan' || host.locked) return
     event.stopPropagation()
@@ -2502,9 +2517,33 @@ export default function Floorplan({
                     </div>
                     {(selectedEntity.openings || []).map(opening => (
                       <div className="floorplan-opening-row" key={opening.id}>
-                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Door' : 'Window'}</span>
-                        <span className="floorplan-opening-hint">Geser untuk memindahkan</span>
-                        <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
+                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Pintu' : 'Jendela'}</span>
+                        <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} disabled={Boolean(selectedEntity.locked)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
+                        <div className="floorplan-opening-actions">
+                          <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-side'}>Sisi dinding</label>
+                            <select id={opening.id + '-side'} className="floorplan-field" value={ROOM_SIDES.some(side => side.value === opening.side) ? opening.side : 'bottom'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { side: event.target.value })}>
+                              {ROOM_SIDES.map(side => <option key={side.value} value={side.value}>{({ top: 'Atas', right: 'Kanan', bottom: 'Bawah', left: 'Kiri' })[side.value]}</option>)}
+                            </select>
+                          </div>
+                          <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-width'}>Lebar (m)</label>
+                            <input id={opening.id + '-width'} className="floorplan-field" type="number" min="0.30" max="5.00" step="0.01" value={(Number(opening.width || 48) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                              const meters = Number(event.target.value)
+                              if (!Number.isFinite(meters) || meters < 0.3 || meters > 5) return
+                              updateOpening(opening.id, { width: Math.round(meters * 100) })
+                            }} />
+                          </div>
+                          <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-offset'}>Posisi (%)</label>
+                            <input id={opening.id + '-offset'} className="floorplan-field" type="number" min="5" max="95" step="1" value={Math.round((Number(opening.offset) || 0.5) * 100)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                              const percent = Number(event.target.value)
+                              if (!Number.isFinite(percent) || percent < 5 || percent > 95) return
+                              updateOpening(opening.id, { offset: percent / 100 })
+                            }} />
+                          </div>
+                        </div>
+                        <span className="floorplan-opening-hint">Bisa digeser langsung di denah.</span>
                       </div>
                     ))}
                   </section>
@@ -2526,10 +2565,29 @@ export default function Floorplan({
                       <button className="floorplan-opening-add" onClick={() => addOpening('door')}><FloorplanObjectIcon type="door" size={18} /> Tambah pintu</button>
                       <button className="floorplan-opening-add" onClick={() => addOpening('window')}><FloorplanObjectIcon type="window" size={18} /> Tambah jendela</button>
                     </div>
-                    {(selectedEntity.openings || []).map(opening => (                      <div className="floorplan-opening-row" key={opening.id}>
-                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Door' : 'Window'}</span>
-                        <span className="floorplan-opening-hint">Geser di kanvas untuk memindahkan</span>
-                        <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
+                    {(selectedEntity.openings || []).map(opening => (
+                      <div className="floorplan-opening-row" key={opening.id}>
+                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Pintu' : 'Jendela'}</span>
+                        <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} disabled={Boolean(selectedEntity.locked)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
+                        <div className="floorplan-opening-actions">
+                          <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-width'}>Lebar (m)</label>
+                            <input id={opening.id + '-width'} className="floorplan-field" type="number" min="0.30" max="5.00" step="0.01" value={(Number(opening.width || 48) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                              const meters = Number(event.target.value)
+                              if (!Number.isFinite(meters) || meters < 0.3 || meters > 5) return
+                              updateOpening(opening.id, { width: Math.round(meters * 100) })
+                            }} />
+                          </div>
+                          <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-offset'}>Posisi (%)</label>
+                            <input id={opening.id + '-offset'} className="floorplan-field" type="number" min="5" max="95" step="1" value={Math.round((Number(opening.offset) || 0.5) * 100)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                              const percent = Number(event.target.value)
+                              if (!Number.isFinite(percent) || percent < 5 || percent > 95) return
+                              updateOpening(opening.id, { offset: percent / 100 })
+                            }} />
+                          </div>
+                        </div>
+                        <span className="floorplan-opening-hint">Bisa digeser langsung di denah.</span>
                       </div>
                     ))}
                   </section>
