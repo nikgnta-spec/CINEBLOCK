@@ -92,6 +92,17 @@ const getRoomBounds = room => {
   const ys = points.map(point => point.y)
   return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) }
 }
+const resizeRoomBounds = (room, dimension, targetUnits) => {
+  const points = getRoomPoints(room)
+  const bounds = getRoomBounds(room)
+  const current = dimension === 'length' ? bounds.width : bounds.height
+  if (!Number.isFinite(targetUnits) || targetUnits <= 0 || current <= 0) return room
+  const scale = targetUnits / current
+  const nextPoints = points.map(point => dimension === 'length'
+    ? { x: Math.round(bounds.x + (point.x - bounds.x) * scale), y: point.y }
+    : { x: point.x, y: Math.round(bounds.y + (point.y - bounds.y) * scale) })
+  return { ...room, points: nextPoints }
+}
 const getRoomEdges = room => getRoomPoints(room).map((point, index, points) => {
   const next = points[(index + 1) % points.length]
   const dx = next.x - point.x
@@ -2757,8 +2768,31 @@ export default function Floorplan({
                     <input id="room-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
                   </section>
                   <section className="floorplan-inspector-section">
-                    <div className="floorplan-section-title">Geometri polygon</div>
-                    <p className="floorplan-field-note">{getRoomPoints(selectedEntity).length} titik · bentuk dapat diedit dengan menyeret vertex di canvas.</p>
+                    <div className="floorplan-section-title">Ukuran ruangan</div>
+                    <p className="floorplan-field-note">Atur ukuran keseluruhan denah secara presisi. Bentuk polygon dipertahankan; titik-titik pada sumbu terkait akan diskalakan.</p>
+                    <div className="floorplan-dimension-grid">
+                      <div className="floorplan-dimension-input">
+                        <label htmlFor="room-length">Panjang (m)</label>
+                        <input id="room-length" className="floorplan-field" type="number" min="0.01" max="10" step="0.01" value={(getRoomBounds(selectedEntity).width / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                          const meters = Number(event.target.value)
+                          if (Number.isFinite(meters) && meters >= 0.01 && meters <= 10) {
+                            const resized = resizeRoomBounds(selectedEntity, 'length', meters * 100)
+                            updateLayout(previous => ({ ...previous, rooms: previous.rooms.map(room => room.id === selectedEntity.id ? resized : room) }))
+                          }
+                        }} />
+                      </div>
+                      <div className="floorplan-dimension-input">
+                        <label htmlFor="room-width">Lebar (m)</label>
+                        <input id="room-width" className="floorplan-field" type="number" min="0.01" max="6.5" step="0.01" value={(getRoomBounds(selectedEntity).height / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                          const meters = Number(event.target.value)
+                          if (Number.isFinite(meters) && meters >= 0.01 && meters <= 6.5) {
+                            const resized = resizeRoomBounds(selectedEntity, 'width', meters * 100)
+                            updateLayout(previous => ({ ...previous, rooms: previous.rooms.map(room => room.id === selectedEntity.id ? resized : room) }))
+                          }
+                        }} />
+                      </div>
+                    </div>
+                    <p className="floorplan-field-note">{getRoomPoints(selectedEntity).length} titik · panjang/lebar mengikuti bounding box polygon.</p>
                   </section>
                   <section className="floorplan-inspector-section">
                     <label htmlFor="room-ceiling-height">Tinggi ruangan (m)</label>
