@@ -1538,10 +1538,22 @@ export default function Floorplan({
     }
 
     if (drag.mode === 'room-vertex') {
-      const dx = point.x - drag.start.x
-      const dy = point.y - drag.start.y
+      const originalVertex = drag.originalPoints[drag.vertexIndex]
+      const snapTolerance = 9 * viewBox.width / Math.max(1, canvasSize.width)
+      const anchors = [
+        ...layout.rooms.flatMap(room => getRoomPoints(room).filter(vertex => !(room.id === drag.id && vertex === room.points?.[drag.vertexIndex]))),
+        ...(layout.walls || []).flatMap(wall => [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]),
+      ].filter(anchor => Math.hypot(anchor.x - originalVertex.x, anchor.y - originalVertex.y) > 0.01)
+      if (event.altKey) {
+        setRoomSnapGuides([])
+      } else {
+        const result = snapRoomPoint(point, originalVertex, anchors, snapTolerance)
+        point.x = result.point.x
+        point.y = result.point.y
+        setRoomSnapGuides(result.guides)
+      }
       const nextPoints = drag.originalPoints.map((vertex, index) => index === drag.vertexIndex
-        ? { x: Math.round(clamp(vertex.x + dx, 0, MAP_WIDTH)), y: Math.round(clamp(vertex.y + dy, 0, MAP_HEIGHT)) }
+        ? { x: Math.round(clamp(point.x, 0, MAP_WIDTH)), y: Math.round(clamp(point.y, 0, MAP_HEIGHT)) }
         : vertex)
       updateLayout(previous => ({ ...previous, rooms: previous.rooms.map(room => room.id === drag.id ? { ...room, points: nextPoints } : room) }))
       return
@@ -2110,6 +2122,14 @@ export default function Floorplan({
               </defs>
               <rect x={-MAP_WIDTH * 2} y={-MAP_HEIGHT * 2} width={MAP_WIDTH * 5} height={MAP_HEIGHT * 5} fill="var(--bg)" />
               <rect x={-MAP_WIDTH * 2} y={-MAP_HEIGHT * 2} width={MAP_WIDTH * 5} height={MAP_HEIGHT * 5} fill="url(#floorplan-grid)" pointerEvents="none" />
+              <g pointerEvents="none">
+                {roomSnapGuides.map((guide, index) => <line key={'snap-guide-active-' + index}
+                  x1={guide.axis === 'horizontal' ? viewBox.x : guide.x}
+                  y1={guide.axis === 'vertical' ? viewBox.y : guide.y}
+                  x2={guide.axis === 'horizontal' ? viewBox.x + viewBox.width : guide.x}
+                  y2={guide.axis === 'vertical' ? viewBox.y + viewBox.height : guide.y}
+                  stroke="var(--accent)" strokeWidth="1" strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />)}
+              </g>
 
               {layout.rooms.map(room => {
                 const points = getRoomPoints(room)
