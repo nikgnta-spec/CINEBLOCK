@@ -140,10 +140,16 @@ test('Room dimensions distinguish individual wall lengths from overall bounds an
   assert.match(source, /y1 = y2 = guideY/)
   assert.match(source, /x1 = x2 = guideX/)
   assert.match(source, /angle: 0/)
-  const roomRender = source.slice(source.indexOf('layout.rooms.map(room => {'), source.indexOf('layout\.walls\.map'))
-  assert.match(roomRender, /key=\{'edge-hit-'\}/)
+  const roomRenderStart = source.indexOf('layout.rooms.map(room => {')
+  const roomRenderEnd = source.indexOf('layout.walls.map', roomRenderStart)
+  assert.notEqual(roomRenderStart, -1, 'Room polygon render block must exist')
+  assert.notEqual(roomRenderEnd, -1, 'Room render block must end before wall render block')
+  const roomRender = source.slice(roomRenderStart, roomRenderEnd)
+  assert.match(roomRender, /key=\{'edge-hit-' \+ edge\.edgeIndex\}/)
+  assert.match(roomRender, /stroke="transparent" strokeWidth="14"/)
   assert.match(roomRender, /beginRoomEdgeDrag\(room, edge\.edgeIndex, event\)/)
   assert.match(roomRender, /beginOpeningDrag\('room', room, opening, event\)/)
+  assert.match(roomRender, /openings\.map\(opening =>/)
 })
 
 test('Door opening controls expose swing direction and single or double leaves', async () => {
