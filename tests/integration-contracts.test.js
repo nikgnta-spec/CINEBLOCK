@@ -348,3 +348,10 @@ test('Leafless doorway is a distinct opening type with editable label and direct
   assert.match(app, /opening\.type === 'doorway'.*label:/)
   assert.match(report, /opening\.type === 'doorway' \? \(opening\.label \|\| 'Pintu Tanpa Daun'\)/)
 })
+
+
+test('Leafless doorway uses an open-gap icon rather than the door-leaf symbol', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /type === 'doorway' \? \([\s\S]*?M-20 -5 H-8 M8 -5 H20 M-20 5 H-8 M8 5 H20/)
+  assert.match(source, /<FloorplanObjectIcon type="doorway" size=\{18\} \/> Tambah pintu tanpa daun/)
+})
