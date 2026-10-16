@@ -1033,7 +1033,7 @@ export default function Floorplan({
     const target = layout.rooms.find(room => room.id === roomMergePrompt.targetRoomId)
     const merged = mergeAdjacentRoomPolygons(moving, target, roomMergePrompt)
     if (!merged) {
-      setRoomMergePrompt({ ...roomMergePrompt, error: 'Bentuk kedua Room belum bisa disatukan dengan aman. Coba sejajarkan sisi yang sama panjang terlebih dahulu.' })
+      setRoomMergePrompt({ ...roomMergePrompt, error: 'Gabungan ini berisiko merusak bentuk atau bukaan. Sejajarkan sisi yang sama panjang dan pindahkan pintu/jendela dari sisi sambungan terlebih dahulu.' })
       return
     }
     updateLayout(previous => ({
@@ -1045,7 +1045,7 @@ export default function Floorplan({
   }
 
   const beginRoomVertexDrag = (room, vertexIndex, event) => {
-    if (tool === 'pan' || room.locked) return
+    if (tool === 'pan' || room.locked || event.detail > 1) return
     event.stopPropagation()
     event.preventDefault()
     applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id })
