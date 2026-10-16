@@ -156,6 +156,11 @@ function PrintFloorplan({ scene, layout }) {
                         <path d={'M ' + (-width / 2) + ' 0 V ' + (-width)} />
                         <path d={'M ' + (-width / 2) + ' ' + (-width) + ' A ' + width + ' ' + width + ' 0 0 1 ' + (width / 2) + ' 0'} strokeDasharray="4 3" />
                       </>
+                    ) : opening.type === 'doorway' ? (
+                      <>
+                        <path d={'M ' + (-width / 2) + ' -5 H ' + (-width / 2 + 10) + ' M ' + (width / 2 - 10) + ' -5 H ' + (width / 2) + ' M ' + (-width / 2) + ' 5 H ' + (-width / 2 + 10) + ' M ' + (width / 2 - 10) + ' 5 H ' + (width / 2)} />
+                        <path d={'M ' + (-width / 2 + 10) + ' -8 V 8 M ' + (width / 2 - 10) + ' -8 V 8'} />
+                      </>
                     ) : (
                       <>
                         <path d={'M ' + (-width / 2) + ' -4 H ' + (width / 2) + ' M ' + (-width / 2) + ' 0 H ' + (width / 2) + ' M ' + (-width / 2) + ' 4 H ' + (width / 2)} />
@@ -196,6 +201,11 @@ function PrintFloorplan({ scene, layout }) {
                       <>
                         <path d={'M ' + (-width / 2) + ' 0 V ' + (-width)} />
                         <path d={'M ' + (-width / 2) + ' ' + (-width) + ' A ' + width + ' ' + width + ' 0 0 1 ' + (width / 2) + ' 0'} strokeDasharray="4 3" />
+                      </>
+                    ) : opening.type === 'doorway' ? (
+                      <>
+                        <path d={'M ' + (-width / 2) + ' -5 H ' + (-width / 2 + 10) + ' M ' + (width / 2 - 10) + ' -5 H ' + (width / 2) + ' M ' + (-width / 2) + ' 5 H ' + (-width / 2 + 10) + ' M ' + (width / 2 - 10) + ' 5 H ' + (width / 2)} />
+                        <path d={'M ' + (-width / 2 + 10) + ' -8 V 8 M ' + (width / 2 - 10) + ' -8 V 8'} />
                       </>
                     ) : (
                       <>
@@ -247,7 +257,7 @@ function PrintFloorplan({ scene, layout }) {
         ))}
       </svg>
       <div className="print-plan-legend">
-        <span>Room / Wall</span><span>Door</span><span>Window</span><span>Prop</span><span>Actor</span><span>Camera + FOV</span><span>Lighting + cone</span>
+        <span>Room / Wall</span><span>Door</span><span>Doorway (no leaf)</span><span>Window</span><span>Prop</span><span>Actor</span><span>Camera + FOV</span><span>Lighting + cone</span>
       </div>
       {rooms.length + walls.length + props.length + actors.length + cameras.length + lights.length === 0 && (
         <p className="print-muted">No floorplan objects added for this scene.</p>
