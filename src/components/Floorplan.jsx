@@ -1202,9 +1202,19 @@ export default function Floorplan({
       dragRef.current = { mode: 'multi-move', start: point, items }
     } else {
       beginDragHistory()
-      // A Room connection is a logical relationship, not a rigid group.
-      // Dragging one Room must move only that Room; its connected neighbors stay put.
-      dragRef.current = { mode: 'move', type, id: item.id, start: point, original: item }
+      // A connected Room behaves like an opening hosted on a wall: it can
+      // slide along the shared wall, but cannot drift away from that wall.
+      let attachmentVector = null
+      if (type === 'room' && Array.isArray(item.connectedRoomIds) && item.connectedRoomIds.length) {
+        const connectedIds = new Set(item.connectedRoomIds)
+        const candidate = findRoomMergeCandidate(item, layout.rooms, 18)
+        if (candidate && connectedIds.has(candidate.targetRoomId)) {
+          const edge = candidate.movingEdge
+          const length = Math.hypot(edge.b.x - edge.a.x, edge.b.y - edge.a.y) || 1
+          attachmentVector = { x: (edge.b.x - edge.a.x) / length, y: (edge.b.y - edge.a.y) / length }
+        }
+      }
+      dragRef.current = { mode: 'move', type, id: item.id, start: point, original: item, attachmentVector }
     }
     svgRef.current?.setPointerCapture?.(event.pointerId)
   }
@@ -1801,8 +1811,13 @@ export default function Floorplan({
       return
     }
 
-    const dx = point.x - drag.start.x
-    const dy = point.y - drag.start.y
+    let dx = point.x - drag.start.x
+    let dy = point.y - drag.start.y
+    if (drag.type === 'room' && drag.attachmentVector) {
+      const alongWall = dx * drag.attachmentVector.x + dy * drag.attachmentVector.y
+      dx = alongWall * drag.attachmentVector.x
+      dy = alongWall * drag.attachmentVector.y
+    }
     updateLayout(previous => ({
       ...previous,
       [drag.type + 's']: previous[drag.type + 's'].map(item => {
@@ -1849,7 +1864,8 @@ export default function Floorplan({
       const currentLayout = layoutRef.current || layout
       const movedRoom = currentLayout.rooms.find(room => room.id === completedDrag.id)
       const candidate = movedRoom && findRoomMergeCandidate(movedRoom, currentLayout.rooms, 18)
-      if (candidate) setRoomMergePrompt(candidate)
+      const alreadyConnected = candidate && (movedRoom.connectedRoomIds || []).includes(candidate.targetRoomId)
+      if (candidate && !alreadyConnected) setRoomMergePrompt(candidate)
     }
     if (completedDrag?.mode === 'room-vertex') setRoomSnapGuides([])
     if (completedDrag?.mode === 'selection-box') {
