@@ -1299,7 +1299,7 @@ export default function Floorplan({
       return
     }
     const previous = roomDrawPoints[roomDrawPoints.length - 1]
-    const snapTolerance = 12 * viewBox.width / Math.max(1, canvasSize.width)
+    const snapTolerance = 12 * viewBox.width / Math.max(1, svgRef.current?.getBoundingClientRect()?.width || canvasSize.width)
     const anchors = [
       ...layout.rooms.flatMap(room => getRoomPoints(room)),
       ...(layout.walls || []).flatMap(wall => [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]),
@@ -1440,7 +1440,7 @@ export default function Floorplan({
     }
     if (tool === 'room' && roomDrawPoints.length) {
       const origin = roomDrawPoints[roomDrawPoints.length - 1]
-      const snapTolerance = 9 * viewBox.width / Math.max(1, canvasSize.width)
+      const snapTolerance = 9 * viewBox.width / Math.max(1, svgRef.current?.getBoundingClientRect()?.width || canvasSize.width)
       const anchors = [
         ...layout.rooms.flatMap(room => getRoomPoints(room)),
         ...(layout.walls || []).flatMap(wall => [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]),
@@ -1573,7 +1573,7 @@ export default function Floorplan({
 
     if (drag.mode === 'room-vertex') {
       const originalVertex = drag.originalPoints[drag.vertexIndex]
-      const snapTolerance = 9 * viewBox.width / Math.max(1, canvasSize.width)
+      const snapTolerance = 9 * viewBox.width / Math.max(1, svgRef.current?.getBoundingClientRect()?.width || canvasSize.width)
       const anchors = [
         ...layout.rooms.flatMap(room => getRoomPoints(room).filter(vertex => !(room.id === drag.id && vertex === room.points?.[drag.vertexIndex]))),
         ...(layout.walls || []).flatMap(wall => [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]),
