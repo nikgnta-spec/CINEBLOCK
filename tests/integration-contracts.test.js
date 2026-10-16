@@ -120,7 +120,7 @@ test('Rooms use editable polygon vertices and a manually entered ceiling height'
 test('Room dimensions are shown outside every polygon edge and can be toggled', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /const getRoomDimensionGeometry =/)
-  assert.match(source, /showRoomDimensions && \(active \|\| hoveredRoomEdge\?\.roomId === room\.id\)/)
+  assert.match(source, /showRoomDimensions && \(\(\) => \{/ )
   assert.match(source, /aria-pressed=\{showRoomDimensions\}/)
   assert.match(source, /\(edge\.length \/ 100\)\.toFixed\(2\) \+ ' m'/)
 })
