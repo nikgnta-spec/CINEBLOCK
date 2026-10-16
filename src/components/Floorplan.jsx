@@ -83,12 +83,6 @@ const RESIZE_HANDLES = [
   { key: 'sw', sx: -1, sy: 1, cursor: 'nesw-resize' },
   { key: 'se', sx: 1, sy: 1, cursor: 'nwse-resize' },
 ]
-const ROOM_SIDES = [
-  { value: 'top', label: 'Top wall' },
-  { value: 'right', label: 'Right wall' },
-  { value: 'bottom', label: 'Bottom wall' },
-  { value: 'left', label: 'Left wall' },
-]
 const getRoomPoints = room => Array.isArray(room?.points) && room.points.length >= 3
   ? room.points
   : [{ x: room.x, y: room.y }, { x: room.x + room.width, y: room.y }, { x: room.x + room.width, y: room.y + room.height }, { x: room.x, y: room.y + room.height }]
@@ -448,6 +442,8 @@ export default function Floorplan({
     }
     setHistoryRevision(value => value + 1)
     setDrawStart(null)
+    setRoomDrawPoints([])
+    setRoomLengthInputOpen(false)
     setPreviewPoint(null)
     // Keep the user's current zoom and pan when switching scenes.
     // Fitting the canvas remains available through the explicit Fit control.
@@ -1306,7 +1302,23 @@ export default function Floorplan({
       return
     }
     if (tool === 'room' && roomDrawPoints.length) {
-      setPreviewPoint(point)
+      let nextPreview = point
+      if (!roomLengthInputOpen && roomDrawPoints.length >= 2) {
+        const previous = roomDrawPoints[roomDrawPoints.length - 2]
+        const origin = roomDrawPoints[roomDrawPoints.length - 1]
+        const referenceAngle = Math.atan2(origin.y - previous.y, origin.x - previous.x)
+        const rawAngle = Math.atan2(point.y - origin.y, point.x - origin.x)
+        const distance = Math.hypot(point.x - origin.x, point.y - origin.y)
+        const candidates = [0, 1, 2, 3, 4].map(step => referenceAngle + step * Math.PI / 2)
+        const nearest = candidates.reduce((best, angle) => {
+          const delta = Math.atan2(Math.sin(rawAngle - angle), Math.cos(rawAngle - angle))
+          return Math.abs(delta) < Math.abs(best.delta) ? { angle, delta } : best
+        }, { angle: rawAngle, delta: Infinity })
+        if (Math.abs(nearest.delta) <= 4 * Math.PI / 180) {
+          nextPreview = { x: origin.x + Math.cos(nearest.angle) * distance, y: origin.y + Math.sin(nearest.angle) * distance }
+        }
+      }
+      setPreviewPoint(nextPreview)
       return
     }
     if (drawStart) {
@@ -1801,7 +1813,7 @@ export default function Floorplan({
     }
     window.addEventListener('keydown', handleFloorplanShortcut)
     return () => window.removeEventListener('keydown', handleFloorplanShortcut)
-  }, [isActive, addObject, deleteSelected, deleteSelectedItems, deleteSelectedWaypoint, redoLayout, selected, selectedItems, selectedWaypoint, undoLayout])
+  }, [isActive, addObject, deleteSelected, deleteSelectedItems, deleteSelectedWaypoint, finishRoomDrawing, redoLayout, roomDrawPoints, selected, selectedItems, selectedWaypoint, tool, undoLayout])
 
   const clearLayout = () => {
     if (!window.confirm('Kosongkan room, wall, properti, aktor, kamera, dan lampu pada scene ini?')) return
