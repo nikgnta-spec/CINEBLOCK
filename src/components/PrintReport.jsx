@@ -48,7 +48,7 @@ function roomOpeningPlacement(room, opening) {
   const edges = roomEdges(room)
   const edge = edges[Math.max(0, Math.min(edges.length - 1, Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)))] || edges[0]
   const offset = Math.max(0.02, Math.min(0.98, Number(opening.offset) || 0.5))
-  return { x: edge.x1 + (edge.x2 - edge.x1) * offset, y: edge.y1 + (edge.y2 - edge.y1) * offset, angle: edge.angle, length: edge.length }
+  return { x: edge.x1 + (edge.x2 - edge.x1) * offset, y: edge.y1 + (edge.y2 - edge.y1) * offset, angle: edge.angle + 180, length: edge.length }
 }
 
 function focalLength(value) {
