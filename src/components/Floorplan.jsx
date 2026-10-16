@@ -1076,6 +1076,28 @@ export default function Floorplan({
     setRoomMergePrompt(null)
   }
 
+  const addRoomVertexAtEdgeMidpoint = room => {
+    if (!room || room.locked || hoveredRoomEdge?.roomId !== room.id) return
+    const edgeIndex = hoveredRoomEdge.edgeIndex
+    const points = getRoomPoints(room).map(point => ({ ...point }))
+    const start = points[edgeIndex]
+    const end = points[(edgeIndex + 1) % points.length]
+    if (!start || !end || Math.hypot(end.x - start.x, end.y - start.y) < 6) return
+    const point = { x: Math.round((start.x + end.x) / 2), y: Math.round((start.y + end.y) / 2) }
+    beginDragHistory()
+    updateLayout(previous => ({
+      ...previous,
+      rooms: previous.rooms.map(item => {
+        if (item.id !== room.id) return item
+        const nextPoints = getRoomPoints(item).map(vertex => ({ ...vertex }))
+        nextPoints.splice(edgeIndex + 1, 0, point)
+        return { ...item, points: nextPoints }
+      }),
+    }))
+    finishDragHistory()
+    setSelectedRoomVertex({ roomId: room.id, vertexIndex: edgeIndex + 1 })
+  }
+
   const beginRoomVertexDrag = (room, vertexIndex, event) => {
     if (tool === 'pan' || room.locked || event.detail > 1) return
     event.stopPropagation()
@@ -3066,6 +3088,11 @@ export default function Floorplan({
                       </div>
                     </div>
                     <p className="floorplan-field-note">{getRoomPoints(selectedEntity).length} titik · panjang/lebar mengikuti bounding box polygon.</p>
+                    <div className="floorplan-opening-actions">
+                      <button type="button" disabled={Boolean(selectedEntity.locked) || hoveredRoomEdge?.roomId !== selectedEntity.id} onClick={() => addRoomVertexAtEdgeMidpoint(selectedEntity)}>Tambah titik di sisi yang disorot</button>
+                      <button type="button" disabled={Boolean(selectedEntity.locked) || selectedRoomVertex?.roomId !== selectedEntity.id} onClick={deleteSelectedRoomVertex}>Hapus titik terpilih</button>
+                    </div>
+                    <p className="floorplan-field-note">Arahkan kursor ke sisi dinding lalu pilih Tambah titik. Untuk menghapus, klik titik kuning lalu pilih Hapus titik terpilih atau tekan Delete.</p>
                   </section>
                   <section className="floorplan-inspector-section">
                     <label htmlFor="room-ceiling-height">Tinggi ruangan (m)</label>
