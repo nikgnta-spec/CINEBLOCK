@@ -105,7 +105,7 @@ function PrintFloorplan({ scene, layout }) {
   return (
     <section className="print-plan-page">
       <div className="print-section-kicker">FLOORPLAN</div>
-      <h2>{scene.name || 'Scene'} — Top-Down Plan</h2>
+      <h2>{scene.name || 'Scene'}</h2>
       <div className="print-scene-meta">
         <span>{scene.intExt || 'INT'}</span>
         <span>{display(scene.location)}</span>
@@ -162,7 +162,6 @@ function PrintFloorplan({ scene, layout }) {
                 const uy = (edge.y2 - edge.y1) / (edge.length || 1)
                 return <line key={edge.edgeIndex + '-' + index} x1={edge.x1 + ux * segment.start} y1={edge.y1 + uy * segment.start} x2={edge.x1 + ux * segment.end} y2={edge.y1 + uy * segment.end} stroke="#111827" strokeWidth="3" />
               }))}
-              <text x={bounds.x + 9} y={bounds.y + 20} fontSize="16" fontWeight="700" fill="#111827">{room.label || 'Room'}</text>
               {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && <text x={bounds.x + 9} y={bounds.y + 36} fontSize="12" fill="#374151">{Number(room.ceilingHeight).toFixed(1) + ' m ceiling'}</text>}
               {edges.map(edge => {
                 const horizontal = Math.abs(edge.x2 - edge.x1) >= Math.abs(edge.y2 - edge.y1)
