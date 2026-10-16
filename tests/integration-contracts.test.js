@@ -158,3 +158,46 @@ test('Room opening normalization preserves the full supported 5-meter width', as
 
   assert.ok(source.includes('width: Math.max(12, Math.min(500, Number(opening.width)'))
 })
+
+
+test('Floorplan navigation supports shared cursor-anchored zoom, pinch, and explicit 1:1 reset', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const zoomCanvas = \(factor, clientX, clientY\) =>/)
+  assert.match(source, /zoomCanvas\(event\.deltaY < 0 \? 0\.9 : 1\.1, event\.clientX, event\.clientY\)/)
+  assert.match(source, /onTouchStart=\{handleCanvasTouchStart\}/)
+  assert.match(source, /onTouchMove=\{handleCanvasTouchMove\}/)
+  assert.match(source, /pinchRef\.current\.distance \/ distance/)
+  assert.match(source, /const resetZoom = \(\) => setViewBox/)
+  assert.match(source, /Reset zoom ke 100% \(1:1\)/)
+  assert.match(source, /Muat seluruh denah ke kanvas/)
+})
+
+test('Floorplan pan capture takes priority over object interactions and select-box is blank-canvas only', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const handleCanvasPointerDownCapture = event =>/)
+  assert.match(source, /event\.button !== 1 && !\(event\.button === 0 && spaceHeld\) && tool !== 'pan'/)
+  assert.match(source, /onPointerDownCapture=\{handleCanvasPointerDownCapture\}/)
+  assert.match(source, /const clickedObject = event\.target\?\.closest\?\.\('\[data-floorplan-object="true"\], \[data-floorplan-waypoint="true"\]'\)/)
+  assert.match(source, /box\.right >= bounds\.left && box\.left <= bounds\.right/)
+  assert.match(source, /if \(event\.code === 'Space'\) setSpaceHeld\(false\)/)
+})
+
+test('Floorplan Escape deselects and shortcuts ignore editable fields; Path drag handlers remain separate', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /if \(key === 'escape'\) \{[\s\S]*?applyEntitySelection\(\[\]\)/)
+  assert.match(source, /target\.isContentEditable \|\| \['INPUT', 'TEXTAREA', 'SELECT'\]\.includes\(target\.tagName\)/)
+  const objectDrag = source.slice(source.indexOf('const beginObjectDrag'), source.indexOf('const beginWaypointDrag'))
+  const waypointDrag = source.slice(source.indexOf('const beginWaypointDrag'), source.indexOf('const beginRotate'))
+  assert.match(objectDrag, /if \(item\.locked \|\| tool === 'room' \|\| tool === 'wall'\) return/)
+  assert.match(waypointDrag, /mode: 'waypoint'/)
+  assert.match(source, /const appendWaypoint =/)
+})
+
+
+test('Path clicks capture before overlapping Room or Prop handlers can steal selection', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+
+  assert.match(source, /if \(tool === 'path' && event\.button === 0\) \{[\s\S]*?event\.stopPropagation\(\)[\s\S]*?return/)
+  assert.match(source, /const handleCanvasClickCapture = event => \{[\s\S]*?if \(tool !== 'path'\) return[\s\S]*?appendWaypoint\(getPoint\(event\)\)/)
+  assert.match(source, /onClickCapture=\{handleCanvasClickCapture\}/)
+})
