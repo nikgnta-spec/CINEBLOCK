@@ -1192,7 +1192,7 @@ export default function Floorplan({
     if (tool === 'path' || (tool === 'room' && type === 'room')) setTool('select')
     const point = getPoint(event)
 
-    if (alreadySelected && currentSelection.length > 1) {
+    if (type !== 'room' && alreadySelected && currentSelection.length > 1) {
       const items = currentSelection.map(entry => ({
         ...entry,
         original: (layout[entry.type + 's'] || []).find(candidate => candidate.id === entry.id),
