@@ -44,6 +44,17 @@ function roomEdges(room) {
   })
 }
 
+function pointInPolygon(point, points) {
+  let inside = false
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const a = points[i], b = points[j]
+    const intersects = ((a.y > point.y) !== (b.y > point.y))
+      && (point.x < ((b.x - a.x) * (point.y - a.y)) / ((b.y - a.y) || 1e-9) + a.x)
+    if (intersects) inside = !inside
+  }
+  return inside
+}
+
 function roomOpeningPlacement(room, opening) {
   const edges = roomEdges(room)
   const edge = edges[Math.max(0, Math.min(edges.length - 1, Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)))] || edges[0]
@@ -144,7 +155,6 @@ function PrintFloorplan({ scene, layout }) {
             maxX: Math.max(...points.map(point => point.x)),
             maxY: Math.max(...points.map(point => point.y)),
           }
-          const center = { x: (bounds.x + bounds.maxX) / 2, y: (bounds.y + bounds.maxY) / 2 }
           return (
             <g key={'room-outline-' + room.id}>
               {edges.flatMap(edge => openingSegments(edge.length, openings.filter(opening => (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)) === edge.edgeIndex)).map((segment, index) => {
@@ -158,8 +168,18 @@ function PrintFloorplan({ scene, layout }) {
                 const horizontal = Math.abs(edge.x2 - edge.x1) >= Math.abs(edge.y2 - edge.y1)
                 const mx = (edge.x1 + edge.x2) / 2
                 const my = (edge.y1 + edge.y2) / 2
-                const nx = mx < center.x ? -1 : 1
-                const ny = my < center.y ? -1 : 1
+                const dx = edge.x2 - edge.x1
+                const dy = edge.y2 - edge.y1
+                const length = edge.length || 1
+                let nx = dy / length
+                let ny = -dx / length
+                const probeDistance = Math.max(2, Math.min(8, length * 0.04))
+                const positiveProbe = { x: mx + nx * probeDistance, y: my + ny * probeDistance }
+                const negativeProbe = { x: mx - nx * probeDistance, y: my - ny * probeDistance }
+                const positiveInside = pointInPolygon(positiveProbe, points)
+                const negativeInside = pointInPolygon(negativeProbe, points)
+                if (positiveInside && !negativeInside) { nx *= -1; ny *= -1 }
+                // Place dimension guides outside the actual polygon, including concave rooms.
                 const offset = 72
                 const x1 = horizontal ? Math.min(edge.x1, edge.x2) : mx + nx * offset
                 const x2 = horizontal ? Math.max(edge.x1, edge.x2) : mx + nx * offset
