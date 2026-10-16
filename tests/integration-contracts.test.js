@@ -131,3 +131,16 @@ test('Props Custom type accepts free text and displays the entered type/name', a
   assert.match(source, /customPropType: event\.target\.value/)
   assert.match(source, /if \(type === 'prop'\) return item\.label \|\| item\.customPropType \|\| item\.propType \|\| 'Prop'/)
 })
+
+test('Doors and windows support precise width, position, and Room wall-side controls', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+
+  assert.match(source, /const updateOpening = \(openingId, patch\) =>/)
+  assert.match(source, /id=\{opening\.id \+ '-width'\}/)
+  assert.match(source, /id=\{opening\.id \+ '-offset'\}/)
+  assert.match(source, /id=\{opening\.id \+ '-side'\}/)
+  assert.match(source, /updateOpening\(opening\.id, \{ width: Math\.round\(meters \* 100\) \}\)/)
+  assert.match(source, /updateOpening\(opening\.id, \{ offset: percent \/ 100 \}\)/)
+  assert.match(source, /updateOpening\(opening\.id, \{ side: event\.target\.value \}\)/)
+  assert.match(source, /disabled=\{Boolean\(selectedEntity\.locked\)\}/)
+})
