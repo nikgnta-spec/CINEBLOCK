@@ -155,16 +155,19 @@ const openingLabel = opening => opening.type === 'window' ? 'Jendela' : opening.
 
 const DoorSwingSymbol = ({ opening, width }) => {
   const direction = opening.swingDirection === 'out' ? -1 : 1
+  const hingeSide = opening.hingeSide === 'right' ? 'right' : 'left'
   const leafCount = opening.doorType === 'double' ? 2 : 1
   const half = width / 2
   const leaf = width / leafCount
   const swing = Math.max(leaf, 24)
+  const hingeX = hingeSide === 'right' ? half : -half
+  const freeX = -hingeX
   return <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke" pointerEvents="none">
     {/* Solid stroke = actual door leaf; dashed curve = swing arc. */}
     {leafCount === 1 ? <>
       <path d={'M ' + (-half) + ' 0 H ' + half} />
-      <path d={'M ' + (-half) + ' 0 L ' + (-half) + ' ' + (direction * swing)} strokeWidth="3" />
-      <path d={'M ' + (-half) + ' ' + (direction * swing) + ' A ' + swing + ' ' + swing + ' 0 0 ' + (direction < 0 ? 1 : 0) + ' ' + half + ' 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
+      <path d={'M ' + hingeX + ' 0 L ' + hingeX + ' ' + (direction * swing)} strokeWidth="3" />
+      <path d={'M ' + hingeX + ' ' + (direction * swing) + ' A ' + swing + ' ' + swing + ' 0 0 ' + (hingeSide === 'left' ? (direction < 0 ? 1 : 0) : (direction > 0 ? 1 : 0)) + ' ' + freeX + ' 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
     </> : <>
       <path d={'M ' + (-half) + ' 0 H ' + half} />
       <path d={'M ' + (-half) + ' 0 L ' + (-half) + ' ' + (direction * swing) + ' M ' + half + ' 0 L ' + half + ' ' + (direction * swing)} strokeWidth="3" />
@@ -2998,6 +3001,13 @@ export default function Floorplan({
                                 <option value="double">Double</option>
                               </select>
                             </div>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-hinge-side'}>Engsel di sisi</label>
+                              <select id={opening.id + '-hinge-side'} className="floorplan-field" value={opening.hingeSide === 'right' ? 'right' : 'left'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { hingeSide: event.target.value })}>
+                                <option value="left">Kiri</option>
+                                <option value="right">Kanan</option>
+                              </select>
+                            </div>
                           </>}
                           <div className="floorplan-dimension-input">
                             <label htmlFor={opening.id + '-offset'}>Posisi (%)</label>
@@ -3088,6 +3098,13 @@ export default function Floorplan({
                               <select id={opening.id + '-door-type'} className="floorplan-field" value={opening.doorType === 'double' ? 'double' : 'single'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { doorType: event.target.value })}>
                                 <option value="single">Single</option>
                                 <option value="double">Double</option>
+                              </select>
+                            </div>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-hinge-side'}>Engsel di sisi</label>
+                              <select id={opening.id + '-hinge-side'} className="floorplan-field" value={opening.hingeSide === 'right' ? 'right' : 'left'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { hingeSide: event.target.value })}>
+                                <option value="left">Kiri</option>
+                                <option value="right">Kanan</option>
                               </select>
                             </div>
                           </>}
