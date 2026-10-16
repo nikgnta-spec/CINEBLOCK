@@ -117,7 +117,7 @@ const getRoomDimensionGeometry = (room, edge) => {
   let nx = dy / length, ny = -dx / length
   const midpoint = { x: (edge.x1 + edge.x2) / 2, y: (edge.y1 + edge.y2) / 2 }
   if ((center.x - midpoint.x) * nx + (center.y - midpoint.y) * ny > 0) { nx *= -1; ny *= -1 }
-  const offset = 32
+  const offset = 62
   const x1 = edge.x1 + nx * offset, y1 = edge.y1 + ny * offset
   const x2 = edge.x2 + nx * offset, y2 = edge.y2 + ny * offset
   return { x1, y1, x2, y2, mx: (x1 + x2) / 2, my: (y1 + y2) / 2, length: edge.length, angle: Math.atan2(dy, dx) * 180 / Math.PI }
@@ -131,6 +131,22 @@ const pointInPolygon = (point, points) => {
     if (intersects) inside = !inside
   }
   return inside
+}
+const DoorSwingSymbol = ({ opening, width }) => {
+  const direction = opening.swingDirection === 'out' ? 1 : -1
+  const leafCount = opening.doorType === 'double' ? 2 : 1
+  const half = width / 2
+  const leaf = width / leafCount
+  return <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke" pointerEvents="none">
+    {leafCount === 1 ? <>
+      <path d={'M ' + (-half) + ' 0 V ' + (direction * leaf)} />
+      <path d={'M ' + (-half) + ' ' + (direction * leaf) + ' A ' + leaf + ' ' + leaf + ' 0 0 ' + (direction < 0 ? 1 : 0) + ' ' + half + ' 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
+    </> : <>
+      <path d={'M ' + (-half) + ' 0 V ' + (direction * leaf) + ' M ' + half + ' 0 V ' + (direction * leaf)} />
+      <path d={'M ' + (-half) + ' ' + (direction * leaf) + ' A ' + leaf + ' ' + leaf + ' 0 0 ' + (direction < 0 ? 1 : 0) + ' 0 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
+      <path d={'M ' + half + ' ' + (direction * leaf) + ' A ' + leaf + ' ' + leaf + ' 0 0 ' + (direction > 0 ? 1 : 0) + ' 0 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
+    </>}
+  </g>
 }
 const getOpeningSegments = (length, openings = []) => {
   const ranges = openings
@@ -1132,6 +1148,7 @@ export default function Floorplan({
       type,
       offset: 0.5,
       width: type === 'door' ? 48 : 58,
+      ...(type === 'door' ? { swingDirection: 'in', doorType: 'single' } : {}),
       ...(selectedType === 'room' ? { edgeIndex: Math.max(0, getRoomPoints(selectedEntity).length - 1) } : {}),
     }
     updateSelected({ openings: [...(selectedEntity.openings || []), opening] })
@@ -2126,10 +2143,7 @@ export default function Floorplan({
                         <g key={opening.id} transform={'translate(' + placement.x + ' ' + placement.y + ') rotate(' + placement.angle + ')'} data-floorplan-object="true" style={{ cursor: 'grab' }} onPointerDown={event => beginOpeningDrag('room', room, opening, event)} onClick={event => event.stopPropagation()}>
                           <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type === 'door' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">{opening.type === 'door' ? 'Pintu' : 'Jendela'}</text>
                           {opening.type === 'door' ? (
-                            <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
-                              <path d={'M ' + (-openingWidth / 2) + ' 0 V ' + (-openingWidth)} />
-                              <path d={'M ' + (-openingWidth / 2) + ' ' + (-openingWidth) + ' A ' + openingWidth + ' ' + openingWidth + ' 0 0 1 ' + (openingWidth / 2) + ' 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
-                            </g>
+                            <DoorSwingSymbol opening={opening} width={openingWidth} />
                           ) : (
                             <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
                               <path d={'M ' + (-openingWidth / 2) + ' -4 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 0 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 4 H ' + (openingWidth / 2)} />
@@ -2183,10 +2197,7 @@ export default function Floorplan({
                             {opening.type === 'door' ? 'Pintu' : 'Jendela'}
                            </text>
                            {opening.type === 'door' ? (
-                            <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
-                              <path d={'M ' + (-openingWidth / 2) + ' 0 V ' + (-openingWidth)} />
-                              <path d={'M ' + (-openingWidth / 2) + ' ' + (-openingWidth) + ' A ' + openingWidth + ' ' + openingWidth + ' 0 0 1 ' + (openingWidth / 2) + ' 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
-                            </g>
+                            <DoorSwingSymbol opening={opening} width={openingWidth} />
                           ) : (
                             <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
                               <path d={'M ' + (-openingWidth / 2) + ' -4 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 0 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 4 H ' + (openingWidth / 2)} />
@@ -2852,6 +2863,22 @@ export default function Floorplan({
                               updateOpening(opening.id, { width: Math.round(meters * 100) })
                             }} />
                           </div>
+                          {opening.type === 'door' && <>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-swing'}>Arah buka</label>
+                              <select id={opening.id + '-swing'} className="floorplan-field" value={opening.swingDirection === 'out' ? 'out' : 'in'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { swingDirection: event.target.value })}>
+                                <option value="in">Ke dalam</option>
+                                <option value="out">Ke luar</option>
+                              </select>
+                            </div>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-door-type'}>Jenis pintu</label>
+                              <select id={opening.id + '-door-type'} className="floorplan-field" value={opening.doorType === 'double' ? 'double' : 'single'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { doorType: event.target.value })}>
+                                <option value="single">Single</option>
+                                <option value="double">Double</option>
+                              </select>
+                            </div>
+                          </>}
                           <div className="floorplan-dimension-input">
                             <label htmlFor={opening.id + '-offset'}>Posisi (%)</label>
                             <input id={opening.id + '-offset'} className="floorplan-field" type="number" min="5" max="95" step="1" value={Math.round((Number(opening.offset) || 0.5) * 100)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
@@ -2896,6 +2923,22 @@ export default function Floorplan({
                               updateOpening(opening.id, { width: Math.round(meters * 100) })
                             }} />
                           </div>
+                          {opening.type === 'door' && <>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-swing'}>Arah buka</label>
+                              <select id={opening.id + '-swing'} className="floorplan-field" value={opening.swingDirection === 'out' ? 'out' : 'in'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { swingDirection: event.target.value })}>
+                                <option value="in">Ke dalam</option>
+                                <option value="out">Ke luar</option>
+                              </select>
+                            </div>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-door-type'}>Jenis pintu</label>
+                              <select id={opening.id + '-door-type'} className="floorplan-field" value={opening.doorType === 'double' ? 'double' : 'single'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { doorType: event.target.value })}>
+                                <option value="single">Single</option>
+                                <option value="double">Double</option>
+                              </select>
+                            </div>
+                          </>}
                           <div className="floorplan-dimension-input">
                             <label htmlFor={opening.id + '-offset'}>Posisi (%)</label>
                             <input id={opening.id + '-offset'} className="floorplan-field" type="number" min="5" max="95" step="1" value={Math.round((Number(opening.offset) || 0.5) * 100)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
