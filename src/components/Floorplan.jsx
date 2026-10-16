@@ -1179,7 +1179,7 @@ export default function Floorplan({
 
     const currentSelection = selectionRef.current
     const alreadySelected = currentSelection.some(entry => entry.type === type && entry.id === item.id)
-    if (alreadySelected && currentSelection.length > 1) {
+    if (type !== 'room' && alreadySelected && currentSelection.length > 1) {
       setSelected({ type, id: item.id })
       setSelectedWaypoint(null)
     } else {
