@@ -1,102 +1,178 @@
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y)
 const pointsOf = room => Array.isArray(room?.points) ? room.points : []
-const edgesOf = room => pointsOf(room).map((a, index, points) => ({ a, b: points[(index + 1) % points.length] })).filter(edge => edge.b)
+const edgesOf = room => pointsOf(room).map((a, index, points) => ({ a, b: points[(index + 1) % points.length], index })).filter(edge => edge.b)
 const length = edge => distance(edge.a, edge.b)
-const midpoint = edge => ({ x: (edge.a.x + edge.b.x) / 2, y: (edge.a.y + edge.b.y) / 2 })
 const unit = edge => { const n = length(edge) || 1; return { x: (edge.b.x - edge.a.x) / n, y: (edge.b.y - edge.a.y) / n } }
 const samePoint = (a, b, tolerance = 1) => distance(a, b) <= tolerance
+const dot = (a, b) => a.x * b.x + a.y * b.y
+const cross = (a, b) => a.x * b.y - a.y * b.x
+const subtract = (a, b) => ({ x: a.x - b.x, y: a.y - b.y })
+const addScaled = (a, v, t) => ({ x: a.x + v.x * t, y: a.y + v.y * t })
+
+function overlapOnLine(a, b, tolerance) {
+  const av = unit(a), bv = unit(b)
+  if (Math.abs(cross(av, bv)) > 0.035) return null
+  const lineDistance = Math.abs(cross(subtract(b.a, a.a), av))
+  if (lineDistance > tolerance) return null
+  const aLength = length(a), bLength = length(b)
+  if (aLength < 1 || bLength < 1) return null
+  const bStart = dot(subtract(b.a, a.a), av)
+  const bEnd = dot(subtract(b.b, a.a), av)
+  const low = Math.max(0, Math.min(bStart, bEnd))
+  const high = Math.min(aLength, Math.max(bStart, bEnd))
+  if (high - low <= 1) return null
+  const gap = Math.max(0, -Math.min(bStart, bEnd), Math.max(bStart, bEnd) - aLength)
+  return { low, high, overlap: high - low, gap, lineDistance, av, bv }
+}
 
 export function findRoomMergeCandidate(movingRoom, rooms, tolerance = 18) {
   let best = null
   for (const other of rooms) {
     if (!other || other.id === movingRoom?.id || other.locked || movingRoom?.locked) continue
     for (const a of edgesOf(movingRoom)) for (const b of edgesOf(other)) {
-      const av = unit(a), bv = unit(b)
-      if (Math.abs(av.x * bv.y - av.y * bv.x) > 0.035) continue
-      const direct = Math.max(distance(a.a, b.a), distance(a.b, b.b))
-      const reverse = Math.max(distance(a.a, b.b), distance(a.b, b.a))
-      const endpointDistance = Math.min(direct, reverse)
-      const lengthDelta = Math.abs(length(a) - length(b))
-      const mid = midpoint(a), otherMid = midpoint(b)
-      const lineDistance = Math.abs((mid.x - otherMid.x) * bv.y - (mid.y - otherMid.y) * bv.x)
-      if (endpointDistance > tolerance || lengthDelta > tolerance * 1.5 || lineDistance > tolerance) continue
-      const score = endpointDistance + lengthDelta * 0.5 + lineDistance
-      if (!best || score < best.score) best = { movingRoomId: movingRoom.id, targetRoomId: other.id, movingEdge: a, targetEdge: b, reverse: reverse < direct, score }
+      const overlap = overlapOnLine(a, b, tolerance)
+      if (!overlap || overlap.gap > tolerance) continue
+      const score = overlap.lineDistance + overlap.gap + Math.abs(overlap.overlap - Math.min(length(a), length(b))) * 0.001
+      if (!best || score < best.score) best = {
+        movingRoomId: movingRoom.id, targetRoomId: other.id,
+        movingEdge: a, targetEdge: b, reverse: dot(overlap.av, overlap.bv) < 0,
+        overlapStart: overlap.low, overlapEnd: overlap.high, score
+      }
     }
   }
   return best
+}
+
+function projectPoint(point, edge) {
+  const v = subtract(edge.b, edge.a)
+  const squared = dot(v, v) || 1
+  const t = dot(subtract(point, edge.a), v) / squared
+  return { t, point: addScaled(edge.a, v, t) }
+}
+
+function splitAndCancelEdges(roomPoints, otherPoints, tolerance = 1.5) {
+  const all = [
+    ...edgesOf({ points: roomPoints }).map(edge => ({ ...edge, source: 0 })),
+    ...edgesOf({ points: otherPoints }).map(edge => ({ ...edge, source: 1 }))
+  ]
+  const pieces = []
+  for (const edge of all) {
+    const v = subtract(edge.b, edge.a)
+    const len = length(edge)
+    if (len < 0.01) continue
+    const cuts = [0, 1]
+    for (const other of all) {
+      if (edge === other) continue
+      const ov = subtract(other.b, other.a)
+      if (Math.abs(cross(v, ov)) / (len * (length(other) || 1)) > 0.035) continue
+      if (Math.abs(cross(subtract(other.a, edge.a), v)) / len > tolerance) continue
+      for (const p of [other.a, other.b]) {
+        const t = dot(subtract(p, edge.a), v) / (len * len)
+        if (t > 0.0001 && t < 0.9999 && distance(p, addScaled(edge.a, v, t)) <= tolerance) cuts.push(t)
+      }
+    }
+    cuts.sort((a, b) => a - b)
+    const unique = cuts.filter((t, i) => i === 0 || Math.abs(t - cuts[i - 1]) > 0.0001)
+    for (let i = 0; i < unique.length - 1; i++) {
+      const t0 = unique[i], t1 = unique[i + 1]
+      const a = addScaled(edge.a, v, t0), b = addScaled(edge.a, v, t1)
+      if (distance(a, b) > 0.01) pieces.push({ a, b, source: edge.source })
+    }
+  }
+  const removed = new Set()
+  for (let i = 0; i < pieces.length; i++) {
+    if (removed.has(i)) continue
+    for (let j = i + 1; j < pieces.length; j++) {
+      if (removed.has(j) || pieces[i].source === pieces[j].source) continue
+      const a = pieces[i], b = pieces[j]
+      if (samePoint(a.a, b.b, tolerance) && samePoint(a.b, b.a, tolerance)) {
+        removed.add(i); removed.add(j); break
+      }
+    }
+  }
+  return pieces.filter((_, i) => !removed.has(i))
+}
+
+function tracePolygon(edges) {
+  if (edges.length < 3) return null
+  const polygon = []
+  const remaining = [...edges]
+  let edge = remaining.shift()
+  polygon.push(edge.a)
+  let end = edge.b
+  let guard = 0
+  while (remaining.length && guard++ < edges.length + 2) {
+    const index = remaining.findIndex(item => samePoint(item.a, end, 1.5) || samePoint(item.b, end, 1.5))
+    if (index < 0) return null
+    edge = remaining.splice(index, 1)[0]
+    if (samePoint(edge.b, end, 1.5)) edge = { a: edge.b, b: edge.a }
+    if (!samePoint(edge.a, end, 1.5)) return null
+    end = edge.b
+    if (!samePoint(end, polygon[0], 1.5)) polygon.push(end)
+  }
+  if (remaining.length || !samePoint(end, polygon[0], 1.5) || polygon.length < 3) return null
+  const cleaned = polygon.filter((p, i) => i === 0 || !samePoint(p, polygon[i - 1], 1))
+  if (cleaned.length < 3) return null
+  const area = cleaned.reduce((sum, p, i) => { const n = cleaned[(i + 1) % cleaned.length]; return sum + p.x * n.y - n.x * p.y }, 0) / 2
+  if (Math.abs(area) < 16) return null
+  return cleaned.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }))
 }
 
 export function mergeAdjacentRoomPolygons(movingRoom, targetRoom, candidate) {
   if (!movingRoom || !targetRoom || !candidate) return null
   const movingPoints = pointsOf(movingRoom).map(p => ({ ...p }))
   const targetPoints = pointsOf(targetRoom).map(p => ({ ...p }))
-  const ma = candidate.movingEdge.a, mb = candidate.movingEdge.b
-  const ta = candidate.targetEdge.a, tb = candidate.targetEdge.b
-  const shift = candidate.reverse
-    ? { x: (ma.x + mb.x - ta.x - tb.x) / 2, y: (ma.y + mb.y - ta.y - tb.y) / 2 }
-    : { x: (ma.x + mb.x - tb.x - ta.x) / 2, y: (ma.y + mb.y - tb.y - ta.y) / 2 }
-  const aligned = targetPoints.map(p => ({ x: Math.round(p.x + shift.x), y: Math.round(p.y + shift.y) }))
-  const alignedA = { x: ta.x + shift.x, y: ta.y + shift.y }
-  const alignedB = { x: tb.x + shift.x, y: tb.y + shift.y }
-  const mi = movingPoints.findIndex((p, i) => samePoint(p, ma) && samePoint(movingPoints[(i + 1) % movingPoints.length], mb))
-  const ti = aligned.findIndex((p, i) => samePoint(p, alignedA) && samePoint(aligned[(i + 1) % aligned.length], alignedB))
-  if (mi < 0 || ti < 0) return null
-  const m0 = movingPoints[mi], m1 = movingPoints[(mi + 1) % movingPoints.length]
-  const t0 = aligned[ti], t1 = aligned[(ti + 1) % aligned.length]
-  const same = samePoint(m0, t0) && samePoint(m1, t1)
-  const reverse = samePoint(m0, t1) && samePoint(m1, t0)
-  if (!same && !reverse) return null
-  const edges = []
-  const collect = (points, sharedStart, sharedEnd) => points.forEach((a, i) => {
-    const b = points[(i + 1) % points.length]
-    if (samePoint(a, sharedStart) && samePoint(b, sharedEnd)) return
-    edges.push({ a: { ...a }, b: { ...b } })
-  })
-  collect(movingPoints, m0, m1)
-  collect(aligned, t0, t1)
-  if (edges.length < 3) return null
-  const polygon = []
-  let edge = edges.shift()
-  polygon.push(edge.a)
-  let end = edge.b
-  let guard = 0
-  while (edges.length && guard++ < 1000) {
-    polygon.push(end)
-    const index = edges.findIndex(e => samePoint(e.a, end, 1.5))
-    if (index < 0) return null
-    edge = edges.splice(index, 1)[0]
-    end = edge.b
-  }
-  if (edges.length || !samePoint(end, polygon[0], 1.5) || polygon.length < 3) return null
-  const area = Math.abs(polygon.reduce((sum, p, i) => { const n = polygon[(i + 1) % polygon.length]; return sum + p.x * n.y - n.x * p.y }, 0)) / 2
-  if (area < 16) return null
-  const mergedPoints = polygon.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }))
-  const hasSharedEdgeOpening = (room, edgeIndex) => (room.openings || []).some(opening => Number(opening.edgeIndex) === edgeIndex)
-  if (hasSharedEdgeOpening(movingRoom, mi) || hasSharedEdgeOpening(targetRoom, ti)) return null
+  const mi = candidate.movingEdge?.index
+  const ti = candidate.targetEdge?.index
+  if (!Number.isInteger(mi) || !Number.isInteger(ti)) return null
+  const movingEdge = edgesOf({ points: movingPoints })[mi]
+  const targetEdge = edgesOf({ points: targetPoints })[ti]
+  if (!movingEdge || !targetEdge) return null
 
-  const remapOpenings = (room, originalPoints) => (room.openings || []).map(opening => {
+  const overlap = overlapOnLine(movingEdge, targetEdge, 18)
+  if (!overlap) return null
+  // Move the target polygon only perpendicular to the shared edge, closing a small gap
+  // without forcing the two rooms' edge lengths to match.
+  const normal = { x: -overlap.av.y, y: overlap.av.x }
+  const signed = dot(subtract(targetEdge.a, movingEdge.a), normal)
+  const shift = { x: -normal.x * signed, y: -normal.y * signed }
+  const alignedTarget = targetPoints.map(p => ({ x: p.x + shift.x, y: p.y + shift.y }))
+
+  const sharedHasOpening = (room, edgeIndex) => (room.openings || []).some(opening => Number(opening.edgeIndex) === edgeIndex)
+  // Any opening on the removed shared segment cannot survive as a wall opening.
+  const sharedRange = overlapOnLine(movingEdge, { a: { x: targetEdge.a.x + shift.x, y: targetEdge.a.y + shift.y }, b: { x: targetEdge.b.x + shift.x, y: targetEdge.b.y + shift.y } }, 1.5)
+  if (!sharedRange) return null
+  const openingOnSharedOverlap = (room, points, edgeIndex, range, source) => (room.openings || []).some(opening => {
+    if (Number(opening.edgeIndex) !== edgeIndex) return false
+    const offset = Math.max(0, Math.min(1, Number(opening.offset ?? 0.5)))
+    const edge = edgesOf({ points })[edgeIndex]
+    const coordinate = dot(subtract(addScaled(edge.a, subtract(edge.b, edge.a), offset), movingEdge.a), overlap.av)
+    return coordinate >= range.low - 1 && coordinate <= range.high + 1
+  })
+  if (openingOnSharedOverlap(movingRoom, movingPoints, mi, sharedRange, 0) || openingOnSharedOverlap(targetRoom, alignedTarget, ti, sharedRange, 1)) return null
+
+  const rawEdges = splitAndCancelEdges(movingPoints, alignedTarget)
+  const mergedPoints = tracePolygon(rawEdges)
+  if (!mergedPoints) return null
+
+  const remapOpenings = (room, originalPoints, shiftBy = { x: 0, y: 0 }) => (room.openings || []).map(opening => {
     const oldIndex = Number(opening.edgeIndex)
     if (!Number.isInteger(oldIndex) || oldIndex < 0 || oldIndex >= originalPoints.length) return { ...opening }
-    const a = originalPoints[oldIndex]
-    const b = originalPoints[(oldIndex + 1) % originalPoints.length]
-    const edgeLength = distance(a, b)
-    if (!edgeLength) return { ...opening }
+    const originalEdge = edgesOf({ points: originalPoints })[oldIndex]
+    if (!originalEdge) return { ...opening }
     const offset = Math.max(0, Math.min(1, Number(opening.offset ?? 0.5)))
-    const center = { x: a.x + (b.x - a.x) * offset, y: a.y + (b.y - a.y) * offset }
+    const center = addScaled(originalEdge.a, subtract(originalEdge.b, originalEdge.a), offset)
+    center.x += shiftBy.x; center.y += shiftBy.y
     let nearest = null
-    edgesOf({ points: mergedPoints }).forEach((edge, edgeIndex) => {
-      const dx = edge.b.x - edge.a.x, dy = edge.b.y - edge.a.y
-      const squared = dx * dx + dy * dy || 1
-      const t = Math.max(0, Math.min(1, ((center.x - edge.a.x) * dx + (center.y - edge.a.y) * dy) / squared))
-      const projected = { x: edge.a.x + t * dx, y: edge.a.y + t * dy }
-      const d = distance(center, projected)
-      if (!nearest || d < nearest.distance) nearest = { edgeIndex, offset: t, distance: d }
-    })
+    for (const edge of edgesOf({ points: mergedPoints })) {
+      const projection = projectPoint(center, edge)
+      const d = distance(center, projection.point)
+      if (projection.t >= -0.001 && projection.t <= 1.001 && (!nearest || d < nearest.distance)) nearest = { edgeIndex: edge.index, offset: Math.max(0, Math.min(1, projection.t)), distance: d }
+    }
     if (!nearest || nearest.distance > 3) return { ...opening, edgeIndex: -1, needsReposition: true }
     return { ...opening, edgeIndex: nearest.edgeIndex, offset: nearest.offset }
   })
-  const targetOpenings = remapOpenings(targetRoom, aligned)
+  const targetOpenings = remapOpenings(targetRoom, targetPoints, shift)
   const movingOpenings = remapOpenings(movingRoom, movingPoints)
   if ([...targetOpenings, ...movingOpenings].some(opening => opening.needsReposition)) return null
   return { ...targetRoom, points: mergedPoints, openings: [...targetOpenings, ...movingOpenings] }
