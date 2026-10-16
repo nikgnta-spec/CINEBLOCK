@@ -480,9 +480,13 @@ button:focus-visible,
   background: var(--bg-subtle);
 }
 .floorplan-canvas-frame {
-  flex: 1 1 auto;
+  /* Keep the drawing surface independent from the inspector/list height. */
+  flex: 0 0 auto;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1000 / 650;
   min-height: 0;
-  height: 100%;
+  align-self: flex-start;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
