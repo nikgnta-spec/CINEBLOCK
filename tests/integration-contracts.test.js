@@ -158,3 +158,12 @@ test('Room opening normalization preserves the full supported 5-meter width', as
 
   assert.ok(source.includes('width: Math.max(12, Math.min(500, Number(opening.width)'))
 })
+
+test('drawing a movement path over overlapping props keeps the selected path target', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  const objectDrag = source.slice(source.indexOf('const beginObjectDrag'), source.indexOf('const beginWaypointDrag'))
+  const waypointDrag = source.slice(source.indexOf('const beginWaypointDrag'), source.indexOf('const beginRotate'))
+
+  assert.match(objectDrag, /if \(tool === 'path'\) \{[\s\S]*?appendWaypoint\(getPoint\(event\)\)[\s\S]*?return/)
+  assert.match(waypointDrag, /if \(tool === 'path'\) \{[\s\S]*?appendWaypoint\(point\)[\s\S]*?return/)
+})
