@@ -768,18 +768,19 @@ button:focus-visible,
   .floorplan-tool-button { padding-inline: 9px; }
 }
 @media (max-width: 780px) {
-  .floorplan-workspace { height: auto; min-height: 0; overflow: visible; }
-  .floorplan-top { flex-basis: 56px; min-height: 56px; padding: 8px 12px; }
+  /* Keep the floorplan workspace viewport-bound: only the inspector scrolls. */
+  .floorplan-workspace { height: 100%; min-height: 0; overflow: hidden; }
+  .floorplan-top { flex: 0 0 56px; min-height: 56px; padding: 8px 12px; }
   .floorplan-scene-select { min-width: 0; max-width: 200px; }
   .floorplan-top-meta { gap: 8px; font-size: 11px; }
-  .floorplan-main-tools { gap: 6px; padding: 8px; }
+  .floorplan-main-tools { flex: 0 0 58px; gap: 6px; padding: 8px; }
   .floorplan-tool-button { min-width: 42px; height: 42px; padding: 0 8px; }
   .floorplan-tool-button span { display: none; }
   .floorplan-tool-divider { margin-inline: 1px; }
-  .floorplan-editor { display: flex; flex-direction: column; min-height: 0; overflow: visible; }
-  .floorplan-canvas-column { min-height: 0; padding: 10px; overflow: visible; }
-  .floorplan-canvas-frame { flex: 0 0 auto; height: min(70vh, 74vw); min-height: 280px; max-height: 70vh; }
-  .floorplan-inspector { border-left: 0; border-top: 1px solid var(--border); }
+  .floorplan-editor { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; overflow: hidden; }
+  .floorplan-canvas-column { flex: 0 0 auto; min-height: 0; padding: 10px; overflow: hidden; }
+  .floorplan-canvas-frame { flex: 0 0 auto; height: min(42vh, 74vw); min-height: 180px; max-height: 42vh; }
+  .floorplan-inspector { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; border-left: 0; border-top: 1px solid var(--border); }
   .floorplan-inspector-head { padding: 14px 16px; }
   .floorplan-inspector-section { padding: 14px 16px; }
   .floorplan-object-browser { padding: 12px; }
