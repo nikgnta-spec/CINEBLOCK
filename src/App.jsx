@@ -404,19 +404,18 @@ function migrateReusableRooms(savedScenes, savedFloorplans, savedRooms = []) {
   for (const scene of scenes) {
     const layout = floorplans[scene.id] || { rooms: [] }
     const legacyRooms = Array.isArray(layout.rooms) ? layout.rooms : []
-    if (!scene.roomIds.length && legacyRooms.length) {
-      for (const sourceRoom of legacyRooms) {
-        let room = { ...sourceRoom }
-        if (knownIds.has(room.id)) {
-          // Legacy IDs can collide across scenes. Preserve both rooms without merging geometry.
-          room.id = crypto.randomUUID()
-        }
-        knownIds.add(room.id)
-        rooms.push(room)
-        scene.roomIds.push(room.id)
+    scene.roomIds = scene.roomIds.filter(id => knownIds.has(id))
+    for (const sourceRoom of legacyRooms) {
+      // If the scene already references this exact Room ID, its geometry is already canonical.
+      if (scene.roomIds.includes(sourceRoom.id) && knownIds.has(sourceRoom.id)) continue
+      let room = { ...sourceRoom }
+      if (knownIds.has(room.id)) {
+        // Legacy IDs can collide across scenes. Preserve both rooms without merging geometry.
+        room.id = crypto.randomUUID()
       }
-    } else {
-      scene.roomIds = scene.roomIds.filter(id => knownIds.has(id))
+      knownIds.add(room.id)
+      rooms.push(room)
+      scene.roomIds.push(room.id)
     }
     floorplans[scene.id] = { ...layout, rooms: [] }
   }
