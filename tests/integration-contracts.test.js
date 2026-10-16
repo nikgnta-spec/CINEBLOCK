@@ -125,6 +125,15 @@ test('Room dimensions distinguish individual wall lengths from overall bounds an
   assert.ok(roomRender.indexOf("key={'edge-hit-'") < roomRender.indexOf("onPointerDown={event => beginOpeningDrag('room', room, opening, event)}"))
 })
 
+test('Door opening controls expose swing direction and single or double leaves', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const DoorSwingSymbol =/)
+  assert.match(source, /opening\.swingDirection === 'out'/)
+  assert.match(source, /opening\.doorType === 'double'/)
+  assert.match(source, /opening\.id \+ '-swing'/)
+  assert.match(source, /opening\.id \+ '-door-type'/)
+  assert.match(source, /const offset = 62/)
+})
 test('Dragging a Room edge translates both endpoint vertices in parallel', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /const beginRoomEdgeDrag =/)
