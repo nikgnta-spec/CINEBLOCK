@@ -1017,6 +1017,37 @@ export default function Floorplan({
     setTool('select')
   }
 
+  const addRoomVertexOnEdge = (room, edgeIndex, event) => {
+    if (tool === 'pan' || room.locked || event.button !== 0) return
+    event.preventDefault()
+    event.stopPropagation()
+    const points = getRoomPoints(room).map(point => ({ ...point }))
+    const start = points[edgeIndex]
+    const end = points[(edgeIndex + 1) % points.length]
+    if (!start || !end) return
+    const dx = end.x - start.x
+    const dy = end.y - start.y
+    const lengthSquared = dx * dx + dy * dy
+    if (lengthSquared < 4) return
+    const pointer = getPoint(event)
+    const t = Math.max(0.02, Math.min(0.98, ((pointer.x - start.x) * dx + (pointer.y - start.y) * dy) / lengthSquared))
+    const point = { x: Math.round(start.x + dx * t), y: Math.round(start.y + dy * t) }
+    // Avoid creating a duplicate vertex close to either endpoint.
+    if (Math.hypot(point.x - start.x, point.y - start.y) < 3 || Math.hypot(point.x - end.x, point.y - end.y) < 3) return
+    applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id })
+    updateLayout(previous => ({
+      ...previous,
+      rooms: previous.rooms.map(item => {
+        if (item.id !== room.id) return item
+        const nextPoints = getRoomPoints(item).map(vertex => ({ ...vertex }))
+        nextPoints.splice(edgeIndex + 1, 0, point)
+        return { ...item, points: nextPoints }
+      }),
+    }))
+    setSelected({ type: 'room', id: room.id })
+    setTool('select')
+  }
+
   const beginRoomFromVertex = () => {
     if (!roomVertexPrompt) return
     const point = { ...roomVertexPrompt.point }
@@ -2288,7 +2319,7 @@ export default function Floorplan({
                         <text x={bounds.x + bounds.width + 124} y={bounds.y + bounds.height / 2} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" transform={'rotate(90 ' + (bounds.x + bounds.width + 124) + ' ' + (bounds.y + bounds.height / 2) + ')'}>{(bounds.height / 100).toFixed(2) + ' m total'}</text>
                       </g>
                     })()}
-                    {active && edges.map(edge => <line key={'edge-hit-' + edge.edgeIndex} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} stroke="transparent" strokeWidth="14" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerEnter={() => setHoveredRoomEdge({ roomId: room.id, edgeIndex: edge.edgeIndex })} onPointerLeave={() => setHoveredRoomEdge(current => current?.roomId === room.id && current.edgeIndex === edge.edgeIndex ? null : current)} onPointerDown={event => beginRoomEdgeDrag(room, edge.edgeIndex, event)} />)}
+                    {active && edges.map(edge => <line key={'edge-hit-' + edge.edgeIndex} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} stroke="transparent" strokeWidth="14" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerEnter={() => setHoveredRoomEdge({ roomId: room.id, edgeIndex: edge.edgeIndex })} onPointerLeave={() => setHoveredRoomEdge(current => current?.roomId === room.id && current.edgeIndex === edge.edgeIndex ? null : current)} onPointerDown={event => beginRoomEdgeDrag(room, edge.edgeIndex, event)} onDoubleClick={event => addRoomVertexOnEdge(room, edge.edgeIndex, event)} />)}
                     {active && points.map((point, index) => (
                       <circle key={'vertex-' + index} cx={point.x} cy={point.y} r="6" fill="var(--bg)" stroke="var(--accent)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerDown={event => beginRoomVertexDrag(room, index, event)} onDoubleClick={event => { event.preventDefault(); event.stopPropagation(); setRoomVertexPrompt({ roomId: room.id, vertexIndex: index, point: { ...point } }) }} />
                     ))}
