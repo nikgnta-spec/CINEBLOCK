@@ -101,6 +101,24 @@ function PrintFloorplan({ scene, layout }) {
   const cameras = plan.cameras || []
   const lights = plan.lights || []
   const shots = scene.shots || []
+  const planPoints = [
+    ...rooms.flatMap(room => roomPoints(room)),
+    ...walls.flatMap(wall => [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]),
+    ...props.map(item => ({ x: item.x, y: item.y })),
+    ...actors.map(item => ({ x: item.x, y: item.y })),
+    ...cameras.map(item => ({ x: item.x, y: item.y })),
+    ...lights.map(item => ({ x: item.x, y: item.y })),
+  ]
+  const planBounds = planPoints.length ? {
+    minX: Math.min(...planPoints.map(point => point.x)),
+    maxX: Math.max(...planPoints.map(point => point.x)),
+    minY: Math.min(...planPoints.map(point => point.y)),
+    maxY: Math.max(...planPoints.map(point => point.y)),
+  } : null
+  const planTranslate = planBounds ? {
+    x: 500 - (planBounds.minX + planBounds.maxX) / 2,
+    y: 325 - (planBounds.minY + planBounds.maxY) / 2,
+  } : { x: 0, y: 0 }
 
   return (
     <section className="print-plan-page">
@@ -120,6 +138,7 @@ function PrintFloorplan({ scene, layout }) {
           <line key={'gy' + i} x1="0" y1={i * 25} x2="1000" y2={i * 25} stroke={i % 4 === 0 ? '#d1d5db' : '#edf0f2'} strokeWidth={i % 4 === 0 ? 1.1 : 0.6} />
         ))}
 
+        <g transform={'translate(' + planTranslate.x + ' ' + planTranslate.y + ')'}>
         {rooms.map(room => (
           <polygon key={'room-fill-' + room.id} points={roomPoints(room).map(point => point.x + ',' + point.y).join(' ')} fill="#fafafa" stroke="none" />
         ))}
@@ -326,6 +345,7 @@ function PrintFloorplan({ scene, layout }) {
             <text x="0" y="35" fontSize="13" fontWeight="600" fill="#111827" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{light.lightType || 'Key'}</text>
           </g>
         ))}
+        </g>
       </svg>
       <div className="print-plan-legend">
         <span>Room / Wall</span><span>Door</span><span>Window</span><span>Prop</span><span>Actor</span><span>Camera + FOV</span><span>Lighting + cone</span>
