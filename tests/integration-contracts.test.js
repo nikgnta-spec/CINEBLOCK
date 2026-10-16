@@ -193,7 +193,7 @@ test('Room dimensions distinguish individual wall lengths from overall bounds an
 
 test('Door leaf mode can be toggled in-place without replacing or resetting opening data', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
-  assert.equal((source.match(/opening\.id \+ '-leaf-mode'/g) || []).length, 2, 'Room and Wall inspectors both expose the door mode selector')
+  assert.equal((source.match(/id=\{opening\.id \+ '-leaf-mode'\}/g) || []).length, 2, 'Room and Wall inspectors both expose the door mode selector')
   assert.match(source, /value=\{opening\.type === 'door' \? 'leaf' : 'no-leaf'\}/)
   assert.match(source, /updateOpening\(opening\.id, \{ type: event\.target\.value === 'leaf' \? 'door' : 'doorway' \}\)/)
   assert.match(source, /const next = \{ \.\.\.opening, \.\.\.patch \}/, 'Updating type retains the existing opening record fields')
