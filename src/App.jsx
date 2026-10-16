@@ -718,13 +718,14 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
     const targetActiveSceneId = targetScenes.some(scene => scene.id === target.activeSceneId)
       ? target.activeSceneId
       : targetScenes[0]?.id || ''
-    const targetFloorplans = normalizeSavedFloorplans(target.floorplans, targetScenes)
+    const migratedTarget = migrateReusableRooms(targetScenes, target.floorplans, target.rooms)
     setProjects(remaining)
     setActiveProjectId(target.id)
     setProject(normalizeSavedProject(target.project))
-    setScenes(targetScenes)
+    setScenes(migratedTarget.scenes)
     setActiveSceneId(targetActiveSceneId)
-    setFloorplans(targetFloorplans)
+    setFloorplans(migratedTarget.floorplans)
+    setProjectRooms(migratedTarget.rooms)
     setTab('floorplan')
   }
 
@@ -783,14 +784,15 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
       const targetActiveSceneId = targetScenes.some(scene => scene.id === target.activeSceneId)
         ? target.activeSceneId
         : targetScenes[0]?.id || ''
-      const targetFloorplans = normalizeSavedFloorplans(target.floorplans, targetScenes)
+      const migratedTarget = migrateReusableRooms(targetScenes, target.floorplans, target.rooms)
 
       setProjects(merged)
       setActiveProjectId(target.id)
       setProject(normalizeSavedProject(target.project))
-      setScenes(targetScenes)
+      setScenes(migratedTarget.scenes)
       setActiveSceneId(targetActiveSceneId)
-      setFloorplans(targetFloorplans)
+      setFloorplans(migratedTarget.floorplans)
+      setProjectRooms(migratedTarget.rooms)
       setTab('floorplan')
     } catch (error) {
       console.error('CINEBLOCK could not import backup:', error)
@@ -846,6 +848,7 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
               setProject(cloudWorkspace.project)
               setScenes(cloudWorkspace.scenes)
               setFloorplans(cloudWorkspace.floorplans)
+              setProjectRooms(null)
               setActiveSceneId(cloudWorkspace.activeSceneId)
               setSelectedShotId('')
               setTab('floorplan')
@@ -1019,6 +1022,8 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
                 onSelectedShotIdChange={setSelectedShotId}
                 floorplans={floorplans}
                 onFloorplansChange={setFloorplans}
+                projectRooms={projectRooms}
+                onProjectRoomsChange={setProjectRooms}
               />
             </div>
           </>
