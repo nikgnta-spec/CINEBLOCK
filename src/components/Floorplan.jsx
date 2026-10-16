@@ -396,7 +396,8 @@ export default function Floorplan({
     setTool('select')
     dragRef.current = null
     dragHistoryBeforeRef.current = null
-    historyActionRef.current = false    historyRef.current = {
+    historyActionRef.current = false
+    historyRef.current = {
       sceneId: scene?.id || null,
       past: [],
       future: [],
