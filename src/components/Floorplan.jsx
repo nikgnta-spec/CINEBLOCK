@@ -2451,8 +2451,6 @@ export default function Floorplan({
                     {showRoomDimensions && (active || hoveredRoomEdge?.roomId === room.id) && (() => {
                       const bounds = getRoomBounds(room)
                       const dimensionLayouts = getRoomDimensionLayouts(room, edges)
-                      const horizontalIsSingleEdge = edges.some(edge => Math.abs(edge.length - bounds.width) < 0.5 && Math.abs(edge.y2 - edge.y1) < 0.5)
-                      const verticalIsSingleEdge = edges.some(edge => Math.abs(edge.length - bounds.height) < 0.5 && Math.abs(edge.x2 - edge.x1) < 0.5)
                       // Connected Rooms form one dimension group: compute a single outer
                       // bounding box for their overall measurements, rather than drawing
                       // each Room's total across the shared wall/openings.
@@ -2514,7 +2512,7 @@ export default function Floorplan({
                             <line x1={verticalTotalX - 6} y1={totalBounds.y} x2={verticalTotalX + 6} y2={totalBounds.y} />
                             <line x1={verticalTotalX - 6} y1={totalBounds.y + totalBounds.height} x2={verticalTotalX + 6} y2={totalBounds.y + totalBounds.height} />
                           </g>
-                          <text x={verticalTotalX + 12} y={bounds.y + bounds.height / 2} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke" transform={'rotate(90 ' + (verticalTotalX + 12) + ' ' + (bounds.y + bounds.height / 2) + ')'}>{(totalBounds.height / 100).toFixed(2) + ' m total'}</text>
+                          <text x={verticalTotalX + 12} y={totalBounds.y + totalBounds.height / 2} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke" transform={'rotate(90 ' + (verticalTotalX + 12) + ' ' + (totalBounds.y + totalBounds.height / 2) + ')'}>{(totalBounds.height / 100).toFixed(2) + ' m total'}</text>
                         </>}
                       </g>
                     })()}
