@@ -340,6 +340,8 @@ export default function Floorplan({
   const [selectedItems, setSelectedItems] = useState([])
   const [selectedWaypoint, setSelectedWaypoint] = useState(null)
   const [selectionBox, setSelectionBox] = useState(null)
+  const [spaceHeld, setSpaceHeld] = useState(false)
+  const pinchRef = useRef(null)
   const [drawStart, setDrawStart] = useState(null)
   const [previewPoint, setPreviewPoint] = useState(null)
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: MAP_WIDTH, height: MAP_HEIGHT })
@@ -693,10 +695,8 @@ export default function Floorplan({
   const toggleEntitySelection = (type, id) => {
     const current = selectionRef.current
     const exists = current.some(item => item.type === type && item.id === id)
-    const next = exists
-      ? current.filter(item => item.type !== type || item.id !== id)
-      : [...current, { type, id }]
-    applyEntitySelection(next, exists ? null : { type, id })
+    if (exists) return
+    applyEntitySelection([...current, { type, id }], { type, id })
   }
 
   useEffect(() => {
@@ -750,42 +750,7 @@ export default function Floorplan({
     }
   }
 
-  const handleCanvasWheel = event => {
-    event.preventDefault()
-    event.stopPropagation()
-    const svg = svgRef.current
-    const rect = svg?.getBoundingClientRect()
-    if (!rect || !rect.width || !rect.height) return
-
-    // Anchor the zoom to the exact world point beneath the mouse cursor.
-    const pointerX = clamp((event.clientX - rect.left) / rect.width, 0, 1)
-    const pointerY = clamp((event.clientY - rect.top) / rect.height, 0, 1)
-    const factor = event.deltaY < 0 ? 0.9 : 1.1
-
-    setViewBox(current => {
-      const width = clamp(current.width * factor, 80, MAP_WIDTH * 2.5)
-      const height = width / (MAP_WIDTH / MAP_HEIGHT)
-      const anchorX = current.x + pointerX * current.width
-      const anchorY = current.y + pointerY * current.height
-      return {
-        x: anchorX - pointerX * width,
-        y: anchorY - pointerY * height,
-        width,
-        height,
-      }
-    })
-  }
-
-  useEffect(() => {
-    const canvas = svgRef.current
-    if (!canvas) return undefined
-
-    // Scope wheel interception to the floorplan SVG; keep sidebar scrolling normal.
-    const handleWheel = event => handleCanvasWheel(event)
-    canvas.addEventListener('wheel', handleWheel, { passive: false })
-    return () => canvas.removeEventListener('wheel', handleWheel)
-  }, [viewBox])
-
+  // All zoom inputs share this anchor-preserving implementation.
   const zoomCanvas = (factor, clientX, clientY) => {
     const rect = svgRef.current?.getBoundingClientRect()
     const pointerX = rect && Number.isFinite(clientX) ? clamp((clientX - rect.left) / rect.width, 0, 1) : 0.5
@@ -803,6 +768,58 @@ export default function Floorplan({
       }
     })
   }
+
+  const handleCanvasWheel = event => {
+    event.preventDefault()
+    event.stopPropagation()
+    zoomCanvas(event.deltaY < 0 ? 0.9 : 1.1, event.clientX, event.clientY)
+  }
+
+  useEffect(() => {
+    const canvas = svgRef.current
+    if (!canvas) return undefined
+    const handleWheel = event => handleCanvasWheel(event)
+    canvas.addEventListener('wheel', handleWheel, { passive: false })
+    return () => canvas.removeEventListener('wheel', handleWheel)
+  }, [viewBox])
+
+  const handleCanvasTouchStart = event => {
+    if (event.touches.length !== 2) return
+    event.preventDefault()
+    const [first, second] = Array.from(event.touches)
+    const centerX = (first.clientX + second.clientX) / 2
+    const centerY = (first.clientY + second.clientY) / 2
+    const distance = Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY)
+    pinchRef.current = { distance, centerX, centerY }
+    dragRef.current = null
+    setSelectionBox(null)
+    setDrawStart(null)
+    setPreviewPoint(null)
+  }
+
+  const handleCanvasTouchMove = event => {
+    if (event.touches.length !== 2 || !pinchRef.current) return
+    event.preventDefault()
+    const [first, second] = Array.from(event.touches)
+    const centerX = (first.clientX + second.clientX) / 2
+    const centerY = (first.clientY + second.clientY) / 2
+    const distance = Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY)
+    if (distance > 0 && pinchRef.current.distance > 0) {
+      zoomCanvas(pinchRef.current.distance / distance, centerX, centerY)
+    }
+    pinchRef.current = { distance, centerX, centerY }
+  }
+
+  const handleCanvasTouchEnd = event => {
+    if (event.touches.length < 2) pinchRef.current = null
+  }
+
+  const resetZoom = () => setViewBox(current => ({
+    x: current.x + current.width / 2 - MAP_WIDTH / 2,
+    y: current.y + current.height / 2 - MAP_HEIGHT / 2,
+    width: MAP_WIDTH,
+    height: MAP_HEIGHT,
+  }))
 
   const fitCanvas = () => setViewBox(getFittedViewBox(layout))
 
@@ -1066,23 +1083,21 @@ export default function Floorplan({
     setTool('select')
   }
 
-  const handleCanvasPointerDown = event => {
-    // Match common diagram editors: middle-drag pans; Space + left-drag pans.
-    // Object drags and the existing Pan tool keep their established behavior.
-    const spaceHeld = event.getModifierState?.('Space') || event.nativeEvent?.getModifierState?.('Space')
-    const startedOnEmptyCanvas = event.target === event.currentTarget
-    if (event.button === 1 || (event.button === 0 && spaceHeld && startedOnEmptyCanvas)) {
-      event.preventDefault()
-      event.stopPropagation()
-      svgRef.current?.setPointerCapture?.(event.pointerId)
-      dragRef.current = {
-        mode: 'pan',
-        startClientX: event.clientX,
-        startClientY: event.clientY,
-        viewBox: { ...viewBox },
-      }
-      return
+  const handleCanvasPointerDownCapture = event => {
+    // Navigation takes priority over any object handler, including on top of objects.
+    if (event.button !== 1 && !(event.button === 0 && spaceHeld) && tool !== 'pan') return
+    event.preventDefault()
+    event.stopPropagation()
+    svgRef.current?.setPointerCapture?.(event.pointerId)
+    dragRef.current = {
+      mode: 'pan',
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      viewBox: { ...viewBox },
     }
+  }
+
+  const handleCanvasPointerDown = event => {
     if (tool === 'pan') {
       event.preventDefault()
       svgRef.current?.setPointerCapture?.(event.pointerId)
@@ -1101,7 +1116,8 @@ export default function Floorplan({
       setPreviewPoint(point)
       return
     }
-    if (tool === 'select') {
+    const clickedObject = event.target?.closest?.('[data-floorplan-object="true"], [data-floorplan-waypoint="true"]')
+    if (tool === 'select' && !clickedObject) {
       const start = point
       dragRef.current = { mode: 'selection-box', start, current: start, additive: event.shiftKey }
       setSelectionBox({ x: start.x, y: start.y, width: 0, height: 0, additive: event.shiftKey })
@@ -1382,11 +1398,18 @@ export default function Floorplan({
       }
       const hits = allObjects.filter(object => {
         const type = object.entityType
-        const x = type === 'room' ? object.x + object.width / 2
-          : type === 'wall' ? (object.x1 + object.x2) / 2 : object.x
-        const y = type === 'room' ? object.y + object.height / 2
-          : type === 'wall' ? (object.y1 + object.y2) / 2 : object.y
-        return x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom
+        const box = type === 'room'
+          ? { left: object.x, top: object.y, right: object.x + object.width, bottom: object.y + object.height }
+          : type === 'wall'
+            ? { left: Math.min(object.x1, object.x2), top: Math.min(object.y1, object.y2), right: Math.max(object.x1, object.x2), bottom: Math.max(object.y1, object.y2) }
+            : {
+              left: object.x - (type === 'prop' ? (Number(object.width) || 52) / 2 : 22),
+              top: object.y - (type === 'prop' ? (Number(object.height) || 36) / 2 : 22),
+              right: object.x + (type === 'prop' ? (Number(object.width) || 52) / 2 : 22),
+              bottom: object.y + (type === 'prop' ? (Number(object.height) || 36) / 2 : 22),
+            }
+        return box.right >= bounds.left && box.left <= bounds.right
+          && box.bottom >= bounds.top && box.top <= bounds.bottom
       }).map(object => ({ type: object.entityType, id: object.id }))
       const combined = completedDrag.additive ? [...selectionRef.current, ...hits] : hits
       applyEntitySelection(combined, hits[hits.length - 1] || null)
@@ -1521,6 +1544,33 @@ export default function Floorplan({
   }
 
   useEffect(() => {
+    if (!isActive) {
+      setSpaceHeld(false)
+      return undefined
+    }
+    const isEditableTarget = target => target instanceof HTMLElement && (
+      target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+    )
+    const handleSpaceDown = event => {
+      if (event.code !== 'Space' || isEditableTarget(event.target) || event.altKey || event.ctrlKey || event.metaKey) return
+      event.preventDefault()
+      setSpaceHeld(true)
+    }
+    const handleSpaceUp = event => {
+      if (event.code === 'Space') setSpaceHeld(false)
+    }
+    const handleWindowBlur = () => setSpaceHeld(false)
+    window.addEventListener('keydown', handleSpaceDown)
+    window.addEventListener('keyup', handleSpaceUp)
+    window.addEventListener('blur', handleWindowBlur)
+    return () => {
+      window.removeEventListener('keydown', handleSpaceDown)
+      window.removeEventListener('keyup', handleSpaceUp)
+      window.removeEventListener('blur', handleWindowBlur)
+    }
+  }, [isActive])
+
+  useEffect(() => {
     if (!isActive) return undefined
     const handleFloorplanShortcut = event => {
       const target = event.target
@@ -1553,6 +1603,14 @@ export default function Floorplan({
           event.preventDefault()
           deleteSelected()
         }
+        return
+      }
+      if (key === 'escape') {
+        event.preventDefault()
+        applyEntitySelection([])
+        setSelectedWaypoint(null)
+        onSelectedShotIdChange?.('')
+        setTool('select')
         return
       }
       if (key === 'v') {
@@ -1719,14 +1777,20 @@ export default function Floorplan({
             </div>
             <svg
               ref={svgRef}
-              className={'floorplan-canvas' + (tool === 'select' ? ' can-select' : tool === 'pan' ? ' can-pan' : ' can-draw')}
+              className={'floorplan-canvas' + (spaceHeld || tool === 'pan' ? ' can-pan' : tool === 'select' ? ' can-select' : ' can-draw')}
+              style={{ touchAction: 'none', cursor: spaceHeld || tool === 'pan' || dragRef.current?.mode === 'pan' ? 'grab' : undefined }}
               viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
               width={canvasSize.width}
               height={canvasSize.height}
               preserveAspectRatio="xMidYMid meet"
               role="img"
               aria-label="Kanvas Floorplan tampak atas"
+              onPointerDownCapture={handleCanvasPointerDownCapture}
               onPointerDown={handleCanvasPointerDown}
+              onTouchStart={handleCanvasTouchStart}
+              onTouchMove={handleCanvasTouchMove}
+              onTouchEnd={handleCanvasTouchEnd}
+              onTouchCancel={handleCanvasTouchEnd}
               onClick={handleCanvasClick}
               onPointerMove={handleCanvasPointerMove}
               onPointerUp={handleCanvasPointerUp}
@@ -2224,6 +2288,7 @@ export default function Floorplan({
               <span className="floorplan-zoom-level" aria-live="polite">{Math.round((MAP_WIDTH / viewBox.width) * 100)}%</span>
               <button type="button" className="floorplan-view-control-button" onClick={() => zoomCanvas(0.8)} disabled={viewBox.width <= 80} title="Perbesar tampilan" aria-label="Perbesar tampilan"><Plus size={16} /></button>
               <span className="floorplan-view-control-divider" />
+              <button type="button" className="floorplan-view-control-button" onClick={resetZoom} title="Reset zoom ke 100% (1:1)" aria-label="Reset zoom ke 100 persen">1:1</button>
               <button type="button" className="floorplan-view-control-button floorplan-fit-button" onClick={fitCanvas} title="Muat seluruh denah ke kanvas" aria-label="Muat seluruh denah ke kanvas"><Maximize2 size={15} /><span>Muat denah</span></button>
             </div>
           </div>
