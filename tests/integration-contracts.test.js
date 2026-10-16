@@ -510,9 +510,12 @@ test('Room tool switches to move mode when dragging an existing Room and inspect
   assert.match(source, /connectedRoomIds: \(room\.connectedRoomIds \|\| \[\]\)\.filter\(id => id !== selectedEntity\.id\)/)
 })
 
-test('dragging a connected Room moves only the selected Room', async () => {
+test('dragging a connected Room keeps it hosted to its shared wall', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
-  assert.match(source, /A Room connection is a logical relationship, not a rigid group/)
-  assert.match(source, /dragRef\.current = \{ mode: 'move', type, id: item\.id, start: point, original: item \}/)
-  assert.doesNotMatch(source, /const connectedIds = new Set\(\[item\.id, \.\.\.\(item\.connectedRoomIds \|\| \[\]\)\]\)/)
+  assert.match(source, /A connected Room behaves like an opening hosted on a wall/)
+  assert.match(source, /attachmentVector = \{ x: \(edge\.b\.x - edge\.a\.x\) \/ length, y: \(edge\.b\.y - edge\.a\.y\) \/ length \}/)
+  assert.match(source, /if \(drag\.type === 'room' && drag\.attachmentVector\)/)
+  assert.match(source, /const alongWall = dx \* drag\.attachmentVector\.x \+ dy \* drag\.attachmentVector\.y/)
+  assert.match(source, /if \(type !== 'room' && alreadySelected && currentSelection\.length > 1\)/)
+  assert.match(source, /if \(candidate && !alreadyConnected\) setRoomMergePrompt\(candidate\)/)
 })
