@@ -4,6 +4,7 @@ import {
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
 import { snapRoomPoint } from '../utils/roomSnapping'
+import { findRoomMergeCandidate, mergeAdjacentRoomPolygons } from '../utils/roomMerge'
 import {
   SIZES as SHOT_SIZES,
   ANGLES as SHOT_ANGLES,
@@ -446,6 +447,8 @@ export default function Floorplan({
   const [hoveredRoomEdge, setHoveredRoomEdge] = useState(null)
   const [previewPoint, setPreviewPoint] = useState(null)
   const [roomSnapGuides, setRoomSnapGuides] = useState([])
+  const [roomMergePrompt, setRoomMergePrompt] = useState(null)
+  const [roomVertexPrompt, setRoomVertexPrompt] = useState(null)
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: MAP_WIDTH, height: MAP_HEIGHT })
   const [historyRevision, setHistoryRevision] = useState(0)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 520 })
@@ -1012,6 +1015,33 @@ export default function Floorplan({
     svgRef.current?.setPointerCapture?.(event.pointerId)
     setSelected({ type: 'room', id: room.id })
     setTool('select')
+  }
+
+  const beginRoomFromVertex = () => {
+    if (!roomVertexPrompt) return
+    const point = { ...roomVertexPrompt.point }
+    setRoomDrawPoints([point])
+    setPreviewPoint(point)
+    setRoomDrawMessage('Titik awal Room baru dipilih. Klik titik berikutnya untuk menggambar.')
+    setRoomVertexPrompt(null)
+    setTool('room')
+  }
+
+  const confirmRoomMerge = () => {
+    if (!roomMergePrompt) return
+    const moving = layout.rooms.find(room => room.id === roomMergePrompt.movingRoomId)
+    const target = layout.rooms.find(room => room.id === roomMergePrompt.targetRoomId)
+    const merged = mergeAdjacentRoomPolygons(moving, target, roomMergePrompt)
+    if (!merged) {
+      setRoomMergePrompt({ ...roomMergePrompt, error: 'Bentuk kedua Room belum bisa disatukan dengan aman. Coba sejajarkan sisi yang sama panjang terlebih dahulu.' })
+      return
+    }
+    updateLayout(previous => ({
+      ...previous,
+      rooms: previous.rooms.filter(room => room.id !== moving.id).map(room => room.id === target.id ? merged : room),
+    }))
+    applyEntitySelection([{ type: 'room', id: target.id }], { type: 'room', id: target.id })
+    setRoomMergePrompt(null)
   }
 
   const beginRoomVertexDrag = (room, vertexIndex, event) => {
@@ -1700,6 +1730,12 @@ export default function Floorplan({
 
   const handleCanvasPointerUp = () => {
     const completedDrag = dragRef.current
+    if (completedDrag?.mode === 'move' && completedDrag.type === 'room') {
+      const movedRoom = layout.rooms.find(room => room.id === completedDrag.id)
+      const candidate = movedRoom && findRoomMergeCandidate(movedRoom, layout.rooms, 18)
+      if (candidate) setRoomMergePrompt(candidate)
+    }
+    const completedDrag = dragRef.current
     if (completedDrag?.mode === 'room-vertex') setRoomSnapGuides([])
     if (completedDrag?.mode === 'selection-box') {
       const end = completedDrag.current || completedDrag.start
@@ -2205,7 +2241,7 @@ export default function Floorplan({
                     })()}
                     {active && edges.map(edge => <line key={'edge-hit-' + edge.edgeIndex} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} stroke="transparent" strokeWidth="14" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerEnter={() => setHoveredRoomEdge({ roomId: room.id, edgeIndex: edge.edgeIndex })} onPointerLeave={() => setHoveredRoomEdge(current => current?.roomId === room.id && current.edgeIndex === edge.edgeIndex ? null : current)} onPointerDown={event => beginRoomEdgeDrag(room, edge.edgeIndex, event)} />)}
                     {active && points.map((point, index) => (
-                      <circle key={'vertex-' + index} cx={point.x} cy={point.y} r="6" fill="var(--bg)" stroke="var(--accent)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerDown={event => beginRoomVertexDrag(room, index, event)} />
+                      <circle key={'vertex-' + index} cx={point.x} cy={point.y} r="6" fill="var(--bg)" stroke="var(--accent)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerDown={event => beginRoomVertexDrag(room, index, event)} onDoubleClick={event => { event.preventDefault(); event.stopPropagation(); setRoomVertexPrompt({ roomId: room.id, vertexIndex: index, point: { ...point } }) }} />
                     ))}
                     {active && edges.map(edge => <circle key={'edge-' + edge.edgeIndex} cx={(edge.x1 + edge.x2) / 2} cy={(edge.y1 + edge.y2) / 2} r="3.5" fill="var(--text-muted)" stroke="var(--bg)" strokeWidth="1" vectorEffect="non-scaling-stroke" pointerEvents="none" />)}
                     {openings.map(opening => {
@@ -3198,6 +3234,31 @@ export default function Floorplan({
           )}
         </aside>
       </div>
+      {roomMergePrompt && (
+        <div className="floorplan-dialog-backdrop" role="presentation" onPointerDown={event => { if (event.target === event.currentTarget) setRoomMergePrompt(null) }}>
+          <section className="floorplan-dialog" role="dialog" aria-modal="true" aria-labelledby="room-merge-title">
+            <h3 id="room-merge-title">Gabungkan kedua Room?</h3>
+            <p>Dua Room sudah berdekatan. Jika digabung, keduanya menjadi satu polygon dan ukuran total dihitung ulang.</p>
+            {roomMergePrompt.error && <p role="alert">{roomMergePrompt.error}</p>}
+            <div className="floorplan-dialog-actions">
+              <button type="button" onClick={() => setRoomMergePrompt(null)}>Batal</button>
+              <button type="button" onClick={confirmRoomMerge}>Gabungkan Room</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {roomVertexPrompt && (
+        <div className="floorplan-dialog-backdrop" role="presentation" onPointerDown={event => { if (event.target === event.currentTarget) setRoomVertexPrompt(null) }}>
+          <section className="floorplan-dialog" role="dialog" aria-modal="true" aria-labelledby="room-vertex-title">
+            <h3 id="room-vertex-title">Titik Room</h3>
+            <p>Mau membuat Room baru yang dimulai dari titik ini?</p>
+            <div className="floorplan-dialog-actions">
+              <button type="button" onClick={() => setRoomVertexPrompt(null)}>Batal</button>
+              <button type="button" onClick={beginRoomFromVertex}>Buat Room baru</button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }
