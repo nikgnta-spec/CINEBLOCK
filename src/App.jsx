@@ -231,6 +231,8 @@ function normalizeRoomPolygon(room, index = 0) {
     next.id = typeof next.id === 'string' && next.id ? next.id : crypto.randomUUID()
     next.type = next.type === 'window' ? 'window' : 'door'
     next.offset = Math.max(0.02, Math.min(0.98, Number.isFinite(Number(next.offset)) ? Number(next.offset) : 0.5))
+    // Legacy bottom and left edges run opposite to the polygon perimeter order.
+    if (legacyRectangle && ['bottom', 'left'].includes(next.side)) next.offset = 1 - next.offset
     next.width = Math.max(12, Math.min(500, Number(next.width) || (next.type === 'window' ? 58 : 48)))
     delete next.side
     return next
