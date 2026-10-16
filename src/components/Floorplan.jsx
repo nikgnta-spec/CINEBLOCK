@@ -1089,7 +1089,7 @@ export default function Floorplan({
       type,
       offset: 0.5,
       width: type === 'door' ? 48 : 58,
-      ...(selectedType === 'room' ? { side: 'bottom' } : {}),
+      ...(selectedType === 'room' ? { edgeIndex: Math.max(0, getRoomPoints(selectedEntity).length - 1) } : {}),
     }
     updateSelected({ openings: [...(selectedEntity.openings || []), opening] })
     setTool('select')
@@ -1106,7 +1106,7 @@ export default function Floorplan({
       if (opening.id !== openingId) return opening
       const next = { ...opening, ...patch }
       const length = selectedType === 'room'
-        ? (['left', 'right'].includes(next.side) ? selectedEntity.height : selectedEntity.width)
+        ? (getRoomEdges(selectedEntity)[Math.max(0, Math.min(getRoomEdges(selectedEntity).length - 1, Number(next.edgeIndex) || 0))]?.length || 1)
         : getWallMetrics(selectedEntity).length
       const openingWidth = Math.min(Math.max(1, Number(next.width) || 1), Math.max(1, length))
       const minimumOffset = Math.min(0.49, openingWidth / (2 * Math.max(1, length)))
@@ -1329,12 +1329,7 @@ export default function Floorplan({
         length = metrics.length || 1
         offset = ((point.x - host.x1) * metrics.ux + (point.y - host.y1) * metrics.uy) / length
       } else {
-        const edges = [
-          { side: 'top', x1: host.x, y1: host.y, x2: host.x + host.width, y2: host.y },
-          { side: 'right', x1: host.x + host.width, y1: host.y, x2: host.x + host.width, y2: host.y + host.height },
-          { side: 'bottom', x1: host.x, y1: host.y + host.height, x2: host.x + host.width, y2: host.y + host.height },
-          { side: 'left', x1: host.x, y1: host.y, x2: host.x, y2: host.y + host.height },
-        ]
+        const edges = getRoomEdges(host)
         const projectedEdges = edges.map(edge => {
           const projection = getWallMetrics({ x1: edge.x1, y1: edge.y1, x2: edge.x2, y2: edge.y2 })
           const edgeLength = projection.length || 1
@@ -1347,7 +1342,7 @@ export default function Floorplan({
         const nearestEdge = projectedEdges.reduce((best, edge) => edge.distance < best.distance ? edge : best)
         length = nearestEdge.length
         offset = nearestEdge.offset
-        patch.side = nearestEdge.side
+        patch.edgeIndex = nearestEdge.edgeIndex
       }
       const openingWidth = Math.min(Number(opening.width) || 48, length)
       const minimumOffset = Math.min(0.49, openingWidth / (2 * length))
