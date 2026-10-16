@@ -462,6 +462,7 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
   const [activeSceneId, setActiveSceneId] = useState('')
   const [selectedShotId, setSelectedShotId] = useState('')
   const [floorplans, setFloorplans] = useState({})
+  const [projectRooms, setProjectRooms] = useState(null)
   const [projects, setProjects] = useState([])
   const [activeProjectId, setActiveProjectId] = useState('')
   const [hydrated, setHydrated] = useState(false)
@@ -550,6 +551,7 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
       setScenes(restoredScenes)
       setActiveSceneId(restoredActiveSceneId)
       setFloorplans(restoredFloorplans)
+      setProjectRooms(null)
       setProjects([cloudRecord])
       setActiveProjectId(cloudProjectId)
       setSaveStatus('saved')
@@ -562,16 +564,21 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
         if (cancelled) return
 
         const restoredProject = normalizeSavedProject(savedState?.project)
-        const restoredScenes = normalizeSavedScenes(savedState?.scenes) || scenes
+        const legacyScenes = normalizeSavedScenes(savedState?.scenes) || scenes
+        let restoredProjects = normalizeWorkspaceProjects(savedState?.projects)
+        const restoredProjectId = savedState?.activeProjectId || restoredProjects[0]?.id || crypto.randomUUID()
+        const savedProjectRecord = restoredProjects.find(item => item.id === restoredProjectId)
+        const migratedCurrent = migrateReusableRooms(
+          legacyScenes,
+          savedState?.floorplans ?? savedProjectRecord?.floorplans,
+          savedState?.rooms ?? savedProjectRecord?.rooms,
+        )
+        const restoredScenes = migratedCurrent.scenes
+        const restoredFloorplans = migratedCurrent.floorplans
+        const restoredRooms = migratedCurrent.rooms
         const restoredActiveSceneId = restoredScenes.some(scene => scene.id === savedState?.activeSceneId)
           ? savedState.activeSceneId
           : restoredScenes[0]?.id || ''
-        let restoredProjects = normalizeWorkspaceProjects(savedState?.projects)
-        let restoredProjectId = savedState?.activeProjectId || restoredProjects[0]?.id || crypto.randomUUID()
-        const restoredFloorplans = normalizeSavedFloorplans(
-          savedState?.floorplans ?? restoredProjects.find(item => item.id === restoredProjectId)?.floorplans,
-          restoredScenes,
-        )
 
         // Migrate the original single-project save into the project library.
         restoredProjects = upsertProject(
@@ -582,6 +589,7 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
             restoredScenes,
             restoredActiveSceneId,
             restoredFloorplans,
+            restoredRooms,
           ),
         )
 
@@ -593,6 +601,7 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
         setScenes(restoredScenes)
         setActiveSceneId(restoredActiveSceneId)
         setFloorplans(restoredFloorplans)
+        setProjectRooms(restoredRooms)
         setProjects(restoredProjects)
         setActiveProjectId(restoredProjectId)
         setSaveStatus('saved')
@@ -631,7 +640,7 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
     const timeout = window.setTimeout(async () => {
       if (externalSaveDetectedRef.current) return
       try {
-        const currentRecord = createProjectRecord(activeProjectId, project, scenes, activeSceneId, floorplans)
+        const currentRecord = createProjectRecord(activeProjectId, project, scenes, activeSceneId, floorplans, projectRooms || [])
         const savedProjects = upsertProject(projects, currentRecord)
         await saveAppState({
           tab,
@@ -639,6 +648,7 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
           scenes,
           activeSceneId,
           floorplans,
+          rooms: projectRooms || [],
           projects: savedProjects,
           activeProjectId,
         })
@@ -653,7 +663,7 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
   }, [hydrated, tab, project, scenes, activeSceneId, floorplans, projects, activeProjectId])
 
   const snapshotCurrentProject = () => (
-    createProjectRecord(activeProjectId, project, scenes, activeSceneId, floorplans)
+    createProjectRecord(activeProjectId, project, scenes, activeSceneId, floorplans, projectRooms || [])
   )
 
   const switchProject = (projectId) => {
@@ -666,12 +676,15 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
     const targetActiveSceneId = targetScenes.some(scene => scene.id === target.activeSceneId)
       ? target.activeSceneId
       : targetScenes[0]?.id || ''
-    const targetFloorplans = normalizeSavedFloorplans(target.floorplans, targetScenes)
+    const migratedTarget = migrateReusableRooms(targetScenes, target.floorplans, target.rooms)
+    const targetScenesWithRooms = migratedTarget.scenes
+    const targetFloorplans = migratedTarget.floorplans
     setActiveProjectId(target.id)
     setProject(normalizeSavedProject(target.project))
-    setScenes(targetScenes)
+    setScenes(targetScenesWithRooms)
     setActiveSceneId(targetActiveSceneId)
     setFloorplans(targetFloorplans)
+    setProjectRooms(migratedTarget.rooms)
     setTab('floorplan')
   }
 
@@ -680,7 +693,7 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
     const newProject = { ...defaultProject, visualRefs: [...defaultProject.visualRefs] }
     const newScenes = [defaultScene(1)]
     const newFloorplans = normalizeSavedFloorplans({}, newScenes)
-    const newRecord = createProjectRecord(crypto.randomUUID(), newProject, newScenes, newScenes[0].id, newFloorplans)
+    const newRecord = createProjectRecord(crypto.randomUUID(), newProject, newScenes, newScenes[0].id, newFloorplans, [])
 
     setProjects(previous => [...upsertProject(previous, currentRecord), newRecord])
     setActiveProjectId(newRecord.id)
@@ -688,6 +701,7 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
     setScenes(newScenes)
     setActiveSceneId(newScenes[0].id)
     setFloorplans(newFloorplans)
+    setProjectRooms([])
     setTab('floorplan')
   }
 
