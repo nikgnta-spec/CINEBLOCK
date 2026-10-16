@@ -2008,8 +2008,6 @@ export default function Floorplan({
     }
   }, [isActive])
 
-  useEffect(() => {
-    if (!isActive) return undefined
   const deleteSelectedRoomVertex = () => {
     if (!selectedRoomVertex) return false
     const { roomId, vertexIndex } = selectedRoomVertex
@@ -2044,6 +2042,8 @@ export default function Floorplan({
     return true
   }
 
+  useEffect(() => {
+    if (!isActive) return undefined
 
   const handleFloorplanShortcut = event => {
       const target = event.target
