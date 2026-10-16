@@ -133,7 +133,7 @@ const pointInPolygon = (point, points) => {
   return inside
 }
 const DoorSwingSymbol = ({ opening, width }) => {
-  const direction = opening.swingDirection === 'out' ? 1 : -1
+  const direction = opening.swingDirection === 'out' ? -1 : 1
   const leafCount = opening.doorType === 'double' ? 2 : 1
   const half = width / 2
   const leaf = width / leafCount
@@ -1234,12 +1234,21 @@ export default function Floorplan({
       return
     }
     const previous = roomDrawPoints[roomDrawPoints.length - 1]
-    if (Math.hypot(point.x - previous.x, point.y - previous.y) < 4) {
+    const dx = point.x - previous.x
+    const dy = point.y - previous.y
+    const distance = Math.hypot(dx, dy)
+    const angle = Math.atan2(dy, dx)
+    const snapAngle = Math.round(angle / (Math.PI / 2)) * (Math.PI / 2)
+    const angleDelta = Math.atan2(Math.sin(angle - snapAngle), Math.cos(angle - snapAngle))
+    const snappedPoint = Math.abs(angleDelta) <= 5 * Math.PI / 180
+      ? { x: previous.x + Math.cos(snapAngle) * distance, y: previous.y + Math.sin(snapAngle) * distance }
+      : point
+    if (Math.hypot(snappedPoint.x - previous.x, snappedPoint.y - previous.y) < 4) {
       setRoomDrawMessage('Garis terlalu pendek.')
       return
     }
-    setRoomDrawPoints(points => [...points, point])
-    setPreviewPoint(point)
+    setRoomDrawPoints(points => [...points, snappedPoint])
+    setPreviewPoint(snappedPoint)
   }
 
   const confirmManualRoomLength = () => {
@@ -2096,12 +2105,12 @@ export default function Floorplan({
                         return <line key={edge.edgeIndex + '-' + index} x1={edge.x1 + ux * segment.start} y1={edge.y1 + uy * segment.start} x2={edge.x1 + ux * segment.end} y2={edge.y1 + uy * segment.end} stroke={active ? 'var(--text)' : 'var(--border-strong)'} strokeWidth={active ? 3.5 : 2.5} vectorEffect="non-scaling-stroke" pointerEvents="none" />
                       })
                     })}
-                    <text x={bounds.x + 12} y={bounds.y + 28} fill="var(--text)" fontSize="18" fontWeight="600" pointerEvents="none" paintOrder="stroke" stroke="var(--bg)" strokeWidth="3">
+                    <text x={bounds.x + 8} y={bounds.y - 18} fill="var(--text)" fontSize="18" fontWeight="600" pointerEvents="none" paintOrder="stroke" stroke="var(--bg)" strokeWidth="3">
                       {room.label || 'Room'}
                     </text>
                     {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && (
-                      <text x={bounds.x + 12} y={bounds.y + 45} fill="var(--text-muted)" fontSize="12" pointerEvents="none" paintOrder="stroke" stroke="var(--bg)" strokeWidth="3">
-                        {Number(room.ceilingHeight).toFixed(1) + ' m'}
+                      <text x={bounds.x + 8} y={bounds.y - 38} fill="var(--text-muted)" fontSize="12" pointerEvents="none" paintOrder="stroke" stroke="var(--bg)" strokeWidth="3">
+                        {'Tinggi ' + Number(room.ceilingHeight).toFixed(1) + ' m'}
                       </text>
                     )}
                     {showRoomDimensions && (active || hoveredRoomEdge?.roomId === room.id) && (() => {
