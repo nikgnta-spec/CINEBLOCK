@@ -364,3 +364,12 @@ test('Double doors render two leaves and matching swing arcs in the PDF floorpla
   assert.match(source, /M ' \+ \(-width \/ 2\) \+ ' 0 L ' \+ \(-width \/ 2\) \+ ' ' \+ \(direction \* leaf\)/)
   assert.match(source, /opening\.swingDirection === 'out' \? -1 : 1/)
 })
+
+
+test('PDF floorplan scales the full measured plan to keep outer dimensions in frame', async () => {
+  const source = await readSource('../src/components/PrintReport.jsx')
+  assert.match(source, /const planScale = planBounds \? Math\.min\(/)
+  assert.match(source, /900 \/ \(planBounds\.maxX - planBounds\.minX \+ 360/)
+  assert.match(source, /570 \/ \(planBounds\.maxY - planBounds\.minY \+ 360/)
+  assert.match(source, /scale\(' \+ planScale \+ '\)/)
+})
