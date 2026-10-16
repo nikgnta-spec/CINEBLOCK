@@ -545,3 +545,22 @@ test('Connected Rooms use one combined bounding box for overall dimensions', asy
   assert.match(source, /\(totalBounds\.width \/ 100\)\.toFixed\(2\) \+ ' m total'/)
   assert.match(source, /\(totalBounds\.height \/ 100\)\.toFixed\(2\) \+ ' m total'/)
 })
+
+test('Confirming a Room connection snaps walls flush and hides the shared wall', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  const handlerStart = source.indexOf('const confirmRoomMerge = () => {')
+  const handlerEnd = source.indexOf('const addRoomVertexAtEdgeMidpoint', handlerStart)
+  const handler = source.slice(handlerStart, handlerEnd)
+  assert.match(handler, /const signedDistance = \(movingEdge\.a\.x - targetEdge\.a\.x\)/)
+  assert.match(handler, /points\.map\(point => \(\{ x: Math\.round\(point\.x \+ shift\.x\), y: Math\.round\(point\.y \+ shift\.y\) \}\)\)/)
+  assert.match(source, /edges\.filter\(edge => !isSharedRoomEdge\(edge\)\)\.map/)
+  assert.match(source, /const isSharedRoomEdge = edge => connectedRooms\.some/)
+})
+
+test('Room total length and width stay visible without hover while edge dimensions remain contextual', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /showRoomDimensions && \(\(\) => \{/)
+  assert.match(source, /isTotalDimensionOwner && !horizontalIsSingleEdge/)
+  assert.match(source, /isTotalDimensionOwner && !verticalIsSingleEdge/)
+  assert.match(source, /\(active \|\| hoveredRoomEdge\?\.roomId === room\.id\) && visibleDimensionLayouts\.map/)
+})
