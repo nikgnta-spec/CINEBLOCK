@@ -240,7 +240,7 @@ function PrintFloorplan({ scene, layout }) {
                         <path d={'M ' + (-width / 2) + ' 0 L ' + (-width / 2) + ' ' + (-width)} strokeWidth="3" />
                         <path d={'M ' + (-width / 2) + ' ' + (-width) + ' A ' + width + ' ' + width + ' 0 0 1 ' + (width / 2) + ' 0'} strokeDasharray="4 3" />
                       </>
-                    ) : (
+                    ) : opening.type === 'doorway' ? null : (
                       <>
                         <path d={'M ' + (-width / 2) + ' -4 H ' + (width / 2) + ' M ' + (-width / 2) + ' 0 H ' + (width / 2) + ' M ' + (-width / 2) + ' 4 H ' + (width / 2)} />
                         <path d={'M ' + (-width / 2) + ' -7 V 7 M ' + (width / 2) + ' -7 V 7'} />
@@ -253,7 +253,7 @@ function PrintFloorplan({ scene, layout }) {
                 const p = roomOpeningPlacement(room, opening)
                 const width = Math.min(Number(opening.width) || 48, p.length)
                 return <g key={'room-opening-dimension-' + opening.id}>
-                  <text x={p.x} y={p.y + 24} fontSize="11" fontWeight="600" fill="#374151" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{opening.type === 'door' ? 'Pintu' : 'Jendela'} {meters(width)} × {meters(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)))}</text>
+                  <text x={p.x} y={p.y + 24} fontSize="11" fontWeight="600" fill="#374151" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{opening.type === 'doorway' ? (opening.label || 'Pintu Tanpa Daun') : opening.type === 'door' ? 'Pintu' : 'Jendela'} {meters(width)} × {meters(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)))}</text>
                   {opening.type === 'door' && <text x={p.x} y={p.y + 38} fontSize="10" fontWeight="600" fill="#92400e" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{'Daun pintu ' + meters(width) + ' m'}</text>}
                 </g>
               })}
@@ -290,7 +290,7 @@ function PrintFloorplan({ scene, layout }) {
                         <path d={'M ' + (-width / 2) + ' 0 L ' + (-width / 2) + ' ' + (-width)} strokeWidth="3" />
                         <path d={'M ' + (-width / 2) + ' ' + (-width) + ' A ' + width + ' ' + width + ' 0 0 1 ' + (width / 2) + ' 0'} strokeDasharray="4 3" />
                       </>
-                    ) : (
+                    ) : opening.type === 'doorway' ? null : (
                       <>
                         <path d={'M ' + (-width / 2) + ' -4 H ' + (width / 2) + ' M ' + (-width / 2) + ' 0 H ' + (width / 2) + ' M ' + (-width / 2) + ' 4 H ' + (width / 2)} />
                         <path d={'M ' + (-width / 2) + ' -7 V 7 M ' + (width / 2) + ' -7 V 7'} />
@@ -305,7 +305,7 @@ function PrintFloorplan({ scene, layout }) {
                 const x = wall.x1 + metric.ux * center
                 const y = wall.y1 + metric.uy * center
                 return <g key={'wall-opening-dimension-' + opening.id}>
-                  <text x={x} y={y + 24} fontSize="11" fontWeight="600" fill="#374151" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{opening.type === 'door' ? 'Pintu' : 'Jendela'} {meters(width)} × {meters(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)))}</text>
+                  <text x={x} y={y + 24} fontSize="11" fontWeight="600" fill="#374151" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{opening.type === 'doorway' ? (opening.label || 'Pintu Tanpa Daun') : opening.type === 'door' ? 'Pintu' : 'Jendela'} {meters(width)} × {meters(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)))}</text>
                   {opening.type === 'door' && <text x={x} y={y + 38} fontSize="10" fontWeight="600" fill="#92400e" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{'Daun pintu ' + meters(width) + ' m'}</text>}
                 </g>
               })}
