@@ -265,9 +265,12 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
       .slice(0, 100)
       .map(opening => ({
         id: safeId(opening),
-        type: opening.type === 'window' ? 'window' : 'door',
+        type: ['window', 'doorway'].includes(opening.type) ? opening.type : 'door',
         offset: Math.max(0.02, Math.min(0.98, Number.isFinite(Number(opening.offset)) ? Number(opening.offset) : 0.5)),
         width: Math.max(12, Math.min(500, Number(opening.width) || (opening.type === 'window' ? 58 : 48))),
+        ...(Number.isFinite(Number(opening.height)) && Number(opening.height) >= 0 ? { height: Math.min(400, Number(opening.height)) } : {}),
+        ...(opening.type === 'doorway' ? { label: typeof opening.label === 'string' ? opening.label.slice(0, 80) : 'Pintu Tanpa Daun', swingDirection: opening.swingDirection === 'out' ? 'out' : 'in' } : {}),
+        ...(opening.type === 'door' ? { swingDirection: opening.swingDirection === 'out' ? 'out' : 'in', doorType: opening.doorType === 'double' ? 'double' : 'single', hingeSide: opening.hingeSide === 'right' ? 'right' : 'left' } : {}),
         ...(allowSide ? { side: ['top', 'right', 'bottom', 'left'].includes(opening.side) ? opening.side : 'bottom' } : {}),
       }))
     const projectToSegment = (point, x1, y1, x2, y2) => {
@@ -1013,7 +1016,7 @@ export default function App() {
                 onFloorplansChange={setFloorplans}
               />
             </div>
-            <div style={{ display: tab === 'floorplan' ? 'block' : 'none' }}>
+            <div className="floorplan-tab-panel" style={{ display: tab === 'floorplan' ? 'flex' : 'none' }}>
               <Floorplan
                 isActive={tab === 'floorplan'}
                 scenes={scenes}

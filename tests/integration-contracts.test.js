@@ -266,7 +266,7 @@ test('Doors and windows support precise width, position, and polygon edge contro
   assert.match(source, /id=\{opening\.id \+ '-width'\}/)
   assert.match(source, /id=\{opening\.id \+ '-offset'\}/)
   assert.match(source, /id=\{opening\.id \+ '-edge'\}/)
-  assert.match(source, /updateOpening\(opening\.id, \{ width: Math\.round\(meters \* 100\) \}\)/)
+  assert.match(source, /updateOpening\(opening\.id, \{ width: Math\.round\(clamp\(meters, 0, 5\) \* 100\) \}\)/)
   assert.match(source, /updateOpening\(opening\.id, \{ offset: percent \/ 100 \}\)/)
   // Openings are attached to a polygon edge by edgeIndex, not legacy cardinal sides.
   assert.match(source, /id=\{opening\.id \+ '-edge'\}/)
@@ -332,4 +332,57 @@ test('Path clicks capture before overlapping Room or Prop handlers can steal sel
   assert.match(source, /if \(tool === 'path' && event\.button === 0\) \{[\s\S]*?event\.stopPropagation\(\)[\s\S]*?return/)
   assert.match(source, /const handleCanvasClickCapture = event => \{[\s\S]*?if \(tool !== 'path'\) return[\s\S]*?appendWaypoint\(getPoint\(event\)\)/)
   assert.match(source, /onClickCapture=\{handleCanvasClickCapture\}/)
+})
+
+
+test('Leafless doorway is a distinct opening type with editable label and direction', async () => {
+  const floorplan = await readSource('../src/components/Floorplan.jsx')
+  const app = await readSource('../src/App.jsx')
+  const report = await readSource('../src/components/PrintReport.jsx')
+
+  assert.match(floorplan, /addOpening\('doorway'\)/)
+  assert.match(floorplan, /opening\.type === 'doorway' \? null/)
+  assert.match(floorplan, /id=\{opening\.id \+ '-label'\}/)
+  assert.match(floorplan, /opening\.type === 'doorway' && <>/)
+  assert.match(app, /\['window', 'doorway'\]\.includes\(opening\.type\)/)
+  assert.match(app, /opening\.type === 'doorway'.*label:/)
+  assert.match(report, /opening\.type === 'doorway' \? \(opening\.label \|\| 'Pintu Tanpa Daun'\)/)
+})
+
+
+test('Leafless doorway uses an open-gap icon rather than the door-leaf symbol', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /type === 'doorway' \? \([\s\S]*?M-20 -5 H-8 M8 -5 H20 M-20 5 H-8 M8 5 H20/)
+  assert.match(source, /<FloorplanObjectIcon type="doorway" size=\{18\} \/> Tambah pintu tanpa daun/)
+})
+
+
+test('Double doors render two leaves and matching swing arcs in the PDF floorplan', async () => {
+  const source = await readSource('../src/components/PrintReport.jsx')
+  assert.match(source, /opening\.doorType === 'double' \? \(\(\) =>/)
+  assert.match(source, /const leaf = width \/ 2/)
+  assert.match(source, /M ' \+ \(-width \/ 2\) \+ ' 0 L ' \+ \(-width \/ 2\) \+ ' ' \+ \(direction \* leaf\)/)
+  assert.match(source, /opening\.swingDirection === 'out' \? -1 : 1/)
+})
+
+
+test('PDF floorplan scales the full measured plan to keep outer dimensions in frame', async () => {
+  const source = await readSource('../src/components/PrintReport.jsx')
+  assert.match(source, /const planScale = planBounds \? Math\.min\(/)
+  assert.match(source, /900 \/ \(planBounds\.maxX - planBounds\.minX \+ 360/)
+  assert.match(source, /570 \/ \(planBounds\.maxY - planBounds\.minY \+ 360/)
+  assert.match(source, /scale\(' \+ planScale \+ '\)/)
+})
+
+
+test('Door hinge side supports left and right in Floorplan, persistence, and PDF', async () => {
+  const floorplan = await readSource('../src/components/Floorplan.jsx')
+  const app = await readSource('../src/App.jsx')
+  const report = await readSource('../src/components/PrintReport.jsx')
+  assert.match(floorplan, /opening\.id \+ '-hinge-side'/)
+  assert.match(floorplan, /option value="left">Kiri/)
+  assert.match(floorplan, /option value="right">Kanan/)
+  assert.match(floorplan, /const hingeSide = opening\.hingeSide === 'right' \? 'right' : 'left'/)
+  assert.match(app, /hingeSide: opening\.hingeSide === 'right' \? 'right' : 'left'/)
+  assert.match(report, /const hingeX = opening\.hingeSide === 'right' \? width \/ 2 : -width \/ 2/)
 })

@@ -44,6 +44,17 @@ function roomEdges(room) {
   })
 }
 
+function pointInPolygon(point, points) {
+  let inside = false
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const a = points[i], b = points[j]
+    const intersects = ((a.y > point.y) !== (b.y > point.y))
+      && (point.x < ((b.x - a.x) * (point.y - a.y)) / ((b.y - a.y) || 1e-9) + a.x)
+    if (intersects) inside = !inside
+  }
+  return inside
+}
+
 function roomOpeningPlacement(room, opening) {
   const edges = roomEdges(room)
   const edge = edges[Math.max(0, Math.min(edges.length - 1, Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)))] || edges[0]
@@ -90,11 +101,35 @@ function PrintFloorplan({ scene, layout }) {
   const cameras = plan.cameras || []
   const lights = plan.lights || []
   const shots = scene.shots || []
+  const planPoints = [
+    ...rooms.flatMap(room => roomPoints(room)),
+    ...walls.flatMap(wall => [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]),
+    ...props.map(item => ({ x: item.x, y: item.y })),
+    ...actors.map(item => ({ x: item.x, y: item.y })),
+    ...cameras.map(item => ({ x: item.x, y: item.y })),
+    ...lights.map(item => ({ x: item.x, y: item.y })),
+  ]
+  const planBounds = planPoints.length ? {
+    minX: Math.min(...planPoints.map(point => point.x)),
+    maxX: Math.max(...planPoints.map(point => point.x)),
+    minY: Math.min(...planPoints.map(point => point.y)),
+    maxY: Math.max(...planPoints.map(point => point.y)),
+  } : null
+  // Reserve drawing space for dimension guides and labels outside the room polygon.
+  // Fit the complete measured plan into the PDF frame instead of centering only the walls.
+  const planScale = planBounds ? Math.min(
+    900 / (planBounds.maxX - planBounds.minX + 360 || 1),
+    570 / (planBounds.maxY - planBounds.minY + 360 || 1),
+  ) : 1
+  const planTranslate = planBounds ? {
+    x: 500 - ((planBounds.minX + planBounds.maxX) / 2) * planScale,
+    y: 325 - ((planBounds.minY + planBounds.maxY) / 2) * planScale,
+  } : { x: 0, y: 0 }
 
   return (
     <section className="print-plan-page">
       <div className="print-section-kicker">FLOORPLAN</div>
-      <h2>{scene.name || 'Scene'} — Top-Down Plan</h2>
+      <h2>{scene.name || 'Scene'}</h2>
       <div className="print-scene-meta">
         <span>{scene.intExt || 'INT'}</span>
         <span>{display(scene.location)}</span>
@@ -102,13 +137,9 @@ function PrintFloorplan({ scene, layout }) {
       </div>
       <svg className="print-plan-svg" viewBox="0 0 1000 650" role="img" aria-label={'Floorplan for ' + (scene.name || 'scene')}>
         <rect width="1000" height="650" fill="#fff" />
-        {Array.from({ length: 41 }, (_, i) => (
-          <line key={'gx' + i} x1={i * 25} y1="0" x2={i * 25} y2="650" stroke={i % 4 === 0 ? '#d1d5db' : '#edf0f2'} strokeWidth={i % 4 === 0 ? 1.1 : 0.6} />
-        ))}
-        {Array.from({ length: 27 }, (_, i) => (
-          <line key={'gy' + i} x1="0" y1={i * 25} x2="1000" y2={i * 25} stroke={i % 4 === 0 ? '#d1d5db' : '#edf0f2'} strokeWidth={i % 4 === 0 ? 1.1 : 0.6} />
-        ))}
+        {/* Export only the plan and its measurements, not the editor workspace grid. */}
 
+        <g transform={'translate(' + planTranslate.x + ' ' + planTranslate.y + ') scale(' + planScale + ')'}>
         {rooms.map(room => (
           <polygon key={'room-fill-' + room.id} points={roomPoints(room).map(point => point.x + ',' + point.y).join(' ')} fill="#fafafa" stroke="none" />
         ))}
@@ -138,7 +169,12 @@ function PrintFloorplan({ scene, layout }) {
           const openings = room.openings || []
           const points = roomPoints(room)
           const edges = roomEdges(room)
-          const bounds = { x: Math.min(...points.map(point => point.x)), y: Math.min(...points.map(point => point.y)) }
+          const bounds = {
+            x: Math.min(...points.map(point => point.x)),
+            y: Math.min(...points.map(point => point.y)),
+            maxX: Math.max(...points.map(point => point.x)),
+            maxY: Math.max(...points.map(point => point.y)),
+          }
           return (
             <g key={'room-outline-' + room.id}>
               {edges.flatMap(edge => openingSegments(edge.length, openings.filter(opening => (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)) === edge.edgeIndex)).map((segment, index) => {
@@ -146,19 +182,84 @@ function PrintFloorplan({ scene, layout }) {
                 const uy = (edge.y2 - edge.y1) / (edge.length || 1)
                 return <line key={edge.edgeIndex + '-' + index} x1={edge.x1 + ux * segment.start} y1={edge.y1 + uy * segment.start} x2={edge.x1 + ux * segment.end} y2={edge.y1 + uy * segment.end} stroke="#111827" strokeWidth="3" />
               }))}
-              <text x={bounds.x + 9} y={bounds.y + 20} fontSize="16" fontWeight="700" fill="#111827">{room.label || 'Room'}</text>
-              {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && <text x={bounds.x + 9} y={bounds.y + 37} fontSize="12" fill="#374151">{Number(room.ceilingHeight).toFixed(1) + ' m ceiling'}</text>}
+              {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && <text x={bounds.x + 9} y={bounds.y + 36} fontSize="12" fill="#374151">{Number(room.ceilingHeight).toFixed(1) + ' m ceiling'}</text>}
+              {edges.map(edge => {
+                const horizontal = Math.abs(edge.x2 - edge.x1) >= Math.abs(edge.y2 - edge.y1)
+                const mx = (edge.x1 + edge.x2) / 2
+                const my = (edge.y1 + edge.y2) / 2
+                const dx = edge.x2 - edge.x1
+                const dy = edge.y2 - edge.y1
+                const length = edge.length || 1
+                let nx = dy / length
+                let ny = -dx / length
+                const probeDistance = Math.max(2, Math.min(8, length * 0.04))
+                const positiveProbe = { x: mx + nx * probeDistance, y: my + ny * probeDistance }
+                const negativeProbe = { x: mx - nx * probeDistance, y: my - ny * probeDistance }
+                const positiveInside = pointInPolygon(positiveProbe, points)
+                const negativeInside = pointInPolygon(negativeProbe, points)
+                if (positiveInside && !negativeInside) { nx *= -1; ny *= -1 }
+                // Place dimension guides outside the actual polygon, including concave rooms.
+                const offset = 72
+                const x1 = horizontal ? Math.min(edge.x1, edge.x2) : mx + nx * offset
+                const x2 = horizontal ? Math.max(edge.x1, edge.x2) : mx + nx * offset
+                const y1 = horizontal ? my + ny * offset : Math.min(edge.y1, edge.y2)
+                const y2 = horizontal ? my + ny * offset : Math.max(edge.y1, edge.y2)
+                const label = meters(edge.length)
+                return <g key={'room-dimension-' + edge.edgeIndex} fill="none" stroke="#64748b" strokeWidth="1.2">
+                  <line x1={x1} y1={y1} x2={x2} y2={y2} />
+                  {horizontal ? <>
+                    <line x1={x1} y1={y1 - 5} x2={x1} y2={y1 + 5} />
+                    <line x1={x2} y1={y2 - 5} x2={x2} y2={y2 + 5} />
+                  </> : <>
+                    <line x1={x1 - 5} y1={y1} x2={x1 + 5} y2={y1} />
+                    <line x1={x2 - 5} y1={y2} x2={x2 + 5} y2={y2} />
+                  </>}
+                  <text x={(x1 + x2) / 2} y={(y1 + y2) / 2 - 7} fill="#374151" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="12" textAnchor="middle">{label}</text>
+
+                </g>
+              })}
+              {(() => {
+                // Match Floorplan's overall dimensions: polygon bounding-box extents, not the sum of edges.
+                const totalLength = bounds.maxX - bounds.x
+                const totalWidth = bounds.maxY - bounds.y
+                const horizontalY = bounds.y - 112
+                const verticalX = bounds.maxX + 112
+                return <g fill="none" stroke="#64748b" strokeWidth="1.2">
+                  <line x1={bounds.x} y1={horizontalY} x2={bounds.maxX} y2={horizontalY} />
+                  <line x1={bounds.x} y1={horizontalY - 5} x2={bounds.x} y2={horizontalY + 5} />
+                  <line x1={bounds.maxX} y1={horizontalY - 5} x2={bounds.maxX} y2={horizontalY + 5} />
+                  <text x={(bounds.x + bounds.maxX) / 2} y={horizontalY - 8} fill="#374151" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="12" textAnchor="middle">{meters(totalLength)} m total</text>
+                  <line x1={verticalX} y1={bounds.y} x2={verticalX} y2={bounds.maxY} />
+                  <line x1={verticalX - 5} y1={bounds.y} x2={verticalX + 5} y2={bounds.y} />
+                  <line x1={verticalX - 5} y1={bounds.maxY} x2={verticalX + 5} y2={bounds.maxY} />
+                  <text x={verticalX + 14} y={(bounds.y + bounds.maxY) / 2} fill="#374151" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="12" textAnchor="middle" transform={'rotate(90 ' + (verticalX + 14) + ' ' + ((bounds.y + bounds.maxY) / 2) + ')'}>{meters(totalWidth)} m total</text>
+                </g>
+              })()}
               {openings.map(opening => {
                 const p = roomOpeningPlacement(room, opening)
                 const width = Math.min(Number(opening.width) || 48, p.length)
                 return (
                   <g key={'room-opening-' + opening.id} transform={'translate(' + p.x + ' ' + p.y + ') rotate(' + p.angle + ')'} fill="none" stroke="#111827" strokeWidth="2">
                     {opening.type === 'door' ? (
-                      <>
-                        <path d={'M ' + (-width / 2) + ' 0 V ' + (-width)} />
-                        <path d={'M ' + (-width / 2) + ' ' + (-width) + ' A ' + width + ' ' + width + ' 0 0 1 ' + (width / 2) + ' 0'} strokeDasharray="4 3" />
-                      </>
-                    ) : (
+                      opening.doorType === 'double' ? (() => {
+                        const direction = opening.swingDirection === 'out' ? -1 : 1
+                        const leaf = width / 2
+                        return <>
+                          <path d={'M ' + (-width / 2) + ' 0 H ' + (width / 2)} />
+                          <path d={'M ' + (-width / 2) + ' 0 L ' + (-width / 2) + ' ' + (direction * leaf) + ' M ' + (width / 2) + ' 0 L ' + (width / 2) + ' ' + (direction * leaf)} strokeWidth="3" />
+                          <path d={'M ' + (-width / 2) + ' ' + (direction * leaf) + ' A ' + leaf + ' ' + leaf + ' 0 0 ' + (direction < 0 ? 1 : 0) + ' 0 0 M ' + (width / 2) + ' ' + (direction * leaf) + ' A ' + leaf + ' ' + leaf + ' 0 0 ' + (direction > 0 ? 1 : 0) + ' 0 0'} strokeDasharray="4 3" />
+                        </>
+                      })() : (() => {
+                        const direction = opening.swingDirection === 'out' ? -1 : 1
+                        const hingeX = opening.hingeSide === 'right' ? width / 2 : -width / 2
+                        const freeX = -hingeX
+                        return <>
+                          <path d={'M ' + (-width / 2) + ' 0 H ' + (width / 2)} />
+                          <path d={'M ' + hingeX + ' 0 L ' + hingeX + ' ' + (direction * width)} strokeWidth="3" />
+                          <path d={'M ' + hingeX + ' ' + (direction * width) + ' A ' + width + ' ' + width + ' 0 0 ' + ((opening.hingeSide === 'right') === (direction > 0) ? 1 : 0) + ' ' + freeX + ' 0'} strokeDasharray="4 3" />
+                        </>
+                      })()
+                    ) : opening.type === 'doorway' ? null : (
                       <>
                         <path d={'M ' + (-width / 2) + ' -4 H ' + (width / 2) + ' M ' + (-width / 2) + ' 0 H ' + (width / 2) + ' M ' + (-width / 2) + ' 4 H ' + (width / 2)} />
                         <path d={'M ' + (-width / 2) + ' -7 V 7 M ' + (width / 2) + ' -7 V 7'} />
@@ -166,6 +267,14 @@ function PrintFloorplan({ scene, layout }) {
                     )}
                   </g>
                 )
+              })}
+              {openings.map(opening => {
+                const p = roomOpeningPlacement(room, opening)
+                const width = Math.min(Number(opening.width) || 48, p.length)
+                return <g key={'room-opening-dimension-' + opening.id}>
+                  <text x={p.x} y={p.y + 24} fontSize="11" fontWeight="600" fill="#374151" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{opening.type === 'doorway' ? (opening.label || 'Pintu Tanpa Daun') : opening.type === 'door' ? 'Pintu' : 'Jendela'} {meters(width)} × {meters(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)))}</text>
+                  {opening.type === 'door' && <text x={p.x} y={p.y + 38} fontSize="10" fontWeight="600" fill="#92400e" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{'Daun pintu ' + meters(width) + ' m'}</text>}
+                </g>
               })}
             </g>
           )
@@ -195,11 +304,25 @@ function PrintFloorplan({ scene, layout }) {
                 return (
                   <g key={'wall-opening-' + opening.id} transform={'translate(' + (wall.x1 + metric.ux * center) + ' ' + (wall.y1 + metric.uy * center) + ') rotate(' + metric.angle + ')'} fill="none" stroke="#111827" strokeWidth="2">
                     {opening.type === 'door' ? (
-                      <>
-                        <path d={'M ' + (-width / 2) + ' 0 V ' + (-width)} />
-                        <path d={'M ' + (-width / 2) + ' ' + (-width) + ' A ' + width + ' ' + width + ' 0 0 1 ' + (width / 2) + ' 0'} strokeDasharray="4 3" />
-                      </>
-                    ) : (
+                      opening.doorType === 'double' ? (() => {
+                        const direction = opening.swingDirection === 'out' ? -1 : 1
+                        const leaf = width / 2
+                        return <>
+                          <path d={'M ' + (-width / 2) + ' 0 H ' + (width / 2)} />
+                          <path d={'M ' + (-width / 2) + ' 0 L ' + (-width / 2) + ' ' + (direction * leaf) + ' M ' + (width / 2) + ' 0 L ' + (width / 2) + ' ' + (direction * leaf)} strokeWidth="3" />
+                          <path d={'M ' + (-width / 2) + ' ' + (direction * leaf) + ' A ' + leaf + ' ' + leaf + ' 0 0 ' + (direction < 0 ? 1 : 0) + ' 0 0 M ' + (width / 2) + ' ' + (direction * leaf) + ' A ' + leaf + ' ' + leaf + ' 0 0 ' + (direction > 0 ? 1 : 0) + ' 0 0'} strokeDasharray="4 3" />
+                        </>
+                      })() : (() => {
+                        const direction = opening.swingDirection === 'out' ? -1 : 1
+                        const hingeX = opening.hingeSide === 'right' ? width / 2 : -width / 2
+                        const freeX = -hingeX
+                        return <>
+                          <path d={'M ' + (-width / 2) + ' 0 H ' + (width / 2)} />
+                          <path d={'M ' + hingeX + ' 0 L ' + hingeX + ' ' + (direction * width)} strokeWidth="3" />
+                          <path d={'M ' + hingeX + ' ' + (direction * width) + ' A ' + width + ' ' + width + ' 0 0 ' + ((opening.hingeSide === 'right') === (direction > 0) ? 1 : 0) + ' ' + freeX + ' 0'} strokeDasharray="4 3" />
+                        </>
+                      })()
+                    ) : opening.type === 'doorway' ? null : (
                       <>
                         <path d={'M ' + (-width / 2) + ' -4 H ' + (width / 2) + ' M ' + (-width / 2) + ' 0 H ' + (width / 2) + ' M ' + (-width / 2) + ' 4 H ' + (width / 2)} />
                         <path d={'M ' + (-width / 2) + ' -7 V 7 M ' + (width / 2) + ' -7 V 7'} />
@@ -207,6 +330,16 @@ function PrintFloorplan({ scene, layout }) {
                     )}
                   </g>
                 )
+              })}
+              {openings.map(opening => {
+                const width = Math.min(Number(opening.width) || 48, metric.length)
+                const center = Math.max(0, Math.min(1, Number(opening.offset) || 0.5)) * metric.length
+                const x = wall.x1 + metric.ux * center
+                const y = wall.y1 + metric.uy * center
+                return <g key={'wall-opening-dimension-' + opening.id}>
+                  <text x={x} y={y + 24} fontSize="11" fontWeight="600" fill="#374151" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{opening.type === 'doorway' ? (opening.label || 'Pintu Tanpa Daun') : opening.type === 'door' ? 'Pintu' : 'Jendela'} {meters(width)} × {meters(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)))}</text>
+                  {opening.type === 'door' && <text x={x} y={y + 38} fontSize="10" fontWeight="600" fill="#92400e" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{'Daun pintu ' + meters(width) + ' m'}</text>}
+                </g>
               })}
             </g>
           )
@@ -247,6 +380,7 @@ function PrintFloorplan({ scene, layout }) {
             <text x="0" y="35" fontSize="13" fontWeight="600" fill="#111827" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{light.lightType || 'Key'}</text>
           </g>
         ))}
+        </g>
       </svg>
       <div className="print-plan-legend">
         <span>Room / Wall</span><span>Door</span><span>Window</span><span>Prop</span><span>Actor</span><span>Camera + FOV</span><span>Lighting + cone</span>
