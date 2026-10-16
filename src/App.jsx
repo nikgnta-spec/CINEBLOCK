@@ -660,7 +660,7 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
     }, 250)
 
     return () => window.clearTimeout(timeout)
-  }, [hydrated, tab, project, scenes, activeSceneId, floorplans, projects, activeProjectId])
+  }, [hydrated, tab, project, scenes, activeSceneId, floorplans, projectRooms, projects, activeProjectId])
 
   const snapshotCurrentProject = () => (
     createProjectRecord(activeProjectId, project, scenes, activeSceneId, floorplans, projectRooms || [])
