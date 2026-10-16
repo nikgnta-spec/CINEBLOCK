@@ -2482,6 +2482,22 @@ export default function Floorplan({
                       const isDimensionGroupActive = active && hasConnectedRooms
                       const totalBounds = hasConnectedRooms ? connectedBounds : bounds
                       const groupEdges = connectedRoomGroup.flatMap(getRoomEdges)
+                      const isSharedBoundaryEdge = edge => connectedRoomGroup.some(other => other.id !== room.id &&
+                        getRoomEdges(other).some(otherEdge => {
+                          const dx = edge.x2 - edge.x1, dy = edge.y2 - edge.y1
+                          const otherDx = otherEdge.x2 - otherEdge.x1, otherDy = otherEdge.y2 - otherEdge.y1
+                          const edgeLength = Math.hypot(dx, dy) || 1
+                          const otherLength = Math.hypot(otherDx, otherDy) || 1
+                          const parallel = Math.abs(dx * otherDy - dy * otherDx) / (edgeLength * otherLength) < 0.02
+                          const lineDistance = Math.abs(dx * (otherEdge.y1 - edge.y1) - dy * (otherEdge.x1 - edge.x1)) / edgeLength
+                          if (!parallel || lineDistance > 3) return false
+                          const ux = dx / edgeLength, uy = dy / edgeLength
+                          const project = point => (point.x - edge.x1) * ux + (point.y - edge.y1) * uy
+                          const start = Math.max(0, Math.min(project({ x: otherEdge.x1, y: otherEdge.y1 }), project({ x: otherEdge.x2, y: otherEdge.y2 })))
+                          const end = Math.min(edgeLength, Math.max(project({ x: otherEdge.x1, y: otherEdge.y1 }), project({ x: otherEdge.x2, y: otherEdge.y2 })))
+                          return end - start > 2
+                        }))
+                      const visibleDimensionLayouts = dimensionLayouts.filter(({ edge }) => !isSharedBoundaryEdge(edge))
                       const horizontalIsSingleEdge = groupEdges.some(edge => Math.abs(edge.length - totalBounds.width) < 0.5 && Math.abs(edge.y2 - edge.y1) < 0.5)
                       const verticalIsSingleEdge = groupEdges.some(edge => Math.abs(edge.length - totalBounds.height) < 0.5 && Math.abs(edge.x2 - edge.x1) < 0.5)
                       const maxHorizontalLevel = Math.max(0, ...dimensionLayouts.filter(item => item.sideKey.startsWith('h-')).map(item => item.dimension.level))
@@ -2489,7 +2505,7 @@ export default function Floorplan({
                       const horizontalTotalY = totalBounds.y - 112 - maxHorizontalLevel * 30
                       const verticalTotalX = totalBounds.x + totalBounds.width + 112 + maxVerticalLevel * 30
                       return <g pointerEvents="none" opacity={active ? 1 : 0.58}>
-                        {dimensionLayouts.map(({ edge, dimension: d }) => {
+                        {visibleDimensionLayouts.map(({ edge, dimension: d }) => {
                           const label = (edge.length / 100).toFixed(2) + ' m'
                           return <g key={'dimension-' + edge.edgeIndex}>
                             <line x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2} stroke="var(--text-muted)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
