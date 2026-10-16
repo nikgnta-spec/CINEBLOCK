@@ -445,6 +445,7 @@ export default function Floorplan({
   const [roomDrawMessage, setRoomDrawMessage] = useState('')
   const [showRoomDimensions, setShowRoomDimensions] = useState(true)
   const [hoveredRoomEdge, setHoveredRoomEdge] = useState(null)
+  const [selectedRoomEdge, setSelectedRoomEdge] = useState(null)
   const [previewPoint, setPreviewPoint] = useState(null)
   const [roomSnapGuides, setRoomSnapGuides] = useState([])
   const [roomMergePrompt, setRoomMergePrompt] = useState(null)
@@ -1004,6 +1005,7 @@ export default function Floorplan({
     event.stopPropagation()
     event.preventDefault()
     applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id })
+    setSelectedRoomEdge({ roomId: room.id, edgeIndex })
     onSelectedShotIdChange?.('')
     beginDragHistory()
     dragRef.current = {
@@ -1077,8 +1079,8 @@ export default function Floorplan({
   }
 
   const addRoomVertexAtEdgeMidpoint = room => {
-    if (!room || room.locked || hoveredRoomEdge?.roomId !== room.id) return
-    const edgeIndex = hoveredRoomEdge.edgeIndex
+    if (!room || room.locked || selectedRoomEdge?.roomId !== room.id) return
+    const edgeIndex = selectedRoomEdge.edgeIndex
     const points = getRoomPoints(room).map(point => ({ ...point }))
     const start = points[edgeIndex]
     const end = points[(edgeIndex + 1) % points.length]
@@ -3089,10 +3091,10 @@ export default function Floorplan({
                     </div>
                     <p className="floorplan-field-note">{getRoomPoints(selectedEntity).length} titik · panjang/lebar mengikuti bounding box polygon.</p>
                     <div className="floorplan-opening-actions">
-                      <button type="button" disabled={Boolean(selectedEntity.locked) || hoveredRoomEdge?.roomId !== selectedEntity.id} onClick={() => addRoomVertexAtEdgeMidpoint(selectedEntity)}>Tambah titik pada sisi terpilih</button>
+                      <button type="button" disabled={Boolean(selectedEntity.locked) || selectedRoomEdge?.roomId !== selectedEntity.id} onClick={() => addRoomVertexAtEdgeMidpoint(selectedEntity)}>Tambah titik pada sisi terpilih</button>
                       <button type="button" disabled={Boolean(selectedEntity.locked) || selectedRoomVertex?.roomId !== selectedEntity.id} onClick={deleteSelectedRoomVertex}>Hapus titik terpilih</button>
                     </div>
-                    <p className="floorplan-field-note">Klik sisi dinding untuk memilihnya, lalu tekan Tambah titik. Pilih titik kuning untuk menghapusnya dengan tombol Hapus titik terpilih atau tekan Delete.</p>
+                    <p className="floorplan-field-note">Klik atau geser sisi dinding untuk memilihnya, lalu tekan Tambah titik. Pilih titik kuning untuk menghapusnya dengan tombol Hapus titik terpilih atau tekan Delete.</p>
                   </section>
                   <section className="floorplan-inspector-section">
                     <label htmlFor="room-ceiling-height">Tinggi ruangan (m)</label>
