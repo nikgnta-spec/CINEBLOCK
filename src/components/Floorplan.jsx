@@ -4,7 +4,7 @@ import {
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
 import { snapRoomPoint } from '../utils/roomSnapping'
-import { findRoomMergeCandidate, snapRoomToEdge } from '../utils/roomMerge'
+import { findRoomMergeCandidate, mergeAdjacentRoomPolygons, snapRoomToEdge } from '../utils/roomMerge'
 import {
   SIZES as SHOT_SIZES,
   ANGLES as SHOT_ANGLES,
@@ -1134,32 +1134,41 @@ export default function Floorplan({
       return
     }
 
-    // Snap the dropped Room exactly onto the target Room's wall line before
-    // persisting the connection. This removes hairline gaps while preserving
-    // each Room's own shape, openings, and label.
+    // A confirmed merge becomes one polygon entity. Keep the target Room's
+    // identity/name/ceiling height, while combining the outer geometry and
+    // safely remapped openings from both Rooms.
     const movingEdge = roomMergePrompt.movingEdge
     const targetEdge = roomMergePrompt.targetEdge
-    // Align the dropped edge with the target edge using a rigid transform.
-    // This corrects tiny angular and sub-pixel offsets without rounding vertices
-    // independently (which can reintroduce hairline gaps along the shared wall).
     const snappedPoints = snapRoomToEdge(moving, movingEdge, targetEdge)
     if (!snappedPoints) {
       setRoomMergePrompt({ ...roomMergePrompt, error: 'Dinding tidak dapat disejajarkan. Coba geser Room sedikit lalu sambungkan kembali.' })
       return
     }
+
+    const snappedMoving = { ...moving, points: snappedPoints }
+    const merged = mergeAdjacentRoomPolygons(snappedMoving, target, {
+      ...roomMergePrompt,
+      movingEdge: { ...movingEdge, a: snappedPoints[movingEdge.index], b: snappedPoints[(movingEdge.index + 1) % snappedPoints.length] },
+      targetEdge,
+    })
+    if (!merged) {
+      setRoomMergePrompt({ ...roomMergePrompt, error: 'Room belum bisa digabung dengan aman. Periksa bentuk dinding dan posisi pintu/jendela, lalu coba lagi.' })
+      return
+    }
+
     updateLayout(previous => ({
       ...previous,
-      rooms: previous.rooms.map(room => {
-        if (room.id !== moving.id && room.id !== target.id) return room
-        const connectedRoomIds = new Set(Array.isArray(room.connectedRoomIds) ? room.connectedRoomIds : [])
-        connectedRoomIds.add(room.id === moving.id ? target.id : moving.id)
-        if (room.id === moving.id) {
-          return { ...room, points: snappedPoints, connectedRoomIds: [...connectedRoomIds] }
-        }
-        return { ...room, connectedRoomIds: [...connectedRoomIds] }
-      }),
+      rooms: previous.rooms
+        .filter(room => room.id !== moving.id && room.id !== target.id)
+        .concat({
+          ...target,
+          points: merged.points,
+          openings: merged.openings,
+          // A merged Room is one entity, not a group of linked Room records.
+          connectedRoomIds: [],
+        }),
     }))
-    applyEntitySelection([{ type: 'room', id: target.id }, { type: 'room', id: moving.id }], { type: 'room', id: target.id })
+    applyEntitySelection([{ type: 'room', id: target.id }], { type: 'room', id: target.id })
     setRoomMergePrompt(null)
   }
 
