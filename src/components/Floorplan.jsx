@@ -2526,8 +2526,9 @@ export default function Floorplan({
                           return end - start > 2
                         }))
                       const visibleDimensionLayouts = dimensionLayouts.filter(({ edge }) => !isSharedBoundaryEdge(edge))
-                      const horizontalIsSingleEdge = groupEdges.some(edge => Math.abs(edge.length - totalBounds.width) < 0.5 && Math.abs(edge.y2 - edge.y1) < 0.5)
-                      const verticalIsSingleEdge = groupEdges.some(edge => Math.abs(edge.length - totalBounds.height) < 0.5 && Math.abs(edge.x2 - edge.x1) < 0.5)
+                      const outerGroupEdges = groupEdges.filter(edge => !isSharedBoundaryEdge(edge))
+                      const horizontalIsSingleEdge = outerGroupEdges.some(edge => Math.abs(edge.length - totalBounds.width) < 0.5 && Math.abs(edge.y2 - edge.y1) < 0.5)
+                      const verticalIsSingleEdge = outerGroupEdges.some(edge => Math.abs(edge.length - totalBounds.height) < 0.5 && Math.abs(edge.x2 - edge.x1) < 0.5)
                       const maxHorizontalLevel = Math.max(0, ...dimensionLayouts.filter(item => item.sideKey.startsWith('h-')).map(item => item.dimension.level))
                       const maxVerticalLevel = Math.max(0, ...dimensionLayouts.filter(item => item.sideKey.startsWith('v-')).map(item => item.dimension.level))
                       const horizontalTotalY = totalBounds.y - 112 - maxHorizontalLevel * 30
