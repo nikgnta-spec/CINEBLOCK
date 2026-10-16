@@ -183,7 +183,7 @@ const defaultShot = (num, cameraDefault = '') => ({
   notes: '',
 })
 
-function createProjectRecord(id, project, scenes, activeSceneId, floorplans = {}) {
+function createProjectRecord(id, project, scenes, activeSceneId, floorplans = {}, rooms = []) {
   const safeId = id || crypto.randomUUID()
   const safeTitle = project?.title?.trim() || 'Proyek tanpa judul'
   return {
@@ -193,6 +193,7 @@ function createProjectRecord(id, project, scenes, activeSceneId, floorplans = {}
     scenes,
     activeSceneId: activeSceneId || scenes[0]?.id || '',
     floorplans,
+    rooms: Array.isArray(rooms) ? rooms : [],
     updatedAt: new Date().toISOString(),
   }
 }
@@ -395,6 +396,33 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
   return result
 }
 
+function migrateReusableRooms(savedScenes, savedFloorplans, savedRooms = []) {
+  const scenes = (savedScenes || []).map(scene => ({ ...scene, roomIds: Array.isArray(scene.roomIds) ? [...scene.roomIds] : [] }))
+  const floorplans = normalizeSavedFloorplans(savedFloorplans, scenes)
+  const rooms = Array.isArray(savedRooms) ? savedRooms.map(room => ({ ...room })) : []
+  const knownIds = new Set(rooms.map(room => room.id))
+  for (const scene of scenes) {
+    const layout = floorplans[scene.id] || { rooms: [] }
+    const legacyRooms = Array.isArray(layout.rooms) ? layout.rooms : []
+    if (!scene.roomIds.length && legacyRooms.length) {
+      for (const sourceRoom of legacyRooms) {
+        let room = { ...sourceRoom }
+        if (knownIds.has(room.id)) {
+          // Legacy IDs can collide across scenes. Preserve both rooms without merging geometry.
+          room.id = crypto.randomUUID()
+        }
+        knownIds.add(room.id)
+        rooms.push(room)
+        scene.roomIds.push(room.id)
+      }
+    } else {
+      scene.roomIds = scene.roomIds.filter(id => knownIds.has(id))
+    }
+    floorplans[scene.id] = { ...layout, rooms: [] }
+  }
+  return { scenes, floorplans, rooms }
+}
+
 function normalizeWorkspaceProjects(savedProjects) {
   if (!Array.isArray(savedProjects)) return []
 
@@ -404,14 +432,15 @@ function normalizeWorkspaceProjects(savedProjects) {
     .map(item => {
       const normalizedProject = normalizeSavedProject(item.project)
       const normalizedScenes = normalizeSavedScenes(item.scenes) || [defaultScene(1)]
-      const normalizedFloorplans = normalizeSavedFloorplans(item.floorplans, normalizedScenes)
+      const migrated = migrateReusableRooms(normalizedScenes, item.floorplans, item.rooms)
       return {
         ...createProjectRecord(
           item.id,
           normalizedProject,
-          normalizedScenes,
-          item.activeSceneId || normalizedScenes[0]?.id || '',
-          normalizedFloorplans,
+          migrated.scenes,
+          item.activeSceneId || migrated.scenes[0]?.id || '',
+          migrated.floorplans,
+          migrated.rooms,
         ),
         name: normalizedProject.title?.trim() || item.name || 'Proyek tanpa judul',
         updatedAt: item.updatedAt || new Date().toISOString(),
