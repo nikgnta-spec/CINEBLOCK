@@ -127,6 +127,7 @@ test('Room migration converts legacy rectangles and remaps openings without assi
   assert.match(source, /\{ x, y \}, \{ x: x \+ width, y \}, \{ x: x \+ width, y: y \+ height \}, \{ x, y: y \+ height \}/)
   assert.match(source, /const oldSideToEdge = \{ top: 0, right: 1, bottom: 2, left: 3 \}/)
   assert.match(source, /delete next\.side/)
+  assert.match(source, /legacyRectangle && \['bottom', 'left'\]\.includes\(next\.side\)\) next\.offset = 1 - next\.offset/)
   assert.match(source, /migrated\.rooms/)
   assert.match(source, /Number\.isFinite\(Number\(room\.ceilingHeight\)\)/)
 })
