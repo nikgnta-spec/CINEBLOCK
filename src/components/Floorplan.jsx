@@ -117,7 +117,7 @@ const getRoomDimensionGeometry = (room, edge) => {
   let nx = dy / length, ny = -dx / length
   const midpoint = { x: (edge.x1 + edge.x2) / 2, y: (edge.y1 + edge.y2) / 2 }
   if ((center.x - midpoint.x) * nx + (center.y - midpoint.y) * ny > 0) { nx *= -1; ny *= -1 }
-  const offset = 12
+  const offset = 32
   const x1 = edge.x1 + nx * offset, y1 = edge.y1 + ny * offset
   const x2 = edge.x2 + nx * offset, y2 = edge.y2 + ny * offset
   return { x1, y1, x2, y2, mx: (x1 + x2) / 2, my: (y1 + y2) / 2, length: edge.length, angle: Math.atan2(dy, dx) * 180 / Math.PI }
