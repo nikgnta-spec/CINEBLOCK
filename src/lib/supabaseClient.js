@@ -209,6 +209,30 @@ export const supabaseClient = Object.freeze({
       }
       return { session: null, user: result?.user || result }
     },
+    async signInAnonymously({ displayName }) {
+      const name = String(displayName || '').trim().replace(/\\s+/g, ' ').slice(0, 80)
+      if (name.length < 2) throw new SupabaseRequestError('Nama minimal 2 karakter.', 400, 'DISPLAY_NAME_REQUIRED')
+      const result = await authRequest('signup', { data: { display_name: name, cineblock_guest: true } })
+      if (!result?.access_token) {
+        throw new SupabaseRequestError('Sesi tamu tidak berhasil dibuat. Pastikan Anonymous Sign-Ins diaktifkan pada Supabase Auth.', 400, 'ANONYMOUS_AUTH_UNAVAILABLE')
+      }
+      const next = { ...result, expires_at: result.expires_at || Math.floor(Date.now() / 1000) + Number(result.expires_in || 3600) }
+      writeSession(next)
+      return { session: next, user: next.user || result.user }
+    },
+    async updateUserMetadata({ data }) {
+      const session = await getFreshSession()
+      if (!session?.access_token) throw new SupabaseRequestError('Sesi pengguna tidak ditemukan.', 401, 'AUTH_SESSION_MISSING')
+      const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        method: 'PUT',
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data }),
+      })
+      const user = await decodeResponse(response)
+      const next = { ...session, user }
+      writeSession(next)
+      return next
+    },
     async signInWithPassword({ email, password }) {
       const session = await authRequest('token?grant_type=password', { email: email.trim(), password })
       const next = { ...session, expires_at: session.expires_at || Math.floor(Date.now() / 1000) + Number(session.expires_in || 3600) }
