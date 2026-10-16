@@ -666,6 +666,16 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
     createProjectRecord(activeProjectId, project, scenes, activeSceneId, floorplans, projectRooms || [])
   )
 
+  const resolvedFloorplans = projectRooms === null
+    ? floorplans
+    : Object.fromEntries(scenes.map(scene => [
+      scene.id,
+      {
+        ...(floorplans?.[scene.id] || {}),
+        rooms: (projectRooms || []).filter(room => (scene.roomIds || []).includes(room.id)),
+      },
+    ]))
+
   const switchProject = (projectId) => {
     if (!projectId || projectId === activeProjectId) return
     const target = projects.find(item => item.id === projectId)
@@ -1029,7 +1039,7 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
           </>
         )}
       </div>
-      {hydrated && <PrintReport project={project} scenes={scenes} floorplans={floorplans} mode={exportMode} orientation={exportOrientation} />}
+      {hydrated && <PrintReport project={project} scenes={scenes} floorplans={resolvedFloorplans} mode={exportMode} orientation={exportOrientation} />}
     </div>
   )
 }
