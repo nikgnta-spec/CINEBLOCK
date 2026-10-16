@@ -854,11 +854,14 @@ export default function Floorplan({
   }
 
   const beginResize = (type, item, sx, sy, event) => {
-    if (tool === 'pan' || item.locked) return
+    if (tool === 'pan') return
     event.stopPropagation()
     event.preventDefault()
-    const point = getPoint(event)
     applyEntitySelection([{ type, id: item.id }], { type, id: item.id })
+    setSelectedWaypoint(null)
+    setSelected({ type, id: item.id })
+    if (item.locked) return
+    const point = getPoint(event)
     if (type !== 'camera') onSelectedShotIdChange?.('')
     beginDragHistory()
     dragRef.current = {
@@ -896,7 +899,7 @@ export default function Floorplan({
 
   const beginObjectDrag = (type, item, event) => {
     event.stopPropagation()
-    if (tool === 'pan' || item.locked) return
+    if (tool === 'pan') return
 
     if (event.shiftKey) {
       const wasSelected = selectionRef.current.some(entry => entry.type === type && entry.id === item.id)
