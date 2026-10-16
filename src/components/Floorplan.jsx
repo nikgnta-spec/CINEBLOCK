@@ -806,7 +806,8 @@ export default function Floorplan({
         })))
       }
       const cameraId = makeId()
-      object = { id: cameraId, ...position, angle: 0, shotId: targetShot.id, path: [] }      if (createdShotAutomatically) {
+      object = { id: cameraId, ...position, angle: 0, shotId: targetShot.id, path: [] }
+      if (createdShotAutomatically) {
         autoCreatedShotsByCameraRef.current.set(cameraId, {
           sceneId: scene.id,
           shot: { ...targetShot },
