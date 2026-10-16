@@ -2453,24 +2453,43 @@ export default function Floorplan({
                       const dimensionLayouts = getRoomDimensionLayouts(room, edges)
                       const horizontalIsSingleEdge = edges.some(edge => Math.abs(edge.length - bounds.width) < 0.5 && Math.abs(edge.y2 - edge.y1) < 0.5)
                       const verticalIsSingleEdge = edges.some(edge => Math.abs(edge.length - bounds.height) < 0.5 && Math.abs(edge.x2 - edge.x1) < 0.5)
-                      // When Rooms are connected, do not draw an overall dimension across
-                      // a shared boundary: it visually cuts through the connection/openings.
-                      const connectedRooms = (room.connectedRoomIds || [])
-                        .map(id => layout.rooms.find(candidate => candidate.id === id))
-                        .filter(Boolean)
-                      const overlaps = (a1, a2, b1, b2) => Math.min(Math.max(a1, a2), Math.max(b1, b2)) - Math.max(Math.min(a1, a2), Math.min(b1, b2)) > 2
-                      const sharedHorizontalBoundary = connectedRooms.some(other => getRoomEdges(other).some(edge =>
-                        Math.abs(edge.y1 - edge.y2) < 1 &&
-                        (Math.abs(edge.y1 - bounds.y) < 3 || Math.abs(edge.y1 - (bounds.y + bounds.height)) < 3) &&
-                        overlaps(edge.x1, edge.x2, bounds.x, bounds.x + bounds.width)))
-                      const sharedVerticalBoundary = connectedRooms.some(other => getRoomEdges(other).some(edge =>
-                        Math.abs(edge.x1 - edge.x2) < 1 &&
-                        (Math.abs(edge.x1 - bounds.x) < 3 || Math.abs(edge.x1 - (bounds.x + bounds.width)) < 3) &&
-                        overlaps(edge.y1, edge.y2, bounds.y, bounds.y + bounds.height)))
+                      // Connected Rooms form one dimension group: compute a single outer
+                      // bounding box for their overall measurements, rather than drawing
+                      // each Room's total across the shared wall/openings.
+                      const connectedRoomGroup = (() => {
+                        const byId = new Map(layout.rooms.map(candidate => [candidate.id, candidate]))
+                        const visited = new Set([room.id])
+                        const queue = [room.id]
+                        while (queue.length) {
+                          const current = byId.get(queue.shift())
+                          ;(current?.connectedRoomIds || []).forEach(id => {
+                            if (byId.has(id) && !visited.has(id)) {
+                              visited.add(id)
+                              queue.push(id)
+                            }
+                          })
+                        }
+                        return [...visited].map(id => byId.get(id)).filter(Boolean)
+                      })()
+                      const connectedGroupPoints = connectedRoomGroup.flatMap(getRoomPoints)
+                      const connectedBounds = connectedGroupPoints.length
+                        ? {
+                            x: Math.min(...connectedGroupPoints.map(point => point.x)),
+                            y: Math.min(...connectedGroupPoints.map(point => point.y)),
+                            width: Math.max(...connectedGroupPoints.map(point => point.x)) - Math.min(...connectedGroupPoints.map(point => point.x)),
+                            height: Math.max(...connectedGroupPoints.map(point => point.y)) - Math.min(...connectedGroupPoints.map(point => point.y)),
+                          }
+                        : bounds
+                      const hasConnectedRooms = connectedRoomGroup.length > 1
+                      const isDimensionGroupActive = active && hasConnectedRooms
+                      const totalBounds = hasConnectedRooms ? connectedBounds : bounds
+                      const groupEdges = connectedRoomGroup.flatMap(getRoomEdges)
+                      const horizontalIsSingleEdge = groupEdges.some(edge => Math.abs(edge.length - totalBounds.width) < 0.5 && Math.abs(edge.y2 - edge.y1) < 0.5)
+                      const verticalIsSingleEdge = groupEdges.some(edge => Math.abs(edge.length - totalBounds.height) < 0.5 && Math.abs(edge.x2 - edge.x1) < 0.5)
                       const maxHorizontalLevel = Math.max(0, ...dimensionLayouts.filter(item => item.sideKey.startsWith('h-')).map(item => item.dimension.level))
                       const maxVerticalLevel = Math.max(0, ...dimensionLayouts.filter(item => item.sideKey.startsWith('v-')).map(item => item.dimension.level))
-                      const horizontalTotalY = bounds.y - 112 - maxHorizontalLevel * 30
-                      const verticalTotalX = bounds.x + bounds.width + 112 + maxVerticalLevel * 30
+                      const horizontalTotalY = totalBounds.y - 112 - maxHorizontalLevel * 30
+                      const verticalTotalX = totalBounds.x + totalBounds.width + 112 + maxVerticalLevel * 30
                       return <g pointerEvents="none" opacity={active ? 1 : 0.58}>
                         {dimensionLayouts.map(({ edge, dimension: d }) => {
                           const label = (edge.length / 100).toFixed(2) + ' m'
@@ -2481,21 +2500,21 @@ export default function Floorplan({
                             <text x={d.mx} y={d.my - 5} textAnchor="middle" fontSize="11" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{label}</text>
                           </g>
                         })}
-                        {!horizontalIsSingleEdge && !sharedHorizontalBoundary && <>
+                        {!horizontalIsSingleEdge && (!hasConnectedRooms || isDimensionGroupActive) && <>
                           <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
-                            <line x1={bounds.x} y1={horizontalTotalY} x2={bounds.x + bounds.width} y2={horizontalTotalY} />
-                            <line x1={bounds.x} y1={horizontalTotalY - 6} x2={bounds.x} y2={horizontalTotalY + 6} />
-                            <line x1={bounds.x + bounds.width} y1={horizontalTotalY - 6} x2={bounds.x + bounds.width} y2={horizontalTotalY + 6} />
+                            <line x1={totalBounds.x} y1={horizontalTotalY} x2={totalBounds.x + totalBounds.width} y2={horizontalTotalY} />
+                            <line x1={totalBounds.x} y1={horizontalTotalY - 6} x2={totalBounds.x} y2={horizontalTotalY + 6} />
+                            <line x1={totalBounds.x + totalBounds.width} y1={horizontalTotalY - 6} x2={totalBounds.x + totalBounds.width} y2={horizontalTotalY + 6} />
                           </g>
-                          <text x={bounds.x + bounds.width / 2} y={horizontalTotalY - 8} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{(bounds.width / 100).toFixed(2) + ' m total'}</text>
+                          <text x={totalBounds.x + totalBounds.width / 2} y={horizontalTotalY - 8} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{(totalBounds.width / 100).toFixed(2) + ' m total'}</text>
                         </>}
-                        {!verticalIsSingleEdge && !sharedVerticalBoundary && <>
+                        {!verticalIsSingleEdge && (!hasConnectedRooms || isDimensionGroupActive) && <>
                           <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
-                            <line x1={verticalTotalX} y1={bounds.y} x2={verticalTotalX} y2={bounds.y + bounds.height} />
-                            <line x1={verticalTotalX - 6} y1={bounds.y} x2={verticalTotalX + 6} y2={bounds.y} />
-                            <line x1={verticalTotalX - 6} y1={bounds.y + bounds.height} x2={verticalTotalX + 6} y2={bounds.y + bounds.height} />
+                            <line x1={verticalTotalX} y1={totalBounds.y} x2={verticalTotalX} y2={totalBounds.y + totalBounds.height} />
+                            <line x1={verticalTotalX - 6} y1={totalBounds.y} x2={verticalTotalX + 6} y2={totalBounds.y} />
+                            <line x1={verticalTotalX - 6} y1={totalBounds.y + totalBounds.height} x2={verticalTotalX + 6} y2={totalBounds.y + totalBounds.height} />
                           </g>
-                          <text x={verticalTotalX + 12} y={bounds.y + bounds.height / 2} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke" transform={'rotate(90 ' + (verticalTotalX + 12) + ' ' + (bounds.y + bounds.height / 2) + ')'}>{(bounds.height / 100).toFixed(2) + ' m total'}</text>
+                          <text x={verticalTotalX + 12} y={bounds.y + bounds.height / 2} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke" transform={'rotate(90 ' + (verticalTotalX + 12) + ' ' + (bounds.y + bounds.height / 2) + ')'}>{(totalBounds.height / 100).toFixed(2) + ' m total'}</text>
                         </>}
                       </g>
                     })()}
