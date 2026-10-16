@@ -82,12 +82,12 @@ test('Room picker keeps every project Room visible across Scenes and marks curre
   assert.match(source, /digunakan scene lain/)
 })
 
-test('Room lock prevents direct, resize, and group movement', async () => {
+test('Object lock prevents direct, resize, and group movement', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
 
   assert.match(source, /locked: !selectedEntity\.locked/)
-  assert.match(source, /type === 'room' && item\.locked/)
-  assert.match(source, /collection === 'rooms' && entry\.original\?\.locked/)
+  assert.match(source, /if \(tool === 'pan' \|\| item\.locked\) return/)
+  assert.match(source, /!entry\.original\.locked/)
   assert.match(source, /if \(item\.locked\) return item/)
 })
 
