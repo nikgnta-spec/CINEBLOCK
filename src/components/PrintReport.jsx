@@ -236,7 +236,8 @@ function PrintFloorplan({ scene, layout }) {
                   <g key={'room-opening-' + opening.id} transform={'translate(' + p.x + ' ' + p.y + ') rotate(' + p.angle + ')'} fill="none" stroke="#111827" strokeWidth="2">
                     {opening.type === 'door' ? (
                       <>
-                        <path d={'M ' + (-width / 2) + ' 0 V ' + (-width)} />
+                        <path d={'M ' + (-width / 2) + ' 0 H ' + (width / 2)} />
+                        <path d={'M ' + (-width / 2) + ' 0 L ' + (-width / 2) + ' ' + (-width)} strokeWidth="3" />
                         <path d={'M ' + (-width / 2) + ' ' + (-width) + ' A ' + width + ' ' + width + ' 0 0 1 ' + (width / 2) + ' 0'} strokeDasharray="4 3" />
                       </>
                     ) : (
@@ -251,7 +252,10 @@ function PrintFloorplan({ scene, layout }) {
               {openings.map(opening => {
                 const p = roomOpeningPlacement(room, opening)
                 const width = Math.min(Number(opening.width) || 48, p.length)
-                return <text key={'room-opening-dimension-' + opening.id} x={p.x} y={p.y + 24} fontSize="11" fontWeight="600" fill="#374151" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{opening.type === 'door' ? 'Pintu' : 'Jendela'} {meters(width)} × {meters(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)))}</text>
+                return <g key={'room-opening-dimension-' + opening.id}>
+                  <text x={p.x} y={p.y + 24} fontSize="11" fontWeight="600" fill="#374151" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{opening.type === 'door' ? 'Pintu' : 'Jendela'} {meters(width)} × {meters(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)))}</text>
+                  {opening.type === 'door' && <text x={p.x} y={p.y + 38} fontSize="10" fontWeight="600" fill="#92400e" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{'Daun pintu ' + meters(width) + ' m'}</text>}
+                </g>
               })}
             </g>
           )
@@ -282,7 +286,8 @@ function PrintFloorplan({ scene, layout }) {
                   <g key={'wall-opening-' + opening.id} transform={'translate(' + (wall.x1 + metric.ux * center) + ' ' + (wall.y1 + metric.uy * center) + ') rotate(' + metric.angle + ')'} fill="none" stroke="#111827" strokeWidth="2">
                     {opening.type === 'door' ? (
                       <>
-                        <path d={'M ' + (-width / 2) + ' 0 V ' + (-width)} />
+                        <path d={'M ' + (-width / 2) + ' 0 H ' + (width / 2)} />
+                        <path d={'M ' + (-width / 2) + ' 0 L ' + (-width / 2) + ' ' + (-width)} strokeWidth="3" />
                         <path d={'M ' + (-width / 2) + ' ' + (-width) + ' A ' + width + ' ' + width + ' 0 0 1 ' + (width / 2) + ' 0'} strokeDasharray="4 3" />
                       </>
                     ) : (
@@ -299,7 +304,10 @@ function PrintFloorplan({ scene, layout }) {
                 const center = Math.max(0, Math.min(1, Number(opening.offset) || 0.5)) * metric.length
                 const x = wall.x1 + metric.ux * center
                 const y = wall.y1 + metric.uy * center
-                return <text key={'wall-opening-dimension-' + opening.id} x={x} y={y + 24} fontSize="11" fontWeight="600" fill="#374151" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{opening.type === 'door' ? 'Pintu' : 'Jendela'} {meters(width)} × {meters(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)))}</text>
+                return <g key={'wall-opening-dimension-' + opening.id}>
+                  <text x={x} y={y + 24} fontSize="11" fontWeight="600" fill="#374151" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{opening.type === 'door' ? 'Pintu' : 'Jendela'} {meters(width)} × {meters(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)))}</text>
+                  {opening.type === 'door' && <text x={x} y={y + 38} fontSize="10" fontWeight="600" fill="#92400e" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{'Daun pintu ' + meters(width) + ' m'}</text>}
+                </g>
               })}
             </g>
           )
