@@ -449,6 +449,7 @@ export default function Floorplan({
   const [roomSnapGuides, setRoomSnapGuides] = useState([])
   const [roomMergePrompt, setRoomMergePrompt] = useState(null)
   const [roomVertexPrompt, setRoomVertexPrompt] = useState(null)
+  const [selectedRoomVertex, setSelectedRoomVertex] = useState(null)
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: MAP_WIDTH, height: MAP_HEIGHT })
   const [historyRevision, setHistoryRevision] = useState(0)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 520 })
@@ -1080,6 +1081,7 @@ export default function Floorplan({
     event.stopPropagation()
     event.preventDefault()
     applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id })
+    setSelectedRoomVertex({ roomId: room.id, vertexIndex })
     beginDragHistory()
     dragRef.current = { mode: 'room-vertex', id: room.id, vertexIndex, start: getPoint(event), originalPoints: getRoomPoints(room).map(point => ({ ...point })) }
     svgRef.current?.setPointerCapture?.(event.pointerId)
@@ -2008,7 +2010,41 @@ export default function Floorplan({
 
   useEffect(() => {
     if (!isActive) return undefined
-    const handleFloorplanShortcut = event => {
+    const deleteSelectedRoomVertex = () => {
+    if (!selectedRoomVertex) return false
+    const { roomId, vertexIndex } = selectedRoomVertex
+    const room = (layoutRef.current?.rooms || layout.rooms).find(item => item.id === roomId)
+    if (!room || room.locked) {
+      setSelectedRoomVertex(null)
+      return true
+    }
+    const points = getRoomPoints(room)
+    if (points.length <= 3) {
+      window.alert('Room harus memiliki minimal 3 titik sudut.')
+      return true
+    }
+    const nextPoints = points.filter((_, index) => index !== vertexIndex)
+    if (nextPoints.length < 3) return true
+    const area = Math.abs(nextPoints.reduce((sum, point, index) => {
+      const next = nextPoints[(index + 1) % nextPoints.length]
+      return sum + point.x * next.y - next.x * point.y
+    }, 0)) / 2
+    if (area < 16) {
+      window.alert('Titik ini tidak bisa dihapus karena bentuk Room akan menjadi tidak valid.')
+      return true
+    }
+    beginDragHistory()
+    updateLayout(previous => ({
+      ...previous,
+      rooms: previous.rooms.map(item => item.id === roomId ? { ...item, points: nextPoints } : item),
+    }))
+    finishDragHistory()
+    setSelectedRoomVertex(null)
+    applyEntitySelection([{ type: 'room', id: roomId }], { type: 'room', id: roomId })
+    return true
+  }
+
+  const handleFloorplanShortcut = event => {
       const target = event.target
       if (target instanceof HTMLElement && (
         target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
@@ -2029,7 +2065,10 @@ export default function Floorplan({
       }
       if (event.ctrlKey || event.metaKey) return
       if (['delete', 'backspace'].includes(key)) {
-        if (selectedWaypoint) {
+        if (selectedRoomVertex) {
+          event.preventDefault()
+          deleteSelectedRoomVertex()
+        } else if (selectedWaypoint) {
           event.preventDefault()
           deleteSelectedWaypoint()
         } else if (selectionRef.current.length > 1) {
@@ -2089,7 +2128,7 @@ export default function Floorplan({
     }
     window.addEventListener('keydown', handleFloorplanShortcut)
     return () => window.removeEventListener('keydown', handleFloorplanShortcut)
-  }, [isActive, addObject, deleteSelected, deleteSelectedItems, deleteSelectedWaypoint, finishRoomDrawing, redoLayout, roomDrawPoints, selected, selectedItems, selectedWaypoint, tool, undoLayout])
+  }, [isActive, addObject, deleteSelected, deleteSelectedItems, deleteSelectedWaypoint, deleteSelectedRoomVertex, finishRoomDrawing, redoLayout, roomDrawPoints, selected, selectedItems, selectedRoomVertex, selectedWaypoint, tool, undoLayout])
 
   const clearLayout = () => {
     if (!window.confirm('Kosongkan room, wall, properti, aktor, kamera, dan lampu pada scene ini?')) return
