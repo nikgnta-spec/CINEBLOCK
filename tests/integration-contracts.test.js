@@ -100,3 +100,24 @@ test('Room dimensions can be entered manually in meters and respect Room lock', 
   assert.match(source, /Math\.round\(meters \* 100\)/)
   assert.match(source, /disabled=\{Boolean\(selectedEntity\.locked\)\}/)
 })
+
+test('Props have editable names and manual dimensions in meters', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+
+  assert.match(source, /id="prop-label"/)
+  assert.match(source, /id="prop-type"/)
+  assert.match(source, /id="prop-width"/)
+  assert.match(source, /id="prop-height"/)
+  assert.match(source, /selectedEntity\.locked\)\} onChange/)
+})
+
+test('Object locking prevents moving, resizing, rotating, and editing paths or openings', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+
+  assert.match(source, /Kunci Objek/)
+  assert.match(source, /if \(tool === 'pan' \|\| item\.locked\) return/)
+  assert.match(source, /if \(tool === 'pan' \|\| wall\.locked\) return/)
+  assert.match(source, /if \(tool === 'pan' \|\| host\.locked\) return/)
+  assert.match(source, /!entry\.original\.locked/)
+  assert.match(source, /selectedEntity\.locked \|\| !selectedType/)
+})
