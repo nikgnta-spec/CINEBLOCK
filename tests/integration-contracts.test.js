@@ -355,3 +355,12 @@ test('Leafless doorway uses an open-gap icon rather than the door-leaf symbol', 
   assert.match(source, /type === 'doorway' \? \([\s\S]*?M-20 -5 H-8 M8 -5 H20 M-20 5 H-8 M8 5 H20/)
   assert.match(source, /<FloorplanObjectIcon type="doorway" size=\{18\} \/> Tambah pintu tanpa daun/)
 })
+
+
+test('Double doors render two leaves and matching swing arcs in the PDF floorplan', async () => {
+  const source = await readSource('../src/components/PrintReport.jsx')
+  assert.match(source, /opening\.doorType === 'double' \? \(\(\) =>/)
+  assert.match(source, /const leaf = width \/ 2/)
+  assert.match(source, /M ' \+ \(-width \/ 2\) \+ ' 0 L ' \+ \(-width \/ 2\) \+ ' ' \+ \(direction \* leaf\)/)
+  assert.match(source, /opening\.swingDirection === 'out' \? -1 : 1/)
+})
