@@ -197,8 +197,7 @@ function FloorplanObjectIcon({ type, size = 20 }) {
           <path d="M-20 -10 V10 M20 -10 V10" />
         </g>
       ) : type === 'prop' ? (
-        <g>
-          <rect x="-16" y="-12" width="32" height="24" rx="2" />
+        <g>          <rect x="-16" y="-12" width="32" height="24" rx="2" />
           <path d="M-10 -7 H10 M-10 7 H10" />
         </g>
       ) : type === 'actor' ? (
@@ -397,8 +396,7 @@ export default function Floorplan({
     setTool('select')
     dragRef.current = null
     dragHistoryBeforeRef.current = null
-    historyActionRef.current = false
-    historyRef.current = {
+    historyActionRef.current = false    historyRef.current = {
       sceneId: scene?.id || null,
       past: [],
       future: [],
@@ -597,7 +595,6 @@ export default function Floorplan({
         && currentCameraIds.has(cameraId)
         && !nextCameraIds.has(cameraId))
       .map(([, record]) => record.shot.id)
-
     if (autoShotsToRestore.length || deletedShotIdsToRemove.length) {
       const removedShotIds = new Set(deletedShotIdsToRemove)
       onChange(previousScenes => previousScenes.map(item => {
@@ -724,6 +721,7 @@ export default function Floorplan({
 
   const handleCanvasWheel = event => {
     event.preventDefault()
+    event.stopPropagation()
     const svg = svgRef.current
     const rect = svg?.getBoundingClientRect()
     if (!rect || !rect.width || !rect.height) return
@@ -746,6 +744,16 @@ export default function Floorplan({
       }
     })
   }
+
+  useEffect(() => {
+    const canvas = svgRef.current
+    if (!canvas) return undefined
+
+    // Scope wheel interception to the floorplan SVG; keep sidebar scrolling normal.
+    const handleWheel = event => handleCanvasWheel(event)
+    canvas.addEventListener('wheel', handleWheel, { passive: false })
+    return () => canvas.removeEventListener('wheel', handleWheel)
+  }, [viewBox])
 
   const zoomCanvas = (factor, clientX, clientY) => {
     const rect = svgRef.current?.getBoundingClientRect()
@@ -797,8 +805,7 @@ export default function Floorplan({
         })))
       }
       const cameraId = makeId()
-      object = { id: cameraId, ...position, angle: 0, shotId: targetShot.id, path: [] }
-      if (createdShotAutomatically) {
+      object = { id: cameraId, ...position, angle: 0, shotId: targetShot.id, path: [] }      if (createdShotAutomatically) {
         autoCreatedShotsByCameraRef.current.set(cameraId, {
           sceneId: scene.id,
           shot: { ...targetShot },
@@ -997,8 +1004,7 @@ export default function Floorplan({
 
   const beginOpeningDrag = (hostType, host, opening, event) => {
     if (tool === 'pan') return
-    event.stopPropagation()
-    event.preventDefault()
+    event.stopPropagation()    event.preventDefault()
     applyEntitySelection([{ type: hostType, id: host.id }], { type: hostType, id: host.id })
     beginDragHistory()
     dragRef.current = { mode: 'opening', type: hostType, id: host.id, openingId: opening.id }
@@ -1197,8 +1203,7 @@ export default function Floorplan({
       const dy = point.y - drag.start.y
       if (drag.type === 'room') {
         const nextWidth = Math.round(clamp(
-          original.width + dx * drag.signX,
-          40,
+          original.width + dx * drag.signX,          40,
           drag.signX < 0 ? Math.min(MAP_WIDTH, original.x + original.width) : Math.max(40, MAP_WIDTH - original.x),
         ))
         const nextHeight = Math.round(clamp(
@@ -1397,8 +1402,7 @@ export default function Floorplan({
     }))
     setSelectedWaypoint(nextPath.length
       ? { type, id, index: Math.min(index, nextPath.length - 1) }
-      : null)
-  }
+      : null)  }
 
   useEffect(() => {
     if (!isActive) return undefined
@@ -1597,8 +1601,7 @@ export default function Floorplan({
           </button>
         </div>
         <span className="floorplan-tool-divider" />
-        <div className="floorplan-tool-group">
-          <button className="floorplan-tool-button" onClick={() => addObject('actor')} title="Tambah aktor" aria-label="Tambah aktor">
+        <div className="floorplan-tool-group">          <button className="floorplan-tool-button" onClick={() => addObject('actor')} title="Tambah aktor" aria-label="Tambah aktor">
             <FloorplanObjectIcon type="actor" size={22} /><span>Aktor</span>
           </button>
           <button className="floorplan-tool-button" onClick={() => addObject('camera')} title="Tambah kamera dan hubungkan ke shot (C)" aria-label="Tambah kamera (C)">
@@ -1642,7 +1645,6 @@ export default function Floorplan({
               role="img"
               aria-label="Kanvas Floorplan tampak atas"
               onPointerDown={handleCanvasPointerDown}
-              onWheel={handleCanvasWheel}
               onClick={handleCanvasClick}
               onPointerMove={handleCanvasPointerMove}
               onPointerUp={handleCanvasPointerUp}
@@ -1797,8 +1799,7 @@ export default function Floorplan({
                             </g>
                           )}
                         </g>
-                      )
-                    })}
+                      )                    })}
                     {active && (
                       <>
                         <circle cx={wall.x1} cy={wall.y1} r="6" fill="var(--bg)" stroke="var(--text)" strokeWidth="2" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerDown={event => beginWallEndpointDrag(wall, 'start', event)} />
@@ -1997,8 +1998,7 @@ export default function Floorplan({
                             <path d="M-22 -6 C-30 -10 -37 -6 -40 2 C-43 12 -36 22 -27 23 C-21 31 -10 34 0 34 C10 34 21 31 27 23 C36 22 43 12 40 2 C37 -6 30 -10 22 -6" />
                             <path d="M0 -31 C-17 -31 -22 -17 -21 -6 C-20 5 -15 13 -8 15 C-5 16 -4 20 0 21 C4 20 5 16 8 15 C15 13 20 5 21 -6 C22 -17 17 -31 0 -31 Z" />
                             <path d="M-18 0 C-12 -5 -7 6 0 6 C7 6 12 -5 18 0" />
-                            <path d="M-25 12 C-28 15 -28 19 -25 23 M25 12 C28 15 28 19 25 23" />
-                          </g>
+                            <path d="M-25 12 C-28 15 -28 19 -25 23 M25 12 C28 15 28 19 25 23" />                          </g>
                         </g>
                       )}
                       {type === 'actor' && (
@@ -2197,8 +2197,7 @@ export default function Floorplan({
                       onChange={event => changeCameraLink(selectedEntity, event.target.value)}
                     >
                       <option value="">Belum ditautkan</option>
-                      {scene.shots.filter(shot => !layout.cameras.some(camera => camera.id !== selectedEntity.id && camera.shotId === shot.id)).map(shot => (
-                        <option key={shot.id} value={shot.id}>{shot.num} — {shot.subject || 'Untitled shot'}</option>
+                      {scene.shots.filter(shot => !layout.cameras.some(camera => camera.id !== selectedEntity.id && camera.shotId === shot.id)).map(shot => (                        <option key={shot.id} value={shot.id}>{shot.num} — {shot.subject || 'Untitled shot'}</option>
                       ))}
                     </select>
                   </section>
@@ -2397,8 +2396,7 @@ export default function Floorplan({
                       <button className="floorplan-opening-add" onClick={() => addOpening('door')}><FloorplanObjectIcon type="door" size={18} /> Tambah pintu</button>
                       <button className="floorplan-opening-add" onClick={() => addOpening('window')}><FloorplanObjectIcon type="window" size={18} /> Tambah jendela</button>
                     </div>
-                    {(selectedEntity.openings || []).map(opening => (
-                      <div className="floorplan-opening-row" key={opening.id}>
+                    {(selectedEntity.openings || []).map(opening => (                      <div className="floorplan-opening-row" key={opening.id}>
                         <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Door' : 'Window'}</span>
                         <span className="floorplan-opening-hint">Geser di kanvas untuk memindahkan</span>
                         <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
@@ -2433,12 +2431,3 @@ export default function Floorplan({
                     <span className="floorplan-object-row-name">{objectName(object.entityType, object)}</span>
                     <span className="floorplan-object-row-type">{objectTypeLabel(object.entityType)}</span>
                   </button>
-                ))
-              )}
-            </div>
-          )}
-        </aside>
-      </div>
-    </div>
-  )
-}
