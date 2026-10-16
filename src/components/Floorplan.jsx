@@ -327,6 +327,8 @@ export default function Floorplan({
   onRenameScene,
   floorplans,
   onFloorplansChange,
+  projectRooms = null,
+  onProjectRoomsChange,
   selectedShotId,
   onSelectedShotIdChange,
 }) {
@@ -353,7 +355,13 @@ export default function Floorplan({
   const autoCreatedShotsByCameraRef = useRef(new Map())
 
   const scene = scenes.find(item => item.id === activeSceneId) || scenes[0]
-  const layout = scene ? (floorplans?.[scene.id] || EMPTY_LAYOUT) : EMPTY_LAYOUT
+  const storedLayout = scene ? (floorplans?.[scene.id] || EMPTY_LAYOUT) : EMPTY_LAYOUT
+  const reusableRoomMode = Array.isArray(projectRooms)
+  const layout = scene
+    ? { ...storedLayout, rooms: reusableRoomMode
+      ? projectRooms.filter(room => (scene.roomIds || []).includes(room.id))
+      : (storedLayout.rooms || []) }
+    : EMPTY_LAYOUT
   layoutRef.current = layout
   const allObjects = [
     ...layout.rooms.map(item => ({ ...item, entityType: 'room' })),
@@ -479,8 +487,29 @@ export default function Floorplan({
   const updateLayout = updater => {
     if (!scene) return
     onFloorplansChange(previous => {
-      const currentLayout = previous?.[scene.id] || EMPTY_LAYOUT
-      return { ...previous, [scene.id]: updater(currentLayout) }
+      const stored = previous?.[scene.id] || EMPTY_LAYOUT
+      const currentLayout = { ...stored, rooms: layoutRef.current?.rooms || [] }
+      const nextLayout = updater(currentLayout)
+      if (reusableRoomMode && JSON.stringify(nextLayout.rooms || []) !== JSON.stringify(currentLayout.rooms || [])) {
+        const beforeRooms = currentLayout.rooms || []
+        const afterRooms = nextLayout.rooms || []
+        const beforeIds = new Set(beforeRooms.map(room => room.id))
+        const afterIds = new Set(afterRooms.map(room => room.id))
+        const nextRoomIds = (scene.roomIds || []).filter(id => afterIds.has(id))
+        afterRooms.forEach(room => {
+          if (!beforeIds.has(room.id)) nextRoomIds.push(room.id)
+        })
+        onProjectRoomsChange?.(previousRooms => {
+          const roomMap = new Map((previousRooms || []).map(room => [room.id, room]))
+          afterRooms.forEach(room => roomMap.set(room.id, room))
+          return [...roomMap.values()]
+        })
+        onChange?.(previousScenes => previousScenes.map(item => item.id === scene.id
+          ? { ...item, roomIds: [...new Set(nextRoomIds)] }
+          : item))
+      }
+      const { rooms: ignoredRooms, ...persistedLayout } = nextLayout
+      return { ...previous, [scene.id]: reusableRoomMode ? persistedLayout : nextLayout }
     })
   }
 
@@ -1594,9 +1623,32 @@ export default function Floorplan({
           </button>
         </div>
         <span className="floorplan-tool-divider" />
+        {reusableRoomMode && (
+          <div className="floorplan-tool-group" role="group" aria-label="Room reusable">
+            <label className="floorplan-structure-label" htmlFor="reuse-room-select">Pakai Room</label>
+            <select
+              id="reuse-room-select"
+              className="floorplan-field"
+              value=""
+              onChange={event => {
+                const roomId = event.target.value
+                if (!roomId || !scene || (scene.roomIds || []).includes(roomId)) return
+                onChange?.(previous => previous.map(item => item.id === scene.id
+                  ? { ...item, roomIds: [...(item.roomIds || []), roomId] }
+                  : item))
+              }}
+              aria-label="Pakai Room yang sudah ada"
+            >
+              <option value="">Pakai Room yang sudah ada…</option>
+              {projectRooms.filter(room => !(scene?.roomIds || []).includes(room.id)).map(room => (
+                <option key={room.id} value={room.id}>{room.label || 'Room tanpa nama'}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="floorplan-structure-group" role="group" aria-label="Struktur">
           <span className="floorplan-structure-label">Struktur</span>
-          <button className={'floorplan-tool-button' + (tool === 'room' ? ' active' : '')} onClick={() => setTool('room')} title="Gambar ruang dengan drag" aria-label="Gambar ruang" aria-pressed={tool === 'room'}>
+          <button className={'floorplan-tool-button' + (tool === 'room' ? ' active' : '')} onClick={() => setTool('room')} title="Buat Room baru dengan drag" aria-label="Buat Room baru" aria-pressed={tool === 'room'}>
             <Square size={18} /><span>Ruang</span>
           </button>
           <button className={'floorplan-tool-button' + (tool === 'wall' ? ' active' : '')} onClick={() => setTool('wall')} title="Gambar dinding dengan menggeser kedua ujungnya" aria-label="Gambar dinding" aria-pressed={tool === 'wall'}>
@@ -2356,6 +2408,12 @@ export default function Floorplan({
 
               {selectedType === 'room' && (
                 <>
+                  {reusableRoomMode && (scenes.filter(item => (item.roomIds || []).includes(selectedEntity.id)).length > 1) && (
+                    <section className="floorplan-inspector-section" role="status">
+                      <strong>Room digunakan bersama</strong>
+                      <p>Perubahan geometri Room ini akan memengaruhi {scenes.filter(item => (item.roomIds || []).includes(selectedEntity.id)).length} Scene yang menggunakannya.</p>
+                    </section>
+                  )}
                   <section className="floorplan-inspector-section">
                     <label htmlFor="room-label">Nama ruang</label>
                     <input id="room-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
