@@ -1226,6 +1226,7 @@ export default function Floorplan({
   }
 
   const handleCanvasPointerDown = event => {
+    if (tool === 'room') return
     if (tool === 'pan') {
       event.preventDefault()
       svgRef.current?.setPointerCapture?.(event.pointerId)
