@@ -386,3 +386,22 @@ test('Door hinge side supports left and right in Floorplan, persistence, and PDF
   assert.match(app, /hingeSide: opening\.hingeSide === 'right' \? 'right' : 'left'/)
   assert.match(report, /const hingeX = opening\.hingeSide === 'right' \? width \/ 2 : -width \/ 2/)
 })
+
+
+test('Room merge prompts after a room is moved near an aligned shared edge', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  const merge = await readSource('../src/utils/roomMerge.js')
+  assert.match(source, /findRoomMergeCandidate\(movedRoom, layout\.rooms, 18\)/)
+  assert.match(source, /Gabungkan kedua Room\?/)
+  assert.match(source, /mergeAdjacentRoomPolygons\(moving, target, roomMergePrompt\)/)
+  assert.match(source, /rooms: previous\.rooms\.filter\(room => room\.id !== moving\.id\)/)
+  assert.match(merge, /export function findRoomMergeCandidate/)
+  assert.match(merge, /export function mergeAdjacentRoomPolygons/)
+})
+
+test('Double-clicking a Room vertex offers to start a new Room from that point', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /onDoubleClick=\{event => \{ event\.preventDefault\(\); event\.stopPropagation\(\); setRoomVertexPrompt/)
+  assert.match(source, /setRoomDrawPoints\(\[point\]\)/)
+  assert.match(source, /Buat Room baru/)
+})
