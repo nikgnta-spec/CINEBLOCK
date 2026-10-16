@@ -451,3 +451,10 @@ test('Room inspector exposes explicit add/remove vertex controls', async () => {
   assert.match(source, /Hapus titik terpilih/)
   assert.match(source, /selectedRoomVertex\?\.roomId !== selectedEntity\.id/)
 })
+
+test('Room edge selection persists when moving from canvas to inspector vertex controls', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /onClick=\{event => \{ event\.preventDefault\(\); event\.stopPropagation\(\); setHoveredRoomEdge\(\{ roomId: room\.id, edgeIndex: edge\.edgeIndex \}\)/)
+  assert.match(source, /Tambah titik pada sisi terpilih/)
+  assert.match(source, /selectedEntity\.id\} onClick=\{\(\) => addRoomVertexAtEdgeMidpoint\(selectedEntity\)\}/)
+})
