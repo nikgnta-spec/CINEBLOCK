@@ -1202,37 +1202,9 @@ export default function Floorplan({
       dragRef.current = { mode: 'multi-move', start: point, items }
     } else {
       beginDragHistory()
-      if (type === 'room') {
-        // Connected Rooms move as one persistent group. Clearing canvas
-        // selection does not break the connection or leave a Room behind.
-        const connectedIds = new Set([item.id, ...(item.connectedRoomIds || [])])
-        let changed = true
-        while (changed) {
-          changed = false
-          for (const room of layout.rooms) {
-            if (connectedIds.has(room.id)) {
-              for (const id of room.connectedRoomIds || []) {
-                if (!connectedIds.has(id)) { connectedIds.add(id); changed = true }
-              }
-            }
-          }
-        }
-        const connectedRooms = layout.rooms.filter(room => connectedIds.has(room.id) && !room.locked)
-        const movableRooms = connectedRooms.length > 1
-          ? connectedRooms
-          : [item]
-        if (movableRooms.length > 1) {
-          dragRef.current = {
-            mode: 'multi-move',
-            start: point,
-            items: movableRooms.map(room => ({ type: 'room', id: room.id, original: room })),
-          }
-        } else {
-          dragRef.current = { mode: 'move', type, id: item.id, start: point, original: item }
-        }
-      } else {
-        dragRef.current = { mode: 'move', type, id: item.id, start: point, original: item }
-      }
+      // A Room connection is a logical relationship, not a rigid group.
+      // Dragging one Room must move only that Room; its connected neighbors stay put.
+      dragRef.current = { mode: 'move', type, id: item.id, start: point, original: item }
     }
     svgRef.current?.setPointerCapture?.(event.pointerId)
   }
