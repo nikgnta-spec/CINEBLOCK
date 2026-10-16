@@ -142,6 +142,51 @@ const getRoomDimensionGeometry = (room, edge) => {
   return { x1, y1, x2, y2, mx: (x1 + x2) / 2, my: (y1 + y2) / 2, length: edge.length, angle: 0 }
 }
 
+// Assign stable, evenly spaced lanes to dimensions that share an exterior side.
+// Geometry and measured values remain unchanged; only visual placement is adjusted.
+const getRoomDimensionLayouts = (room, edges) => {
+  const prepared = edges.map(edge => {
+    const dimension = getRoomDimensionGeometry(room, edge)
+    const horizontal = Math.abs(edge.x2 - edge.x1) >= Math.abs(edge.y2 - edge.y1)
+    const edgeMidX = (edge.x1 + edge.x2) / 2
+    const edgeMidY = (edge.y1 + edge.y2) / 2
+    const side = horizontal
+      ? (dimension.my < edgeMidY ? 'top' : 'bottom')
+      : (dimension.mx < edgeMidX ? 'left' : 'right')
+    const sideKey = (horizontal ? 'h-' : 'v-') + side
+    return { edge, dimension, sideKey, sort: horizontal ? edgeMidX : edgeMidY }
+  })
+  const groups = new Map()
+  prepared.forEach(item => {
+    if (!groups.has(item.sideKey)) groups.set(item.sideKey, [])
+    groups.get(item.sideKey).push(item)
+  })
+  for (const group of groups.values()) {
+    group.sort((a, b) => a.sort - b.sort || a.edge.edgeIndex - b.edge.edgeIndex)
+    group.forEach((item, level) => {
+      const offset = 72 + level * 30
+      const edge = item.edge
+      const dx = edge.x2 - edge.x1, dy = edge.y2 - edge.y1
+      const horizontal = Math.abs(dx) >= Math.abs(dy)
+      const midpoint = { x: (edge.x1 + edge.x2) / 2, y: (edge.y1 + edge.y2) / 2 }
+      const sign = horizontal ? Math.sign(item.dimension.my - midpoint.y) : Math.sign(item.dimension.mx - midpoint.x)
+      if (horizontal) {
+        item.dimension.y1 = item.dimension.y2 = midpoint.y + (sign || -1) * offset
+        item.dimension.my = item.dimension.y1
+      } else {
+        item.dimension.x1 = item.dimension.x2 = midpoint.x + (sign || 1) * offset
+        item.dimension.mx = item.dimension.x1
+      }
+      item.dimension.x1 = Math.round(item.dimension.x1 * 100) / 100
+      item.dimension.x2 = Math.round(item.dimension.x2 * 100) / 100
+      item.dimension.y1 = Math.round(item.dimension.y1 * 100) / 100
+      item.dimension.y2 = Math.round(item.dimension.y2 * 100) / 100
+      item.dimension.level = level
+    })
+  }
+  return prepared
+}
+
 const pointInPolygon = (point, points) => {
   let inside = false
   for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
@@ -2386,27 +2431,39 @@ export default function Floorplan({
                     )}
                     {showRoomDimensions && (active || hoveredRoomEdge?.roomId === room.id) && (() => {
                       const bounds = getRoomBounds(room)
-                      return <g pointerEvents="none">
-                        {edges.map(edge => {
-                          const d = getRoomDimensionGeometry(room, edge)
+                      const dimensionLayouts = getRoomDimensionLayouts(room, edges)
+                      const horizontalIsSingleEdge = edges.some(edge => Math.abs(edge.length - bounds.width) < 0.5 && Math.abs(edge.y2 - edge.y1) < 0.5)
+                      const verticalIsSingleEdge = edges.some(edge => Math.abs(edge.length - bounds.height) < 0.5 && Math.abs(edge.x2 - edge.x1) < 0.5)
+                      const maxHorizontalLevel = Math.max(0, ...dimensionLayouts.filter(item => item.sideKey.startsWith('h-')).map(item => item.dimension.level))
+                      const maxVerticalLevel = Math.max(0, ...dimensionLayouts.filter(item => item.sideKey.startsWith('v-')).map(item => item.dimension.level))
+                      const horizontalTotalY = bounds.y - 112 - maxHorizontalLevel * 30
+                      const verticalTotalX = bounds.x + bounds.width + 112 + maxVerticalLevel * 30
+                      return <g pointerEvents="none" opacity={active ? 1 : 0.58}>
+                        {dimensionLayouts.map(({ edge, dimension: d }) => {
                           const label = (edge.length / 100).toFixed(2) + ' m'
                           return <g key={'dimension-' + edge.edgeIndex}>
                             <line x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2} stroke="var(--text-muted)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
                             <path d={'M ' + d.x1 + ' ' + d.y1 + ' L ' + (d.x1 + (d.y2 - d.y1) * 0.012) + ' ' + (d.y1 - (d.x2 - d.x1) * 0.012) + ' L ' + (d.x1 + (d.x2 - d.x1) * 0.025) + ' ' + (d.y1 + (d.y2 - d.y1) * 0.025) + ' Z'} fill="var(--text-muted)" />
                             <path d={'M ' + d.x2 + ' ' + d.y2 + ' L ' + (d.x2 - (d.y2 - d.y1) * 0.012) + ' ' + (d.y2 + (d.x2 - d.x1) * 0.012) + ' L ' + (d.x2 - (d.x2 - d.x1) * 0.025) + ' ' + (d.y2 - (d.y2 - d.y1) * 0.025) + ' Z'} fill="var(--text-muted)" />
-                            <text x={d.mx} y={d.my - 3} textAnchor="middle" fontSize="11" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" transform={'rotate(' + (d.angle > 90 || d.angle < -90 ? d.angle + 180 : d.angle) + ' ' + d.mx + ' ' + d.my + ')'}>{label}</text>
+                            <text x={d.mx} y={d.my - 5} textAnchor="middle" fontSize="11" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{label}</text>
                           </g>
                         })}
-                        <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
-                          <line x1={bounds.x} y1={bounds.y - 112} x2={bounds.x + bounds.width} y2={bounds.y - 112} />
-                          <line x1={bounds.x} y1={bounds.y - 118} x2={bounds.x} y2={bounds.y - 106} />
-                          <line x1={bounds.x + bounds.width} y1={bounds.y - 118} x2={bounds.x + bounds.width} y2={bounds.y - 106} />
-                          <line x1={bounds.x + bounds.width + 112} y1={bounds.y} x2={bounds.x + bounds.width + 112} y2={bounds.y + bounds.height} />
-                          <line x1={bounds.x + bounds.width + 106} y1={bounds.y} x2={bounds.x + bounds.width + 118} y2={bounds.y} />
-                          <line x1={bounds.x + bounds.width + 106} y1={bounds.y + bounds.height} x2={bounds.x + bounds.width + 118} y2={bounds.y + bounds.height} />
-                        </g>
-                        <text x={bounds.x + bounds.width / 2} y={bounds.y - 124} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke">{(bounds.width / 100).toFixed(2) + ' m total'}</text>
-                        <text x={bounds.x + bounds.width + 124} y={bounds.y + bounds.height / 2} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" transform={'rotate(90 ' + (bounds.x + bounds.width + 124) + ' ' + (bounds.y + bounds.height / 2) + ')'}>{(bounds.height / 100).toFixed(2) + ' m total'}</text>
+                        {!horizontalIsSingleEdge && <>
+                          <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
+                            <line x1={bounds.x} y1={horizontalTotalY} x2={bounds.x + bounds.width} y2={horizontalTotalY} />
+                            <line x1={bounds.x} y1={horizontalTotalY - 6} x2={bounds.x} y2={horizontalTotalY + 6} />
+                            <line x1={bounds.x + bounds.width} y1={horizontalTotalY - 6} x2={bounds.x + bounds.width} y2={horizontalTotalY + 6} />
+                          </g>
+                          <text x={bounds.x + bounds.width / 2} y={horizontalTotalY - 8} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{(bounds.width / 100).toFixed(2) + ' m total'}</text>
+                        </>}
+                        {!verticalIsSingleEdge && <>
+                          <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
+                            <line x1={verticalTotalX} y1={bounds.y} x2={verticalTotalX} y2={bounds.y + bounds.height} />
+                            <line x1={verticalTotalX - 6} y1={bounds.y} x2={verticalTotalX + 6} y2={bounds.y} />
+                            <line x1={verticalTotalX - 6} y1={bounds.y + bounds.height} x2={verticalTotalX + 6} y2={bounds.y + bounds.height} />
+                          </g>
+                          <text x={verticalTotalX + 12} y={bounds.y + bounds.height / 2} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke" transform={'rotate(90 ' + (verticalTotalX + 12) + ' ' + (bounds.y + bounds.height / 2) + ')'}>{(bounds.height / 100).toFixed(2) + ' m total'}</text>
+                        </>}
                       </g>
                     })()}
                     {active && edges.map(edge => <line key={'edge-hit-' + edge.edgeIndex} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} stroke="transparent" strokeWidth="14" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerEnter={() => setHoveredRoomEdge(current => current?.roomId === room.id ? current : current)} onClick={event => { event.preventDefault(); event.stopPropagation(); setHoveredRoomEdge({ roomId: room.id, edgeIndex: edge.edgeIndex }); applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id }); setSelected({ type: 'room', id: room.id }) }} onPointerDown={event => { if (event.detail > 1) addRoomVertexOnEdge(room, edge.edgeIndex, event); else beginRoomEdgeDrag(room, edge.edgeIndex, event) }} onDoubleClick={event => addRoomVertexOnEdge(room, edge.edgeIndex, event)} />)}
