@@ -1776,8 +1776,12 @@ export default function Floorplan({
       svgRef.current.releasePointerCapture(event.pointerId)
     }
     if (completedDrag?.mode === 'move' && completedDrag.type === 'room') {
-      const movedRoom = layout.rooms.find(room => room.id === completedDrag.id)
-      const candidate = movedRoom && findRoomMergeCandidate(movedRoom, layout.rooms, 18)
+      // Pointer-up can run with a stale React render closure after the final
+      // pointer-move update. Read the latest layout snapshot so the merge
+      // candidate is calculated from the Room's actual dropped position.
+      const currentLayout = layoutRef.current || layout
+      const movedRoom = currentLayout.rooms.find(room => room.id === completedDrag.id)
+      const candidate = movedRoom && findRoomMergeCandidate(movedRoom, currentLayout.rooms, 18)
       if (candidate) setRoomMergePrompt(candidate)
     }
     if (completedDrag?.mode === 'room-vertex') setRoomSnapGuides([])
