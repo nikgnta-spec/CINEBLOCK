@@ -192,3 +192,12 @@ test('Floorplan Escape deselects and shortcuts ignore editable fields; Path drag
   assert.match(waypointDrag, /mode: 'waypoint'/)
   assert.match(source, /const appendWaypoint =/)
 })
+
+
+test('Path clicks capture before overlapping Room or Prop handlers can steal selection', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+
+  assert.match(source, /if \(tool === 'path' && event\.button === 0\) \{[\s\S]*?event\.stopPropagation\(\)[\s\S]*?return/)
+  assert.match(source, /const handleCanvasClickCapture = event => \{[\s\S]*?if \(tool !== 'path'\) return[\s\S]*?appendWaypoint\(getPoint\(event\)\)/)
+  assert.match(source, /onClickCapture=\{handleCanvasClickCapture\}/)
+})
