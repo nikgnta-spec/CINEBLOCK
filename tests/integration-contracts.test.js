@@ -411,7 +411,7 @@ test('Door hinge side supports left and right in Floorplan, persistence, and PDF
 test('Room merge prompts after a room is moved near an aligned shared edge', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   const merge = await readSource('../src/utils/roomMerge.js')
-  assert.match(source, /findRoomMergeCandidate\(movedRoom, layout\.rooms, 18\)/)
+  assert.match(source, /const currentLayout = layoutRef\.current \|\| layout[\s\S]*?findRoomMergeCandidate\(movedRoom, currentLayout\.rooms, 18\)/)
   assert.match(source, /Gabungkan kedua Room\?/)
   assert.match(source, /mergeAdjacentRoomPolygons\(moving, target, roomMergePrompt\)/)
   assert.match(source, /rooms: previous\.rooms\.filter\(room => room\.id !== moving\.id\)/)
