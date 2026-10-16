@@ -152,3 +152,9 @@ test('restoring active project preserves canonical reusable Rooms when legacy to
           ? savedState.rooms
           : (savedProjectRecord?.rooms || [])`))
 })
+
+test('Room opening normalization preserves the full supported 5-meter width', async () => {
+  const source = await readSource('../src/App.jsx')
+
+  assert.match(source, /width: Math\.max\(12, Math\.min\(500, Number\(opening\.width\)/)
+})
