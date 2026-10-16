@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Undo2, Redo2, Lock, Unlock,
+  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Undo2, Redo2, Lock, Unlock, Ruler,
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
 import {
@@ -914,6 +914,25 @@ export default function Floorplan({
     setTool('select')
   }
 
+  const beginRoomEdgeDrag = (room, edgeIndex, event) => {
+    if (tool === 'pan' || room.locked || event.button !== 0) return
+    event.stopPropagation()
+    event.preventDefault()
+    applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id })
+    onSelectedShotIdChange?.('')
+    beginDragHistory()
+    dragRef.current = {
+      mode: 'room-edge',
+      id: room.id,
+      edgeIndex,
+      start: getPoint(event),
+      originalPoints: getRoomPoints(room).map(point => ({ ...point })),
+    }
+    svgRef.current?.setPointerCapture?.(event.pointerId)
+    setSelected({ type: 'room', id: room.id })
+    setTool('select')
+  }
+
   const beginRoomVertexDrag = (room, vertexIndex, event) => {
     if (tool === 'pan' || room.locked) return
     event.stopPropagation()
@@ -1435,6 +1454,25 @@ export default function Floorplan({
       return
     }
 
+    if (drag.mode === 'room-edge') {
+      const edge = getRoomEdges({ points: drag.originalPoints })[drag.edgeIndex]
+      if (!edge) return
+      const dx = point.x - drag.start.x
+      const dy = point.y - drag.start.y
+      const length = edge.length || 1
+      const nx = (edge.y2 - edge.y1) / length
+      const ny = -(edge.x2 - edge.x1) / length
+      const distance = dx * nx + dy * ny
+      const points = drag.originalPoints.map((vertex, index) => {
+        if (index === drag.edgeIndex || index === (drag.edgeIndex + 1) % drag.originalPoints.length) {
+          return { x: Math.round(clamp(vertex.x + nx * distance, 0, MAP_WIDTH)), y: Math.round(clamp(vertex.y + ny * distance, 0, MAP_HEIGHT)) }
+        }
+        return vertex
+      })
+      updateLayout(previous => ({ ...previous, rooms: previous.rooms.map(room => room.id === drag.id ? { ...room, points } : room) }))
+      return
+    }
+
     if (drag.mode === 'room-vertex') {
       const dx = point.x - drag.start.x
       const dy = point.y - drag.start.y
@@ -1626,7 +1664,7 @@ export default function Floorplan({
     }
     setDrawStart(null)
     setPreviewPoint(null)
-    if (completedDrag && ['move', 'multi-move', 'resize', 'room-vertex', 'wall-endpoint', 'waypoint', 'rotate', 'opening'].includes(completedDrag.mode)) {
+    if (completedDrag && ['move', 'multi-move', 'resize', 'room-vertex', 'room-edge', 'wall-endpoint', 'waypoint', 'rotate', 'opening'].includes(completedDrag.mode)) {
       finishDragHistory()
     }
     dragRef.current = null
