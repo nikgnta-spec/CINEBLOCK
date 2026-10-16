@@ -2118,15 +2118,15 @@ export default function Floorplan({
                           </g>
                         })}
                         <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
-                          <line x1={bounds.x} y1={bounds.y - 112} x2={bounds.x + bounds.width} y2={bounds.y - 48} />
+                          <line x1={bounds.x} y1={bounds.y - 112} x2={bounds.x + bounds.width} y2={bounds.y - 112} />
                           <line x1={bounds.x} y1={bounds.y - 118} x2={bounds.x} y2={bounds.y - 106} />
-                          <line x1={bounds.x + bounds.width} y1={bounds.y - 54} x2={bounds.x + bounds.width} y2={bounds.y - 42} />
-                          <line x1={bounds.x + bounds.width + 112} y1={bounds.y} x2={bounds.x + bounds.width + 48} y2={bounds.y + bounds.height} />
+                          <line x1={bounds.x + bounds.width} y1={bounds.y - 118} x2={bounds.x + bounds.width} y2={bounds.y - 106} />
+                          <line x1={bounds.x + bounds.width + 112} y1={bounds.y} x2={bounds.x + bounds.width + 112} y2={bounds.y + bounds.height} />
                           <line x1={bounds.x + bounds.width + 106} y1={bounds.y} x2={bounds.x + bounds.width + 118} y2={bounds.y} />
-                          <line x1={bounds.x + bounds.width + 42} y1={bounds.y + bounds.height} x2={bounds.x + bounds.width + 54} y2={bounds.y + bounds.height} />
+                          <line x1={bounds.x + bounds.width + 106} y1={bounds.y + bounds.height} x2={bounds.x + bounds.width + 118} y2={bounds.y + bounds.height} />
                         </g>
-                        <text x={bounds.x + bounds.width / 2} y={bounds.y - 54} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke">{(bounds.width / 100).toFixed(2) + ' m total'}</text>
-                        <text x={bounds.x + bounds.width + 54} y={bounds.y + bounds.height / 2} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" transform={'rotate(90 ' + (bounds.x + bounds.width + 54) + ' ' + (bounds.y + bounds.height / 2) + ')'}>{(bounds.height / 100).toFixed(2) + ' m total'}</text>
+                        <text x={bounds.x + bounds.width / 2} y={bounds.y - 124} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke">{(bounds.width / 100).toFixed(2) + ' m total'}</text>
+                        <text x={bounds.x + bounds.width + 124} y={bounds.y + bounds.height / 2} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" transform={'rotate(90 ' + (bounds.x + bounds.width + 124) + ' ' + (bounds.y + bounds.height / 2) + ')'}>{(bounds.height / 100).toFixed(2) + ' m total'}</text>
                       </g>
                     })()}
                     {active && edges.map(edge => <line key={'edge-hit-' + edge.edgeIndex} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} stroke="transparent" strokeWidth="14" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerEnter={() => setHoveredRoomEdge({ roomId: room.id, edgeIndex: edge.edgeIndex })} onPointerLeave={() => setHoveredRoomEdge(current => current?.roomId === room.id && current.edgeIndex === edge.edgeIndex ? null : current)} onPointerDown={event => beginRoomEdgeDrag(room, edge.edgeIndex, event)} />)}
