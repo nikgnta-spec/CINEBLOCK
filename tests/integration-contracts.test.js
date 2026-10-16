@@ -491,6 +491,11 @@ test('confirming a Room merge replaces two Room records with one polygon and ret
   assert.match(handler, /\.concat\(\{[\s\S]*?\.\.\.target,[\s\S]*?points: merged\.points,[\s\S]*?openings: merged\.openings/)
   assert.match(handler, /connectedRoomIds: \[\]/)
   assert.match(handler, /applyEntitySelection\(\[\{ type: 'room', id: target\.id \}\]/)
+  const mergeUtils = await readSource('../src/utils/roomMerge.js')
+  assert.match(mergeUtils, /internalWalls = \[/)
+  assert.match(mergeUtils, /internalWalls \}/)
+  assert.match(source, /\{\(room\.internalWalls \|\| \[\]\)\.map/)
+  assert.match(source, /internalWalls: \(drag\.original\.internalWalls \|\| \[\]\)\.map/)
 })
 
 test('Room connections persist independently of selection and Rooms remain draggable', async () => {
