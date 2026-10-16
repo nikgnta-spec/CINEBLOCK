@@ -2453,6 +2453,20 @@ export default function Floorplan({
                       const dimensionLayouts = getRoomDimensionLayouts(room, edges)
                       const horizontalIsSingleEdge = edges.some(edge => Math.abs(edge.length - bounds.width) < 0.5 && Math.abs(edge.y2 - edge.y1) < 0.5)
                       const verticalIsSingleEdge = edges.some(edge => Math.abs(edge.length - bounds.height) < 0.5 && Math.abs(edge.x2 - edge.x1) < 0.5)
+                      // When Rooms are connected, do not draw an overall dimension across
+                      // a shared boundary: it visually cuts through the connection/openings.
+                      const connectedRooms = (room.connectedRoomIds || [])
+                        .map(id => layout.rooms.find(candidate => candidate.id === id))
+                        .filter(Boolean)
+                      const overlaps = (a1, a2, b1, b2) => Math.min(Math.max(a1, a2), Math.max(b1, b2)) - Math.max(Math.min(a1, a2), Math.min(b1, b2)) > 2
+                      const sharedHorizontalBoundary = connectedRooms.some(other => getRoomEdges(other).some(edge =>
+                        Math.abs(edge.y1 - edge.y2) < 1 &&
+                        (Math.abs(edge.y1 - bounds.y) < 3 || Math.abs(edge.y1 - (bounds.y + bounds.height)) < 3) &&
+                        overlaps(edge.x1, edge.x2, bounds.x, bounds.x + bounds.width)))
+                      const sharedVerticalBoundary = connectedRooms.some(other => getRoomEdges(other).some(edge =>
+                        Math.abs(edge.x1 - edge.x2) < 1 &&
+                        (Math.abs(edge.x1 - bounds.x) < 3 || Math.abs(edge.x1 - (bounds.x + bounds.width)) < 3) &&
+                        overlaps(edge.y1, edge.y2, bounds.y, bounds.y + bounds.height)))
                       const maxHorizontalLevel = Math.max(0, ...dimensionLayouts.filter(item => item.sideKey.startsWith('h-')).map(item => item.dimension.level))
                       const maxVerticalLevel = Math.max(0, ...dimensionLayouts.filter(item => item.sideKey.startsWith('v-')).map(item => item.dimension.level))
                       const horizontalTotalY = bounds.y - 112 - maxHorizontalLevel * 30
@@ -2467,7 +2481,7 @@ export default function Floorplan({
                             <text x={d.mx} y={d.my - 5} textAnchor="middle" fontSize="11" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{label}</text>
                           </g>
                         })}
-                        {!horizontalIsSingleEdge && <>
+                        {!horizontalIsSingleEdge && !sharedHorizontalBoundary && <>
                           <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
                             <line x1={bounds.x} y1={horizontalTotalY} x2={bounds.x + bounds.width} y2={horizontalTotalY} />
                             <line x1={bounds.x} y1={horizontalTotalY - 6} x2={bounds.x} y2={horizontalTotalY + 6} />
@@ -2475,7 +2489,7 @@ export default function Floorplan({
                           </g>
                           <text x={bounds.x + bounds.width / 2} y={horizontalTotalY - 8} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{(bounds.width / 100).toFixed(2) + ' m total'}</text>
                         </>}
-                        {!verticalIsSingleEdge && <>
+                        {!verticalIsSingleEdge && !sharedVerticalBoundary && <>
                           <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
                             <line x1={verticalTotalX} y1={bounds.y} x2={verticalTotalX} y2={bounds.y + bounds.height} />
                             <line x1={verticalTotalX - 6} y1={bounds.y} x2={verticalTotalX + 6} y2={bounds.y} />
