@@ -251,10 +251,12 @@ function PrintFloorplan({ scene, layout }) {
                         </>
                       })() : (() => {
                         const direction = opening.swingDirection === 'out' ? -1 : 1
+                        const hingeX = opening.hingeSide === 'right' ? width / 2 : -width / 2
+                        const freeX = -hingeX
                         return <>
                           <path d={'M ' + (-width / 2) + ' 0 H ' + (width / 2)} />
-                          <path d={'M ' + (-width / 2) + ' 0 L ' + (-width / 2) + ' ' + (direction * width)} strokeWidth="3" />
-                          <path d={'M ' + (-width / 2) + ' ' + (direction * width) + ' A ' + width + ' ' + width + ' 0 0 ' + (direction < 0 ? 1 : 0) + ' ' + (width / 2) + ' 0'} strokeDasharray="4 3" />
+                          <path d={'M ' + hingeX + ' 0 L ' + hingeX + ' ' + (direction * width)} strokeWidth="3" />
+                          <path d={'M ' + hingeX + ' ' + (direction * width) + ' A ' + width + ' ' + width + ' 0 0 ' + ((opening.hingeSide === 'right') === (direction > 0) ? 1 : 0) + ' ' + freeX + ' 0'} strokeDasharray="4 3" />
                         </>
                       })()
                     ) : opening.type === 'doorway' ? null : (
@@ -312,10 +314,12 @@ function PrintFloorplan({ scene, layout }) {
                         </>
                       })() : (() => {
                         const direction = opening.swingDirection === 'out' ? -1 : 1
+                        const hingeX = opening.hingeSide === 'right' ? width / 2 : -width / 2
+                        const freeX = -hingeX
                         return <>
                           <path d={'M ' + (-width / 2) + ' 0 H ' + (width / 2)} />
-                          <path d={'M ' + (-width / 2) + ' 0 L ' + (-width / 2) + ' ' + (direction * width)} strokeWidth="3" />
-                          <path d={'M ' + (-width / 2) + ' ' + (direction * width) + ' A ' + width + ' ' + width + ' 0 0 ' + (direction < 0 ? 1 : 0) + ' ' + (width / 2) + ' 0'} strokeDasharray="4 3" />
+                          <path d={'M ' + hingeX + ' 0 L ' + hingeX + ' ' + (direction * width)} strokeWidth="3" />
+                          <path d={'M ' + hingeX + ' ' + (direction * width) + ' A ' + width + ' ' + width + ' 0 0 ' + ((opening.hingeSide === 'right') === (direction > 0) ? 1 : 0) + ' ' + freeX + ' 0'} strokeDasharray="4 3" />
                         </>
                       })()
                     ) : opening.type === 'doorway' ? null : (
