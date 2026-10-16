@@ -40,6 +40,7 @@ export default function AuthGate({ children }) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [localMode, setLocalMode] = useState(false)
+  const [guestName, setGuestName] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -127,6 +128,34 @@ export default function AuthGate({ children }) {
       })
     return () => { cancelled = true }
   }, [session?.access_token, session?.auth_flow])
+
+  const continueAsGuest = async event => {
+    event.preventDefault()
+    const name = guestName.trim().replace(/\\s+/g, ' ').slice(0, 80)
+    if (name.length < 2) {
+      setError('Masukkan nama minimal 2 karakter.')
+      return
+    }
+    const shareToken = new URLSearchParams(window.location.search).get('share')
+    if (!shareToken) {
+      setError('Buka tautan proyek CineBlock yang dibagikan untuk bergabung.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    setNotice('')
+    try {
+      const result = await supabaseClient.auth.signInAnonymously({ displayName: name })
+      const sessionWithName = result.session
+      if (!sessionWithName?.access_token) throw new Error('Sesi tamu tidak berhasil dibuat.')
+      setSession(sessionWithName)
+      setNotice('Nama tersimpan. Memverifikasi tautan proyek…')
+    } catch (err) {
+      setError(err.message || 'Tidak dapat masuk sebagai tamu. Pastikan fitur Anonymous Sign-Ins diaktifkan.')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const signIn = async event => {
     event.preventDefault()
@@ -257,8 +286,40 @@ export default function AuthGate({ children }) {
     }
   }
 
+  const currentShareToken = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('share')
+    : null
+
+  // The app remains directly accessible for local work. A shared project link
+  // asks for a display name, then uses a scoped anonymous Supabase identity.
+  if (!loading && !session?.access_token && !currentShareToken) {
+    return cloneElement(children, {})
+  }
+
   if (loading) {
     return <main className="auth-gate"><div className="auth-gate-card"><div className="auth-gate-brand"><Cloud size={22} /> CINEBLOCK</div><p role="status">Memeriksa sesi akun…</p></div></main>
+  }
+
+  if (currentShareToken && (!session?.access_token || session.user?.is_anonymous) && !cloudWorkspace) {
+    return (
+      <main className="auth-gate">
+        <section className="auth-gate-card" aria-labelledby="cineblock-guest-title">
+          <div className="auth-gate-brand"><Cloud size={24} strokeWidth={1.8} /><span>CINEBLOCK</span></div>
+          <div className="auth-gate-icon"><Users size={25} /></div>
+          <h1 id="cineblock-guest-title">{session?.access_token ? 'Membuka proyek…' : 'Gabung ke proyek'}</h1>
+          <p className="auth-gate-subtitle">{session?.access_token ? 'Memverifikasi tautan dan memuat workspace bersama.' : 'Masukkan nama agar perubahanmu dapat dikenali di proyek ini. Tidak perlu email atau kata sandi.'}</p>
+          {!session?.access_token && (
+            <form className="auth-gate-form" onSubmit={continueAsGuest}>
+              <label htmlFor="cineblock-guest-name">Nama kamu</label>
+              <input id="cineblock-guest-name" autoComplete="name" maxLength={80} required minLength={2} value={guestName} onChange={event => setGuestName(event.target.value)} placeholder="Contoh: Betz" />
+              <button type="submit" disabled={busy}>{busy ? 'Memproses…' : 'Masuk ke proyek'}</button>
+            </form>
+          )}
+          {error && <p className="auth-gate-error" role="alert">{error}</p>}
+          {notice && <p className="auth-gate-notice" role="status">{notice}</p>}
+        </section>
+      </main>
+    )
   }
 
   if (session?.access_token && session.user?.id === 'cf4a51e8-825e-4db4-8b8a-037d3908663c' && !['invite', 'recovery'].includes(session.auth_flow) && !cloudWorkspace) {
