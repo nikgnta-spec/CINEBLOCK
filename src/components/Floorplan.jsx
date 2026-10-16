@@ -170,7 +170,7 @@ const DoorSwingSymbol = ({ opening, width }) => {
 const getOpeningSegments = (length, openings = []) => {
   const ranges = openings
     .map(opening => {
-      const width = Math.min(Number(opening.width) || 48, length)
+      const width = Math.min(Number(opening.width ?? 48), length)
       const center = clamp(opening.offset, 0, 1) * length
       return { start: clamp(center - width / 2, 0, length), end: clamp(center + width / 2, 0, length) }
     })
@@ -1469,7 +1469,7 @@ export default function Floorplan({
         offset = nearestEdge.offset
         patch.edgeIndex = nearestEdge.edgeIndex
       }
-      const openingWidth = Math.min(Number(opening.width) || 48, length)
+      const openingWidth = Math.min(Number(opening.width ?? 48), length)
       const minimumOffset = Math.min(0.49, openingWidth / (2 * length))
       patch.offset = clamp(offset, minimumOffset, 1 - minimumOffset)
       updateLayout(previous => ({
@@ -2197,10 +2197,10 @@ export default function Floorplan({
                     {active && edges.map(edge => <circle key={'edge-' + edge.edgeIndex} cx={(edge.x1 + edge.x2) / 2} cy={(edge.y1 + edge.y2) / 2} r="3.5" fill="var(--text-muted)" stroke="var(--bg)" strokeWidth="1" vectorEffect="non-scaling-stroke" pointerEvents="none" />)}
                     {openings.map(opening => {
                       const placement = getRoomOpeningPlacement(room, opening)
-                      const openingWidth = Math.min(Number(opening.width) || 48, placement.length)
+                      const openingWidth = Math.min(Number(opening.width ?? 48), placement.length)
                       return (
                         <g key={opening.id} transform={'translate(' + placement.x + ' ' + placement.y + ') rotate(' + placement.angle + ')'} data-floorplan-object="true" style={{ cursor: 'grab' }} onPointerDownCapture={event => beginOpeningDrag('room', room, opening, event)} onClick={event => event.stopPropagation()}>
-                          <rect x={-(Math.min(Number(opening.width) || 48, placement.length) / 2) - 8} y="-16" width={Math.min(Number(opening.width) || 48, placement.length) + 16} height="32" fill="transparent" pointerEvents="all" />
+                          <rect x={-(Math.min(Number(opening.width ?? 48), placement.length) / 2) - 8} y="-16" width={Math.min(Number(opening.width ?? 48), placement.length) + 16} height="32" fill="transparent" pointerEvents="all" />
                           <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type === 'door' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">{opening.type === 'door' ? 'Pintu' : 'Jendela'}</text>
                           {opening.type === 'door' ? (
                             <DoorSwingSymbol opening={opening} width={openingWidth} />
@@ -2243,7 +2243,7 @@ export default function Floorplan({
                       stroke="transparent" strokeWidth="20" vectorEffect="non-scaling-stroke" />
                     {openings.map(opening => {
                       const center = clamp(opening.offset, 0, 1) * length
-                      const openingWidth = Math.min(Number(opening.width) || 48, length)
+                      const openingWidth = Math.min(Number(opening.width ?? 48), length)
                       return (
                         <g
                           key={opening.id}
@@ -2933,17 +2933,17 @@ export default function Floorplan({
                           </div>
                           <div className="floorplan-dimension-input">
                             <label htmlFor={opening.id + '-width'}>Lebar (m)</label>
-                            <input id={opening.id + '-width'} className="floorplan-field" type="number" min="0.30" max="5.00" step="0.01" value={(Number(opening.width || 48) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                            <input id={opening.id + '-width'} className="floorplan-field" type="number" min="0" max="5.00" step="0.01" value={(Number(opening.width ?? 48) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
                               const meters = Number(event.target.value)
-                              if (!Number.isFinite(meters) || meters < 0.3 || meters > 5) return
+                              if (!Number.isFinite(meters) || meters < 0 || meters > 5) return
                               updateOpening(opening.id, { width: Math.round(meters * 100) })
                             }} />
                           </div>
                           <div className="floorplan-dimension-input">
                             <label htmlFor={opening.id + '-height'}>Tinggi (m)</label>
-                            <input id={opening.id + '-height'} className="floorplan-field" type="number" min="0.30" max="4.00" step="0.01" value={(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                            <input id={opening.id + '-height'} className="floorplan-field" type="number" min="0" max="4.00" step="0.01" value={(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
                               const meters = Number(event.target.value)
-                              if (!Number.isFinite(meters) || meters < 0.3 || meters > 4) return
+                              if (!Number.isFinite(meters) || meters < 0 || meters > 4) return
                               updateOpening(opening.id, { height: Math.round(meters * 100) })
                             }} />
                           </div>
@@ -3001,17 +3001,17 @@ export default function Floorplan({
                         <div className="floorplan-opening-actions">
                           <div className="floorplan-dimension-input">
                             <label htmlFor={opening.id + '-width'}>Lebar (m)</label>
-                            <input id={opening.id + '-width'} className="floorplan-field" type="number" min="0.30" max="5.00" step="0.01" value={(Number(opening.width || 48) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                            <input id={opening.id + '-width'} className="floorplan-field" type="number" min="0" max="5.00" step="0.01" value={(Number(opening.width ?? 48) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
                               const meters = Number(event.target.value)
-                              if (!Number.isFinite(meters) || meters < 0.3 || meters > 5) return
+                              if (!Number.isFinite(meters) || meters < 0 || meters > 5) return
                               updateOpening(opening.id, { width: Math.round(meters * 100) })
                             }} />
                           </div>
                           <div className="floorplan-dimension-input">
                             <label htmlFor={opening.id + '-height'}>Tinggi (m)</label>
-                            <input id={opening.id + '-height'} className="floorplan-field" type="number" min="0.30" max="4.00" step="0.01" value={(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                            <input id={opening.id + '-height'} className="floorplan-field" type="number" min="0" max="4.00" step="0.01" value={(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
                               const meters = Number(event.target.value)
-                              if (!Number.isFinite(meters) || meters < 0.3 || meters > 4) return
+                              if (!Number.isFinite(meters) || meters < 0 || meters > 4) return
                               updateOpening(opening.id, { height: Math.round(meters * 100) })
                             }} />
                           </div>
