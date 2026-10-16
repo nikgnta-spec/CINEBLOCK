@@ -2055,7 +2055,7 @@ export default function Floorplan({
                 const edges = getRoomEdges(room)
                 const centroid = points.reduce((sum, point) => ({ x: sum.x + point.x / points.length, y: sum.y + point.y / points.length }), { x: 0, y: 0 })
                 return (
-                  <g key={room.id} data-floorplan-object="true" onPointerDown={event => beginObjectDrag('room', room, event)} onClick={event => event.stopPropagation()}>
+                  <g key={room.id} data-floorplan-object="true" onPointerEnter={() => setHoveredRoomEdge({ roomId: room.id, edgeIndex: null })} onPointerLeave={() => setHoveredRoomEdge(current => current?.roomId === room.id ? null : current)} onPointerDown={event => beginObjectDrag('room', room, event)} onClick={event => event.stopPropagation()}>
                     <polygon points={pointString} fill={active ? 'var(--bg-hover)' : 'var(--bg-subtle)'} stroke="none" />
                     {groupSelected && !active && <polygon points={pointString} fill="none" stroke="var(--accent)" strokeWidth="2" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
                     {edges.map(edge => {
