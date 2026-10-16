@@ -1674,6 +1674,7 @@ export default function Floorplan({
 
   const handleCanvasPointerUp = () => {
     const completedDrag = dragRef.current
+    if (completedDrag?.mode === 'room-vertex') setRoomSnapGuides([])
     if (completedDrag?.mode === 'selection-box') {
       const end = completedDrag.current || completedDrag.start
       const bounds = {
