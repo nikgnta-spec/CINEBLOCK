@@ -228,11 +228,11 @@ function PrintFloorplan({ scene, layout }) {
                   <line x1={bounds.x} y1={horizontalY} x2={bounds.maxX} y2={horizontalY} />
                   <line x1={bounds.x} y1={horizontalY - 5} x2={bounds.x} y2={horizontalY + 5} />
                   <line x1={bounds.maxX} y1={horizontalY - 5} x2={bounds.maxX} y2={horizontalY + 5} />
-                  <text x={(bounds.x + bounds.maxX) / 2} y={horizontalY - 8} fill="#374151" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="12" textAnchor="middle">{meters(totalLength)} m total</text>
+                  <text x={(bounds.x + bounds.maxX) / 2} y={horizontalY - 8} fill="#374151" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="12" textAnchor="middle">{meters(totalLength)} total</text>
                   <line x1={verticalX} y1={bounds.y} x2={verticalX} y2={bounds.maxY} />
                   <line x1={verticalX - 5} y1={bounds.y} x2={verticalX + 5} y2={bounds.y} />
                   <line x1={verticalX - 5} y1={bounds.maxY} x2={verticalX + 5} y2={bounds.maxY} />
-                  <text x={verticalX + 14} y={(bounds.y + bounds.maxY) / 2} fill="#374151" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="12" textAnchor="middle" transform={'rotate(90 ' + (verticalX + 14) + ' ' + ((bounds.y + bounds.maxY) / 2) + ')'}>{meters(totalWidth)} m total</text>
+                  <text x={verticalX + 14} y={(bounds.y + bounds.maxY) / 2} fill="#374151" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="12" textAnchor="middle" transform={'rotate(90 ' + (verticalX + 14) + ' ' + ((bounds.y + bounds.maxY) / 2) + ')'}>{meters(totalWidth)} total</text>
                 </g>
               })()}
               {openings.map(opening => {
