@@ -382,6 +382,7 @@ export default function Floorplan({
   const [roomDrawPoints, setRoomDrawPoints] = useState([])
   const [roomLengthInputOpen, setRoomLengthInputOpen] = useState(false)
   const [roomLengthInput, setRoomLengthInput] = useState('')
+  const [roomManualAngle, setRoomManualAngle] = useState(null)
   const [roomDrawMessage, setRoomDrawMessage] = useState('')
   const [showRoomDimensions, setShowRoomDimensions] = useState(true)
   const [hoveredRoomEdge, setHoveredRoomEdge] = useState(null)
@@ -1222,13 +1223,14 @@ export default function Floorplan({
     const origin = roomDrawPoints[roomDrawPoints.length - 1]
     const dx = previewPoint.x - origin.x
     const dy = previewPoint.y - origin.y
-    const angle = Math.atan2(dy, dx)
+    const angle = Number.isFinite(roomManualAngle) ? roomManualAngle : Math.atan2(dy, dx)
     const distance = meters * 100
     const nextPoint = { x: origin.x + Math.cos(angle) * distance, y: origin.y + Math.sin(angle) * distance }
     setRoomDrawPoints(points => [...points, nextPoint])
     setPreviewPoint(nextPoint)
     setRoomLengthInputOpen(false)
     setRoomLengthInput('')
+    setRoomManualAngle(null)
   }
 
   const handleCanvasPointerDownCapture = event => {
@@ -1845,6 +1847,8 @@ export default function Floorplan({
       }
       if (tool === 'room' && roomDrawPoints.length && key === 'tab') {
         event.preventDefault()
+        const origin = roomDrawPoints[roomDrawPoints.length - 1]
+        setRoomManualAngle(Math.atan2(previewPoint.y - origin.y, previewPoint.x - origin.x))
         setRoomLengthInputOpen(true)
         setRoomLengthInput('')
         return
@@ -1970,7 +1974,7 @@ export default function Floorplan({
         <div className="floorplan-structure-group" role="group" aria-label="Struktur">
           <span className="floorplan-structure-label">Struktur</span>
           <button type="button" className={'floorplan-tool-button' + (showRoomDimensions ? ' active' : '')} onClick={() => setShowRoomDimensions(value => !value)} title={showRoomDimensions ? 'Sembunyikan dimensi Room' : 'Tampilkan dimensi Room'} aria-pressed={showRoomDimensions}><Ruler size={18} /><span>Dimensi</span></button>
-          <button className={'floorplan-tool-button' + (tool === 'room' ? ' active' : '')} onClick={() => setTool('room')} title="Buat Room baru dengan drag" aria-label="Buat Room baru" aria-pressed={tool === 'room'}>
+          <button className={'floorplan-tool-button' + (tool === 'room' ? ' active' : '')} onClick={() => setTool('room')} title="Gambar Room titik demi titik" aria-label="Gambar Room baru" aria-pressed={tool === 'room'}>
             <Square size={18} /><span>Ruang</span>
           </button>
           <button className={'floorplan-tool-button' + (tool === 'wall' ? ' active' : '')} onClick={() => setTool('wall')} title="Gambar dinding dengan menggeser kedua ujungnya" aria-label="Gambar dinding" aria-pressed={tool === 'wall'}>
