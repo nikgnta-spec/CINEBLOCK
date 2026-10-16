@@ -563,7 +563,7 @@ test('Confirming a Room connection snaps walls flush while retaining shared wall
 test('Room total length and width stay visible without hover while edge dimensions remain contextual', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /showRoomDimensions && \(\(\) => \{/)
-  assert.match(source, /isTotalDimensionOwner && !horizontalIsSingleEdge/)
-  assert.match(source, /isTotalDimensionOwner && !verticalIsSingleEdge/)
+  assert.match(source, /!horizontalIsSingleEdge/)
+  assert.match(source, /!verticalIsSingleEdge/)
   assert.match(source, /\(active \|\| hoveredRoomEdge\?\.roomId === room\.id\) && visibleDimensionLayouts\.map/)
 })
