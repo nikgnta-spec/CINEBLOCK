@@ -127,26 +127,28 @@ const getRoomDimensionGeometry = (room, edge) => {
   return { x1, y1, x2, y2, mx: (x1 + x2) / 2, my: (y1 + y2) / 2, length: edge.length, angle: Math.atan2(dy, dx) * 180 / Math.PI }
 }
 const snapRoomPoint = (point, origin, anchors, tolerance) => {
-  if (!origin) return point
+  if (!origin) return { point, guides: [] }
   const candidates = [
-    { x: point.x, y: origin.y, axis: 'horizontal' },
-    { x: origin.x, y: point.y, axis: 'vertical' },
+    { x: point.x, y: origin.y, guide: { axis: 'horizontal', x: origin.x, y: origin.y } },
+    { x: origin.x, y: point.y, guide: { axis: 'vertical', x: origin.x, y: origin.y } },
     ...anchors.flatMap(anchor => [
-      { x: anchor.x, y: point.y, axis: 'align-x' },
-      { x: point.x, y: anchor.y, axis: 'align-y' },
-      { x: anchor.x, y: anchor.y, axis: 'vertex' },
+      { x: point.x, y: anchor.y, guide: { axis: 'horizontal', x: anchor.x, y: anchor.y } },
+      { x: anchor.x, y: point.y, guide: { axis: 'vertical', x: anchor.x, y: anchor.y } },
+      { x: anchor.x, y: anchor.y, guide: { axis: 'point', x: anchor.x, y: anchor.y } },
     ]),
   ]
   let best = point
   let bestDistance = tolerance
+  let bestGuide = null
   for (const candidate of candidates) {
     const distance = Math.hypot(candidate.x - point.x, candidate.y - point.y)
     if (distance <= bestDistance) {
       best = { x: candidate.x, y: candidate.y }
       bestDistance = distance
+      bestGuide = candidate.guide
     }
   }
-  return best
+  return { point: best, guides: bestGuide ? [bestGuide] : [] }
 }
 const pointInPolygon = (point, points) => {
   let inside = false
@@ -440,6 +442,7 @@ export default function Floorplan({
   const [showRoomDimensions, setShowRoomDimensions] = useState(true)
   const [hoveredRoomEdge, setHoveredRoomEdge] = useState(null)
   const [previewPoint, setPreviewPoint] = useState(null)
+  const [roomSnapGuides, setRoomSnapGuides] = useState([])
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: MAP_WIDTH, height: MAP_HEIGHT })
   const [historyRevision, setHistoryRevision] = useState(0)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 520 })
@@ -1239,6 +1242,7 @@ export default function Floorplan({
     onSelectedShotIdChange?.('')
     setRoomDrawPoints([])
     setPreviewPoint(null)
+    setRoomSnapGuides([])
     setRoomDrawMessage('')
     setRoomLengthInputOpen(false)
     setTool('select')
@@ -1250,6 +1254,7 @@ export default function Floorplan({
     if (!roomDrawPoints.length) {
       setRoomDrawPoints([point])
       setPreviewPoint(point)
+      setRoomSnapGuides([])
       return
     }
     const first = roomDrawPoints[0]
@@ -1260,8 +1265,12 @@ export default function Floorplan({
       return
     }
     const previous = roomDrawPoints[roomDrawPoints.length - 1]
-    const snapTolerance = 24 * viewBox.width / Math.max(1, canvasSize.width)
-    const snappedPoint = snapRoomPoint(point, previous, roomDrawPoints.slice(0, -1), snapTolerance)
+    const snapTolerance = 9 * viewBox.width / Math.max(1, canvasSize.width)
+    const anchors = [
+      ...layout.rooms.flatMap(room => getRoomPoints(room)),
+      ...(layout.walls || []).flatMap(wall => [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]),
+    ].filter(anchor => !(Math.abs(anchor.x - previous.x) < 0.01 && Math.abs(anchor.y - previous.y) < 0.01))
+    const snappedPoint = point.altKey ? point : snapRoomPoint(point, previous, [...roomDrawPoints.slice(0, -1), ...anchors], snapTolerance).point
     if (Math.hypot(snappedPoint.x - previous.x, snappedPoint.y - previous.y) < 4) {
       setRoomDrawMessage('Garis terlalu pendek.')
       return
@@ -1293,7 +1302,7 @@ export default function Floorplan({
     if (tool === 'room' && event.button === 0 && !spaceHeld && !event.target?.closest?.('foreignObject')) {
       event.preventDefault()
       event.stopPropagation()
-      addRoomDrawingPoint(getPoint(event))
+      addRoomDrawingPoint({ ...getPoint(event), altKey: event.altKey })
       return
     }
     // Path mode must intercept object pointer handlers: rooms and props can
@@ -1397,11 +1406,19 @@ export default function Floorplan({
     }
     if (tool === 'room' && roomDrawPoints.length) {
       const origin = roomDrawPoints[roomDrawPoints.length - 1]
-      const snapTolerance = 14 * viewBox.width / Math.max(1, canvasSize.width)
-      const nextPreview = roomLengthInputOpen
-        ? point
-        : snapRoomPoint(point, origin, roomDrawPoints.slice(0, -1), snapTolerance)
-      setPreviewPoint(nextPreview)
+      const snapTolerance = 9 * viewBox.width / Math.max(1, canvasSize.width)
+      const anchors = [
+        ...layout.rooms.flatMap(room => getRoomPoints(room)),
+        ...(layout.walls || []).flatMap(wall => [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]),
+      ].filter(anchor => !(Math.abs(anchor.x - origin.x) < 0.01 && Math.abs(anchor.y - origin.y) < 0.01))
+      if (roomLengthInputOpen || event.altKey) {
+        setPreviewPoint(point)
+        setRoomSnapGuides([])
+      } else {
+        const result = snapRoomPoint(point, origin, [...roomDrawPoints.slice(0, -1), ...anchors], snapTolerance)
+        setPreviewPoint(result.point)
+        setRoomSnapGuides(result.guides)
+      }
       return
     }
     if (drawStart) {
@@ -2539,7 +2556,14 @@ export default function Floorplan({
                 const pointString = points.map(point => point.x + ',' + point.y).join(' ')
                 const closeTolerance = 15 * viewBox.width / Math.max(1, canvasSize.width)
                 const close = Math.hypot(previewPoint.x - roomDrawPoints[0].x, previewPoint.y - roomDrawPoints[0].y) <= closeTolerance
-                return <g pointerEvents="none"><polyline points={pointString} fill={roomDrawPoints.length >= 2 ? 'var(--bg-hover)' : 'none'} fillOpacity="0.45" stroke="var(--text-muted)" strokeWidth="2" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" /><circle cx={roomDrawPoints[0].x} cy={roomDrawPoints[0].y} r={close ? 9 : 5} fill={close ? 'var(--accent)' : 'var(--bg)'} stroke="var(--accent)" strokeWidth="2" vectorEffect="non-scaling-stroke" /><text x={(last.x + previewPoint.x) / 2 + 6} y={(last.y + previewPoint.y) / 2 - 8} fontSize="13" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke">{(length / 100).toFixed(2) + ' m'}</text></g>
+                return <g pointerEvents="none">
+                  {roomSnapGuides.map((guide, index) => <line key={'snap-guide-' + index}
+                    x1={guide.axis === 'horizontal' ? viewBox.x : guide.x}
+                    y1={guide.axis === 'vertical' ? viewBox.y : guide.y}
+                    x2={guide.axis === 'horizontal' ? viewBox.x + viewBox.width : guide.x}
+                    y2={guide.axis === 'vertical' ? viewBox.y + viewBox.height : guide.y}
+                    stroke="var(--accent)" strokeWidth="1" strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />)}
+                  <polyline points={pointString} fill={roomDrawPoints.length >= 2 ? 'var(--bg-hover)' : 'none'} fillOpacity="0.45" stroke="var(--text-muted)" strokeWidth="2" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" /><circle cx={roomDrawPoints[0].x} cy={roomDrawPoints[0].y} r={close ? 9 : 5} fill={close ? 'var(--accent)' : 'var(--bg)'} stroke="var(--accent)" strokeWidth="2" vectorEffect="non-scaling-stroke" /><text x={(last.x + previewPoint.x) / 2 + 6} y={(last.y + previewPoint.y) / 2 - 8} fontSize="13" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke">{(length / 100).toFixed(2) + ' m'}</text></g>
               })()}
               {tool === 'room' && roomLengthInputOpen && previewPoint && (
                 <foreignObject x={previewPoint.x + 10} y={previewPoint.y + 10} width="150" height="48" style={{ overflow: 'visible', pointerEvents: 'all' }}>
