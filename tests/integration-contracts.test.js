@@ -90,3 +90,13 @@ test('Room lock prevents direct, resize, and group movement', async () => {
   assert.match(source, /collection === 'rooms' && entry\.original\?\.locked/)
   assert.match(source, /if \(item\.locked\) return item/)
 })
+
+test('Room dimensions can be entered manually in meters and respect Room lock', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+
+  assert.match(source, /id="room-width"/)
+  assert.match(source, /id="room-height"/)
+  assert.match(source, /type="number"/)
+  assert.match(source, /Math\.round\(meters \* 100\)/)
+  assert.match(source, /disabled=\{Boolean\(selectedEntity\.locked\)\}/)
+})
