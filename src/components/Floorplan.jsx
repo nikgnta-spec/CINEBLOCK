@@ -3022,6 +3022,13 @@ export default function Floorplan({
                         <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{openingLabel(opening)}</span>
                         <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} disabled={Boolean(selectedEntity.locked)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
                         <div className="floorplan-opening-actions">
+                          {(opening.type === 'door' || opening.type === 'doorway') && <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-leaf-mode'}>Model pintu</label>
+                            <select id={opening.id + '-leaf-mode'} className="floorplan-field" value={opening.type === 'door' ? 'leaf' : 'no-leaf'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { type: event.target.value === 'leaf' ? 'door' : 'doorway' })}>
+                              <option value="leaf">Pintu berdaun</option>
+                              <option value="no-leaf">Pintu tanpa daun</option>
+                            </select>
+                          </div>}
                           <div className="floorplan-dimension-input">
                             <label htmlFor={opening.id + '-edge'}>Sisi polygon</label>
                             <select id={opening.id + '-edge'} className="floorplan-field" value={Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : 0} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { edgeIndex: Number(event.target.value) })}>
@@ -3127,6 +3134,13 @@ export default function Floorplan({
                         <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{openingLabel(opening)}</span>
                         <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} disabled={Boolean(selectedEntity.locked)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
                         <div className="floorplan-opening-actions">
+                          {(opening.type === 'door' || opening.type === 'doorway') && <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-leaf-mode'}>Model pintu</label>
+                            <select id={opening.id + '-leaf-mode'} className="floorplan-field" value={opening.type === 'door' ? 'leaf' : 'no-leaf'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { type: event.target.value === 'leaf' ? 'door' : 'doorway' })}>
+                              <option value="leaf">Pintu berdaun</option>
+                              <option value="no-leaf">Pintu tanpa daun</option>
+                            </select>
+                          </div>}
                           <div className="floorplan-dimension-input">
                             <label htmlFor={opening.id + '-width'}>Lebar (m)</label>
                             <input id={opening.id + '-width'} className="floorplan-field" type="number" min="0" max="5.00" step="0.01" value={(Number(opening.width ?? 48) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onFocus={event => event.currentTarget.select()} onChange={event => {
