@@ -54,7 +54,7 @@ export function mergeAdjacentRoomPolygons(movingRoom, targetRoom, candidate) {
     edges.push({ a: { ...a }, b: { ...b } })
   })
   collect(movingPoints, m0, m1)
-  collect(aligned, same ? t0 : t1, same ? t1 : t0)
+  collect(aligned, t0, t1)
   if (edges.length < 3) return null
   const polygon = []
   let edge = edges.shift()
