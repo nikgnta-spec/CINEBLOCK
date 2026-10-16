@@ -133,7 +133,7 @@ const getRoomOpeningPlacement = (room, opening) => {
   return {
     x: edge.x1 + (edge.x2 - edge.x1) * offset,
     y: edge.y1 + (edge.y2 - edge.y1) * offset,
-    angle: edge.angle,
+    angle: edge.angle + 180,
     length: edge.length,
     edgeIndex: edge.edgeIndex,
   }
@@ -2012,11 +2012,11 @@ export default function Floorplan({
                         return <line key={edge.edgeIndex + '-' + index} x1={edge.x1 + ux * segment.start} y1={edge.y1 + uy * segment.start} x2={edge.x1 + ux * segment.end} y2={edge.y1 + uy * segment.end} stroke={active ? 'var(--text)' : 'var(--border-strong)'} strokeWidth={active ? 3.5 : 2.5} vectorEffect="non-scaling-stroke" pointerEvents="none" />
                       })
                     })}
-                    <text x={bounds.x + 12} y={bounds.y + 25} fill="var(--text)" fontSize="18" fontWeight="600" pointerEvents="none" paintOrder="stroke" stroke="var(--bg)" strokeWidth="3">
+                    <text x={bounds.x + 12} y={bounds.y + 28} fill="var(--text)" fontSize="18" fontWeight="600" pointerEvents="none" paintOrder="stroke" stroke="var(--bg)" strokeWidth="3">
                       {room.label || 'Room'}
                     </text>
                     {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && (
-                      <text x={bounds.x + 12} y={bounds.y + 42} fill="var(--text-muted)" fontSize="12" pointerEvents="none" paintOrder="stroke" stroke="var(--bg)" strokeWidth="3">
+                      <text x={bounds.x + 12} y={bounds.y + 45} fill="var(--text-muted)" fontSize="12" pointerEvents="none" paintOrder="stroke" stroke="var(--bg)" strokeWidth="3">
                         {Number(room.ceilingHeight).toFixed(1) + ' m'}
                       </text>
                     )}
