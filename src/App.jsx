@@ -568,10 +568,16 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
         let restoredProjects = normalizeWorkspaceProjects(savedState?.projects)
         const restoredProjectId = savedState?.activeProjectId || restoredProjects[0]?.id || crypto.randomUUID()
         const savedProjectRecord = restoredProjects.find(item => item.id === restoredProjectId)
+        const sourceFloorplans = savedState?.floorplans ?? savedProjectRecord?.floorplans
+        const sourceRooms = Array.isArray(savedState?.rooms)
+          ? savedState.rooms
+          : savedState?.floorplans
+            ? []
+            : (savedProjectRecord?.rooms || [])
         const migratedCurrent = migrateReusableRooms(
           legacyScenes,
-          savedState?.floorplans ?? savedProjectRecord?.floorplans,
-          savedState?.rooms ?? savedProjectRecord?.rooms,
+          sourceFloorplans,
+          sourceRooms,
         )
         const restoredScenes = migratedCurrent.scenes
         const restoredFloorplans = migratedCurrent.floorplans
