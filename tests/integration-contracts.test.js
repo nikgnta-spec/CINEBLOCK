@@ -72,3 +72,21 @@ test('local backup project records include reusable rooms and Scene references',
   assert.match(source, /const backup = \{[\s\S]*?projects: savedProjects/)
   assert.match(source, /migrateReusableRooms\(targetScenes, target\.floorplans, target\.rooms\)/)
 })
+
+test('Room picker keeps every project Room visible across Scenes and marks current Scene usage', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+
+  assert.match(source, /projectRooms\.map\(room =>/)
+  assert.match(source, /disabled=\{alreadyUsed\}/)
+  assert.match(source, /sudah dipakai di scene ini/)
+  assert.match(source, /digunakan scene lain/)
+})
+
+test('Room lock prevents direct, resize, and group movement', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+
+  assert.match(source, /locked: !selectedEntity\.locked/)
+  assert.match(source, /type === 'room' && item\.locked/)
+  assert.match(source, /collection === 'rooms' && entry\.original\?\.locked/)
+  assert.match(source, /if \(item\.locked\) return item/)
+})
