@@ -158,12 +158,14 @@ const DoorSwingSymbol = ({ opening, width }) => {
   const leaf = width / leafCount
   return <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke" pointerEvents="none">
     {leafCount === 1 ? <>
-      <path d={'M ' + (-half) + ' 0 V ' + (direction * leaf)} />
-      <path d={'M ' + (-half) + ' ' + (direction * leaf) + ' A ' + leaf + ' ' + leaf + ' 0 0 ' + (direction < 0 ? 1 : 0) + ' ' + half + ' 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
+      <path d={'M ' + (-half) + ' 0 H ' + half} />
+      <path d={'M ' + (-half) + ' 0 V ' + (direction * Math.max(leaf, 24))} />
+      <path d={'M ' + (-half) + ' ' + (direction * Math.max(leaf, 24)) + ' A ' + Math.max(leaf, 24) + ' ' + Math.max(leaf, 24) + ' 0 0 ' + (direction < 0 ? 1 : 0) + ' ' + half + ' 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
     </> : <>
-      <path d={'M ' + (-half) + ' 0 V ' + (direction * leaf) + ' M ' + half + ' 0 V ' + (direction * leaf)} />
-      <path d={'M ' + (-half) + ' ' + (direction * leaf) + ' A ' + leaf + ' ' + leaf + ' 0 0 ' + (direction < 0 ? 1 : 0) + ' 0 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
-      <path d={'M ' + half + ' ' + (direction * leaf) + ' A ' + leaf + ' ' + leaf + ' 0 0 ' + (direction > 0 ? 1 : 0) + ' 0 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
+      <path d={'M ' + (-half) + ' 0 H ' + half} />
+      <path d={'M ' + (-half) + ' 0 V ' + (direction * Math.max(leaf, 24)) + ' M ' + half + ' 0 V ' + (direction * Math.max(leaf, 24))} />
+      <path d={'M ' + (-half) + ' ' + (direction * Math.max(leaf, 24)) + ' A ' + Math.max(leaf, 24) + ' ' + Math.max(leaf, 24) + ' 0 0 ' + (direction < 0 ? 1 : 0) + ' 0 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
+      <path d={'M ' + half + ' ' + (direction * Math.max(leaf, 24)) + ' A ' + Math.max(leaf, 24) + ' ' + Math.max(leaf, 24) + ' 0 0 ' + (direction > 0 ? 1 : 0) + ' 0 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
     </>}
   </g>
 }
@@ -2933,18 +2935,28 @@ export default function Floorplan({
                           </div>
                           <div className="floorplan-dimension-input">
                             <label htmlFor={opening.id + '-width'}>Lebar (m)</label>
-                            <input id={opening.id + '-width'} className="floorplan-field" type="number" min="0" max="5.00" step="0.01" value={(Number(opening.width ?? 48) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
-                              const meters = Number(event.target.value)
-                              if (!Number.isFinite(meters) || meters < 0 || meters > 5) return
-                              updateOpening(opening.id, { width: Math.round(meters * 100) })
+                            <input id={opening.id + '-width'} className="floorplan-field" type="number" min="0" max="5.00" step="0.01" value={(Number(opening.width ?? 48) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onFocus={event => event.currentTarget.select()} onChange={event => {
+                              const raw = event.target.value
+                              if (raw.trim() === '') {
+                                updateOpening(opening.id, { width: 0 })
+                                return
+                              }
+                              const meters = Number(raw)
+                              if (!Number.isFinite(meters)) return
+                              updateOpening(opening.id, { width: Math.round(clamp(meters, 0, 5) * 100) })
                             }} />
                           </div>
                           <div className="floorplan-dimension-input">
                             <label htmlFor={opening.id + '-height'}>Tinggi (m)</label>
-                            <input id={opening.id + '-height'} className="floorplan-field" type="number" min="0" max="4.00" step="0.01" value={(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
-                              const meters = Number(event.target.value)
-                              if (!Number.isFinite(meters) || meters < 0 || meters > 4) return
-                              updateOpening(opening.id, { height: Math.round(meters * 100) })
+                            <input id={opening.id + '-height'} className="floorplan-field" type="number" min="0" max="4.00" step="0.01" value={(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onFocus={event => event.currentTarget.select()} onChange={event => {
+                              const raw = event.target.value
+                              if (raw.trim() === '') {
+                                updateOpening(opening.id, { height: 0 })
+                                return
+                              }
+                              const meters = Number(raw)
+                              if (!Number.isFinite(meters)) return
+                              updateOpening(opening.id, { height: Math.round(clamp(meters, 0, 4) * 100) })
                             }} />
                           </div>
                           {opening.type === 'door' && <>
@@ -3001,18 +3013,28 @@ export default function Floorplan({
                         <div className="floorplan-opening-actions">
                           <div className="floorplan-dimension-input">
                             <label htmlFor={opening.id + '-width'}>Lebar (m)</label>
-                            <input id={opening.id + '-width'} className="floorplan-field" type="number" min="0" max="5.00" step="0.01" value={(Number(opening.width ?? 48) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
-                              const meters = Number(event.target.value)
-                              if (!Number.isFinite(meters) || meters < 0 || meters > 5) return
-                              updateOpening(opening.id, { width: Math.round(meters * 100) })
+                            <input id={opening.id + '-width'} className="floorplan-field" type="number" min="0" max="5.00" step="0.01" value={(Number(opening.width ?? 48) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onFocus={event => event.currentTarget.select()} onChange={event => {
+                              const raw = event.target.value
+                              if (raw.trim() === '') {
+                                updateOpening(opening.id, { width: 0 })
+                                return
+                              }
+                              const meters = Number(raw)
+                              if (!Number.isFinite(meters)) return
+                              updateOpening(opening.id, { width: Math.round(clamp(meters, 0, 5) * 100) })
                             }} />
                           </div>
                           <div className="floorplan-dimension-input">
                             <label htmlFor={opening.id + '-height'}>Tinggi (m)</label>
-                            <input id={opening.id + '-height'} className="floorplan-field" type="number" min="0" max="4.00" step="0.01" value={(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
-                              const meters = Number(event.target.value)
-                              if (!Number.isFinite(meters) || meters < 0 || meters > 4) return
-                              updateOpening(opening.id, { height: Math.round(meters * 100) })
+                            <input id={opening.id + '-height'} className="floorplan-field" type="number" min="0" max="4.00" step="0.01" value={(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onFocus={event => event.currentTarget.select()} onChange={event => {
+                              const raw = event.target.value
+                              if (raw.trim() === '') {
+                                updateOpening(opening.id, { height: 0 })
+                                return
+                              }
+                              const meters = Number(raw)
+                              if (!Number.isFinite(meters)) return
+                              updateOpening(opening.id, { height: Math.round(clamp(meters, 0, 4) * 100) })
                             }} />
                           </div>
                           {opening.type === 'door' && <>
