@@ -107,6 +107,23 @@ test('Rooms use editable polygon vertices and a manually entered ceiling height'
   assert.doesNotMatch(source, /id="room-height"/)
 })
 
+test('Room dimensions are shown outside every polygon edge and can be toggled', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const getRoomDimensionGeometry =/)
+  assert.match(source, /showRoomDimensions && \(active \|\| hoveredRoomEdge\?\.roomId === room\.id\)/)
+  assert.match(source, /aria-pressed=\{showRoomDimensions\}/)
+  assert.match(source, /\(edge\.length \/ 100\)\.toFixed\(2\) \+ ' m'/)
+})
+
+test('Dragging a Room edge translates both endpoint vertices in parallel', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const beginRoomEdgeDrag =/)
+  assert.match(source, /mode: 'room-edge'/)
+  assert.match(source, /const distance = dx \* nx \+ dy \* ny/)
+  assert.match(source, /index === drag\.edgeIndex \|\| index === \(drag\.edgeIndex \+ 1\) % drag\.originalPoints\.length/)
+  assert.match(source, /beginRoomEdgeDrag\(room, edge\.edgeIndex, event\)/)
+})
+
 test('Room drawing is point-by-point with close, Escape, live dimensions and manual lengths', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
 
