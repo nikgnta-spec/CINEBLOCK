@@ -1509,20 +1509,20 @@ export default function Floorplan({
             const original = selectedById.get(item.id)
             if (!original) return item
             if (collection === 'rooms') return { ...item, points: getRoomPoints(original).map(vertex => ({
-              x: Math.round(clamp(vertex.x + dx, 0, MAP_WIDTH)),
-              y: Math.round(clamp(vertex.y + dy, 0, MAP_HEIGHT)),
+              x: Math.round(vertex.x + dx),
+              y: Math.round(vertex.y + dy),
             })) }
             if (collection === 'walls') return {
               ...item,
-              x1: Math.round(clamp(original.x1 + dx, 0, MAP_WIDTH)),
-              y1: Math.round(clamp(original.y1 + dy, 0, MAP_HEIGHT)),
-              x2: Math.round(clamp(original.x2 + dx, 0, MAP_WIDTH)),
-              y2: Math.round(clamp(original.y2 + dy, 0, MAP_HEIGHT)),
+              x1: Math.round(original.x1 + dx),
+              y1: Math.round(original.y1 + dy),
+              x2: Math.round(original.x2 + dx),
+              y2: Math.round(original.y2 + dy),
             }
             return {
               ...item,
-              x: Math.round(clamp(original.x + dx, 0, MAP_WIDTH)),
-              y: Math.round(clamp(original.y + dy, 0, MAP_HEIGHT)),
+              x: Math.round(original.x + dx),
+              y: Math.round(original.y + dy),
             }
           })
         }
@@ -1542,7 +1542,7 @@ export default function Floorplan({
       const distance = dx * nx + dy * ny
       const points = drag.originalPoints.map((vertex, index) => {
         if (index === drag.edgeIndex || index === (drag.edgeIndex + 1) % drag.originalPoints.length) {
-          return { x: Math.round(clamp(vertex.x + nx * distance, 0, MAP_WIDTH)), y: Math.round(clamp(vertex.y + ny * distance, 0, MAP_HEIGHT)) }
+          return { x: Math.round(vertex.x + nx * distance), y: Math.round(vertex.y + ny * distance) }
         }
         return vertex
       })
@@ -1566,7 +1566,7 @@ export default function Floorplan({
         setRoomSnapGuides(result.guides)
       }
       const nextPoints = drag.originalPoints.map((vertex, index) => index === drag.vertexIndex
-        ? { x: Math.round(clamp(point.x, 0, MAP_WIDTH)), y: Math.round(clamp(point.y, 0, MAP_HEIGHT)) }
+        ? { x: Math.round(point.x), y: Math.round(point.y) }
         : vertex)
       updateLayout(previous => ({ ...previous, rooms: previous.rooms.map(room => room.id === drag.id ? { ...room, points: nextPoints } : room) }))
       return
@@ -1624,8 +1624,8 @@ export default function Floorplan({
 
     if (drag.mode === 'waypoint') {
       const waypoint = {
-        x: Math.round(clamp(point.x, 0, MAP_WIDTH)),
-        y: Math.round(clamp(point.y, 0, MAP_HEIGHT)),
+        x: Math.round(point.x),
+        y: Math.round(point.y),
       }
       updateLayout(previous => ({
         ...previous,
@@ -1660,15 +1660,15 @@ export default function Floorplan({
         if (['actor', 'camera', 'light', 'door', 'window', 'prop'].includes(drag.type)) {
           return {
             ...item,
-            x: Math.round(clamp(drag.original.x + dx, 0, MAP_WIDTH)),
-            y: Math.round(clamp(drag.original.y + dy, 0, MAP_HEIGHT)),
+            x: Math.round(drag.original.x + dx),
+            y: Math.round(drag.original.y + dy),
           }
         }
         if (drag.type === 'room') {
           if (item.locked) return item
           return { ...item, points: getRoomPoints(drag.original).map(vertex => ({
-            x: Math.round(clamp(vertex.x + dx, 0, MAP_WIDTH)),
-            y: Math.round(clamp(vertex.y + dy, 0, MAP_HEIGHT)),
+            x: Math.round(vertex.x + dx),
+            y: Math.round(vertex.y + dy),
           })) }
         }
         if (drag.type === 'wall') {
