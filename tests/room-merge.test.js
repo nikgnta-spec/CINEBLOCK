@@ -44,6 +44,15 @@ test('merges adjacent Rooms when the shared edges have different lengths', () =>
   const ys = merged.points.map(point => point.y)
   assert.equal(Math.max(...xs) - Math.min(...xs), 180)
   assert.equal(Math.max(...ys) - Math.min(...ys), 100)
+  // The outer boundary must follow the stepped union, not diagonal bridges.
+  const vertices = new Set(merged.points.map(point => `${point.x},${point.y}`))
+  for (const point of [[100, 20], [180, 20], [180, 80], [100, 80]]) {
+    assert.ok(vertices.has(point.join(',')), `expected boundary vertex ${point.join(',')}`)
+  }
+  assert.equal(merged.points.some((point, index) => {
+    const next = merged.points[(index + 1) % merged.points.length]
+    return point.x !== next.x && point.y !== next.y
+  }), false, 'axis-aligned rectangle union should not introduce diagonal edges')
 })
 
 test('merges Rooms when the moving Room is taller than the target Room', () => {
