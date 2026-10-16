@@ -425,3 +425,11 @@ test('Double-clicking a Room vertex offers to start a new Room from that point',
   assert.match(source, /setRoomDrawPoints\(\[point\]\)/)
   assert.match(source, /Buat Room baru/)
 })
+
+test('Double-clicking a Room edge inserts a new editable vertex on that edge', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const addRoomVertexOnEdge = \(room, edgeIndex, event\) =>/)
+  assert.match(source, /nextPoints\.splice\(edgeIndex \+ 1, 0, point\)/)
+  assert.match(source, /onDoubleClick=\{event => addRoomVertexOnEdge\(room, edge\.edgeIndex, event\)\}/)
+  assert.match(source, /Avoid creating a duplicate vertex close to either endpoint/)
+})
