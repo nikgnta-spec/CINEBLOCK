@@ -103,9 +103,16 @@ test('Rooms use editable polygon vertices and a manually entered ceiling height'
   assert.match(source, /id="room-ceiling-height"/)
   assert.match(source, /placeholder="Belum diisi"/)
   assert.match(source, /Room hasil migrasi tidak diberi tinggi otomatis/)
+  // Polygon Rooms expose editable overall bounds (not a legacy rectangle width),
+  // while individual edge lengths are rendered separately and manual drawing
+  // accepts a length in meters. All inspector dimension controls respect Room lock.
   assert.match(source, /id="room-length"/)
   assert.match(source, /id="room-width"/)
+  assert.match(source, /disabled=\{Boolean\(selectedEntity\.locked\)\} onChange=\{event =>/)
   assert.match(source, /const resizeRoomBounds = \(room, dimension, targetUnits\) =>/)
+  assert.match(source, /const confirmManualRoomLength =/)
+  assert.match(source, /aria-label="Panjang garis dalam meter"/)
+  assert.match(source, /getRoomPoints\(selectedEntity\)\.length/)
   assert.match(source, /step="0\.01"/)
 })
 
@@ -229,6 +236,10 @@ test('Doors and windows support precise width, position, and polygon edge contro
   assert.match(source, /id=\{opening\.id \+ '-edge'\}/)
   assert.match(source, /updateOpening\(opening\.id, \{ width: Math\.round\(meters \* 100\) \}\)/)
   assert.match(source, /updateOpening\(opening\.id, \{ offset: percent \/ 100 \}\)/)
+  // Openings are attached to a polygon edge by edgeIndex, not legacy cardinal sides.
+  assert.match(source, /id=\{opening\.id \+ '-edge'\}/)
+  assert.match(source, /value=\{Number\.isInteger\(opening\.edgeIndex\) \? opening\.edgeIndex : 0\}/)
+  assert.match(source, /getRoomEdges\(selectedEntity\)\.map\(edge => <option key=\{edge\.edgeIndex\} value=\{edge\.edgeIndex\}>/)
   assert.match(source, /updateOpening\(opening\.id, \{ edgeIndex: Number\(event\.target\.value\) \}\)/)
   assert.match(source, /disabled=\{Boolean\(selectedEntity\.locked\)\}/)
 })
