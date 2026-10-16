@@ -138,7 +138,14 @@ function PrintFloorplan({ scene, layout }) {
           const openings = room.openings || []
           const points = roomPoints(room)
           const edges = roomEdges(room)
-          const bounds = { x: Math.min(...points.map(point => point.x)), y: Math.min(...points.map(point => point.y)) }
+          const bounds = {
+            x: Math.min(...points.map(point => point.x)),
+            y: Math.min(...points.map(point => point.y)),
+            maxX: Math.max(...points.map(point => point.x)),
+            maxY: Math.max(...points.map(point => point.y)),
+          }
+          const roomLength = bounds.maxX - bounds.x
+          const roomWidth = bounds.maxY - bounds.y
           return (
             <g key={'room-outline-' + room.id}>
               {edges.flatMap(edge => openingSegments(edge.length, openings.filter(opening => (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)) === edge.edgeIndex)).map((segment, index) => {
@@ -147,7 +154,8 @@ function PrintFloorplan({ scene, layout }) {
                 return <line key={edge.edgeIndex + '-' + index} x1={edge.x1 + ux * segment.start} y1={edge.y1 + uy * segment.start} x2={edge.x1 + ux * segment.end} y2={edge.y1 + uy * segment.end} stroke="#111827" strokeWidth="3" />
               }))}
               <text x={bounds.x + 9} y={bounds.y + 20} fontSize="16" fontWeight="700" fill="#111827">{room.label || 'Room'}</text>
-              {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && <text x={bounds.x + 9} y={bounds.y + 37} fontSize="12" fill="#374151">{Number(room.ceilingHeight).toFixed(1) + ' m ceiling'}</text>}
+              <text x={bounds.x + 9} y={bounds.y + 36} fontSize="12" fontWeight="600" fill="#374151" stroke="#fafafa" strokeWidth="3" paintOrder="stroke">{meters(roomLength)} × {meters(roomWidth)}</text>
+              {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && <text x={bounds.x + 9} y={bounds.y + 51} fontSize="12" fill="#374151">{Number(room.ceilingHeight).toFixed(1) + ' m ceiling'}</text>}
               {openings.map(opening => {
                 const p = roomOpeningPlacement(room, opening)
                 const width = Math.min(Number(opening.width) || 48, p.length)
@@ -164,6 +172,7 @@ function PrintFloorplan({ scene, layout }) {
                         <path d={'M ' + (-width / 2) + ' -7 V 7 M ' + (width / 2) + ' -7 V 7'} />
                       </>
                     )}
+                    <text x="0" y={opening.type === 'door' ? width + 16 : 20} fontSize="11" fontWeight="600" fill="#374151" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{opening.type === 'door' ? 'Pintu' : 'Jendela'} {meters(width)} × {meters(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)))}</text>
                   </g>
                 )
               })}
@@ -205,6 +214,7 @@ function PrintFloorplan({ scene, layout }) {
                         <path d={'M ' + (-width / 2) + ' -7 V 7 M ' + (width / 2) + ' -7 V 7'} />
                       </>
                     )}
+                    <text x="0" y={opening.type === 'door' ? width + 16 : 20} fontSize="11" fontWeight="600" fill="#374151" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{opening.type === 'door' ? 'Pintu' : 'Jendela'} {meters(width)} × {meters(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)))}</text>
                   </g>
                 )
               })}
