@@ -235,11 +235,22 @@ function PrintFloorplan({ scene, layout }) {
                 return (
                   <g key={'room-opening-' + opening.id} transform={'translate(' + p.x + ' ' + p.y + ') rotate(' + p.angle + ')'} fill="none" stroke="#111827" strokeWidth="2">
                     {opening.type === 'door' ? (
-                      <>
-                        <path d={'M ' + (-width / 2) + ' 0 H ' + (width / 2)} />
-                        <path d={'M ' + (-width / 2) + ' 0 L ' + (-width / 2) + ' ' + (-width)} strokeWidth="3" />
-                        <path d={'M ' + (-width / 2) + ' ' + (-width) + ' A ' + width + ' ' + width + ' 0 0 1 ' + (width / 2) + ' 0'} strokeDasharray="4 3" />
-                      </>
+                      opening.doorType === 'double' ? (() => {
+                        const direction = opening.swingDirection === 'out' ? -1 : 1
+                        const leaf = width / 2
+                        return <>
+                          <path d={'M ' + (-width / 2) + ' 0 H ' + (width / 2)} />
+                          <path d={'M ' + (-width / 2) + ' 0 L ' + (-width / 2) + ' ' + (direction * leaf) + ' M ' + (width / 2) + ' 0 L ' + (width / 2) + ' ' + (direction * leaf)} strokeWidth="3" />
+                          <path d={'M ' + (-width / 2) + ' ' + (direction * leaf) + ' A ' + leaf + ' ' + leaf + ' 0 0 ' + (direction < 0 ? 1 : 0) + ' 0 0 M ' + (width / 2) + ' ' + (direction * leaf) + ' A ' + leaf + ' ' + leaf + ' 0 0 ' + (direction > 0 ? 1 : 0) + ' 0 0'} strokeDasharray="4 3" />
+                        </>
+                      })() : (() => {
+                        const direction = opening.swingDirection === 'out' ? -1 : 1
+                        return <>
+                          <path d={'M ' + (-width / 2) + ' 0 H ' + (width / 2)} />
+                          <path d={'M ' + (-width / 2) + ' 0 L ' + (-width / 2) + ' ' + (direction * width)} strokeWidth="3" />
+                          <path d={'M ' + (-width / 2) + ' ' + (direction * width) + ' A ' + width + ' ' + width + ' 0 0 ' + (direction < 0 ? 1 : 0) + ' ' + (width / 2) + ' 0'} strokeDasharray="4 3" />
+                        </>
+                      })()
                     ) : opening.type === 'doorway' ? null : (
                       <>
                         <path d={'M ' + (-width / 2) + ' -4 H ' + (width / 2) + ' M ' + (-width / 2) + ' 0 H ' + (width / 2) + ' M ' + (-width / 2) + ' 4 H ' + (width / 2)} />
@@ -285,11 +296,22 @@ function PrintFloorplan({ scene, layout }) {
                 return (
                   <g key={'wall-opening-' + opening.id} transform={'translate(' + (wall.x1 + metric.ux * center) + ' ' + (wall.y1 + metric.uy * center) + ') rotate(' + metric.angle + ')'} fill="none" stroke="#111827" strokeWidth="2">
                     {opening.type === 'door' ? (
-                      <>
-                        <path d={'M ' + (-width / 2) + ' 0 H ' + (width / 2)} />
-                        <path d={'M ' + (-width / 2) + ' 0 L ' + (-width / 2) + ' ' + (-width)} strokeWidth="3" />
-                        <path d={'M ' + (-width / 2) + ' ' + (-width) + ' A ' + width + ' ' + width + ' 0 0 1 ' + (width / 2) + ' 0'} strokeDasharray="4 3" />
-                      </>
+                      opening.doorType === 'double' ? (() => {
+                        const direction = opening.swingDirection === 'out' ? -1 : 1
+                        const leaf = width / 2
+                        return <>
+                          <path d={'M ' + (-width / 2) + ' 0 H ' + (width / 2)} />
+                          <path d={'M ' + (-width / 2) + ' 0 L ' + (-width / 2) + ' ' + (direction * leaf) + ' M ' + (width / 2) + ' 0 L ' + (width / 2) + ' ' + (direction * leaf)} strokeWidth="3" />
+                          <path d={'M ' + (-width / 2) + ' ' + (direction * leaf) + ' A ' + leaf + ' ' + leaf + ' 0 0 ' + (direction < 0 ? 1 : 0) + ' 0 0 M ' + (width / 2) + ' ' + (direction * leaf) + ' A ' + leaf + ' ' + leaf + ' 0 0 ' + (direction > 0 ? 1 : 0) + ' 0 0'} strokeDasharray="4 3" />
+                        </>
+                      })() : (() => {
+                        const direction = opening.swingDirection === 'out' ? -1 : 1
+                        return <>
+                          <path d={'M ' + (-width / 2) + ' 0 H ' + (width / 2)} />
+                          <path d={'M ' + (-width / 2) + ' 0 L ' + (-width / 2) + ' ' + (direction * width)} strokeWidth="3" />
+                          <path d={'M ' + (-width / 2) + ' ' + (direction * width) + ' A ' + width + ' ' + width + ' 0 0 ' + (direction < 0 ? 1 : 0) + ' ' + (width / 2) + ' 0'} strokeDasharray="4 3" />
+                        </>
+                      })()
                     ) : opening.type === 'doorway' ? null : (
                       <>
                         <path d={'M ' + (-width / 2) + ' -4 H ' + (width / 2) + ' M ' + (-width / 2) + ' 0 H ' + (width / 2) + ' M ' + (-width / 2) + ' 4 H ' + (width / 2)} />
