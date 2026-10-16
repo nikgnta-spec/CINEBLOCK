@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Undo2, Redo2,
+  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Undo2, Redo2, Lock, Unlock,
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
 import {
@@ -1201,7 +1201,7 @@ export default function Floorplan({
       updateLayout(previous => {
         const next = { ...previous }
         for (const collection of ['rooms', 'walls', 'props', 'actors', 'cameras', 'lights']) {
-          const selectedById = new Map(drag.items.filter(entry => entry.type + 's' === collection).map(entry => [entry.id, entry.original]))
+          const selectedById = new Map(drag.items.filter(entry => entry.type + 's' === collection && !(collection === 'rooms' && entry.original?.locked)).map(entry => [entry.id, entry.original]))
           if (!selectedById.size) continue
           next[collection] = previous[collection].map(item => {
             const original = selectedById.get(item.id)
@@ -1323,6 +1323,7 @@ export default function Floorplan({
           }
         }
         if (drag.type === 'room') {
+          if (item.locked) return item
           return {
             ...item,
             x: Math.round(clamp(drag.original.x + dx, 0, MAP_WIDTH - item.width)),
