@@ -179,8 +179,8 @@ test('Room dimension layout uses consistent exterior lanes and suppresses duplic
   assert.match(source, /const offset = 72 \+ level \* 30/)
   assert.match(source, /const horizontalIsSingleEdge = outerGroupEdges\.some/)
   assert.match(source, /const verticalIsSingleEdge = outerGroupEdges\.some/)
-  assert.match(source, /isTotalDimensionOwner && !horizontalIsSingleEdge/)
-  assert.match(source, /isTotalDimensionOwner && !verticalIsSingleEdge/)
+  assert.match(source, /!horizontalIsSingleEdge/)
+  assert.match(source, /!verticalIsSingleEdge/)
   assert.match(source, /opacity=\{active \? 1 : 0\.58\}/)
   assert.match(source, /strokeWidth="5" paintOrder="stroke"/)
 })
@@ -538,7 +538,10 @@ test('Connected Rooms use one combined bounding box for overall dimensions', asy
   assert.match(source, /const connectedGroupPoints = connectedRoomGroup\.flatMap\(getRoomPoints\)/)
   assert.match(source, /const totalBounds = hasConnectedRooms \? connectedBounds : bounds/)
   assert.match(source, /const isSharedBoundaryEdge = edge => connectedRoomGroup\.some/)
-  assert.match(source, /const visibleDimensionLayouts = dimensionLayouts\.filter\(\(\{ edge \}\) => !isSharedBoundaryEdge\(edge\)\)/)
+  assert.match(source, /const visibleDimensionLayouts = dimensionLayouts/)
+  assert.match(source, /const groupTotalBounds = hasConnectedRooms \? connectedBounds : null/)
+  assert.match(source, /m total gabungan/)
+  assert.match(source, /\{edges\.map\(edge => \{/)
   assert.match(source, /const isDimensionGroupActive = active && hasConnectedRooms/)
   assert.match(source, /const outerGroupEdges = groupEdges\.filter\(edge => !isSharedBoundaryEdge\(edge\)\)/)
   assert.match(source, /const verticalIsSingleEdge = outerGroupEdges\.some/)
@@ -546,7 +549,7 @@ test('Connected Rooms use one combined bounding box for overall dimensions', asy
   assert.match(source, /\(totalBounds\.height \/ 100\)\.toFixed\(2\) \+ ' m total'/)
 })
 
-test('Confirming a Room connection snaps walls flush and hides the shared wall', async () => {
+test('Confirming a Room connection snaps walls flush while retaining shared walls', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   const handlerStart = source.indexOf('const confirmRoomMerge = () => {')
   const handlerEnd = source.indexOf('const addRoomVertexAtEdgeMidpoint', handlerStart)
