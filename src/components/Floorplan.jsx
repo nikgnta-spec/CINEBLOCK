@@ -901,6 +901,14 @@ export default function Floorplan({
     event.stopPropagation()
     if (tool === 'pan') return
 
+    // In path mode, overlapping props/actors must not steal selection from the
+    // actor or camera whose route is being drawn. Treat the click as a waypoint.
+    if (tool === 'path') {
+      event.preventDefault()
+      appendWaypoint(getPoint(event))
+      return
+    }
+
     if (event.shiftKey) {
       const wasSelected = selectionRef.current.some(entry => entry.type === type && entry.id === item.id)
       toggleEntitySelection(type, item.id)
@@ -942,6 +950,11 @@ export default function Floorplan({
     if (tool === 'pan' || item.locked) return
     event.stopPropagation()
     const point = getPoint(event)
+    if (tool === 'path') {
+      event.preventDefault()
+      appendWaypoint(point)
+      return
+    }
     const waypoint = (item.path || [])[pathIndex]
     if (!waypoint) return
     applyEntitySelection([{ type, id: item.id }], { type, id: item.id })
