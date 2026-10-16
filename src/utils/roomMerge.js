@@ -219,7 +219,9 @@ export function snapRoomToEdge(room, movingEdge, targetEdge) {
 
   const movingAngle = Math.atan2(movingEdge.b.y - movingEdge.a.y, movingEdge.b.x - movingEdge.a.x)
   const targetAngle = Math.atan2(targetEdge.b.y - targetEdge.a.y, targetEdge.b.x - targetEdge.a.x)
-  const rotation = Math.atan2(Math.sin(targetAngle - movingAngle), Math.cos(targetAngle - movingAngle))
+  // Treat an edge and its reverse as the same wall direction; a 180° vertex-order difference must not rotate the Room.
+  const angleDifference = targetAngle - movingAngle
+  const rotation = Math.atan2(Math.sin(2 * angleDifference), Math.cos(2 * angleDifference)) / 2
   // Merge candidates are deliberately limited to nearly parallel edges. Reject
   // unexpected input rather than silently rotating a Room by a large amount.
   if (Math.abs(rotation) > 0.08) return null
