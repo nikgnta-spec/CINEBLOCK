@@ -39,8 +39,7 @@ function getFittedViewBox(layout) {
   }
 
   ;(layout.rooms || []).forEach(room => {
-    addPoint(room.x, room.y)
-    addPoint(Number(room.x) + Number(room.width), Number(room.y) + Number(room.height))
+    getRoomPoints(room).forEach(point => addPoint(point.x, point.y))
   })
   ;(layout.walls || []).forEach(wall => {
     addPoint(wall.x1, wall.y1)
@@ -90,6 +89,31 @@ const ROOM_SIDES = [
   { value: 'bottom', label: 'Bottom wall' },
   { value: 'left', label: 'Left wall' },
 ]
+const getRoomPoints = room => Array.isArray(room?.points) && room.points.length >= 3
+  ? room.points
+  : [{ x: room.x, y: room.y }, { x: room.x + room.width, y: room.y }, { x: room.x + room.width, y: room.y + room.height }, { x: room.x, y: room.y + room.height }]
+const getRoomBounds = room => {
+  const points = getRoomPoints(room)
+  const xs = points.map(point => point.x)
+  const ys = points.map(point => point.y)
+  return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) }
+}
+const getRoomEdges = room => getRoomPoints(room).map((point, index, points) => {
+  const next = points[(index + 1) % points.length]
+  const dx = next.x - point.x
+  const dy = next.y - point.y
+  return { edgeIndex: index, x1: point.x, y1: point.y, x2: next.x, y2: next.y, length: Math.hypot(dx, dy), angle: Math.atan2(dy, dx) * 180 / Math.PI }
+})
+const pointInPolygon = (point, points) => {
+  let inside = false
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const a = points[i], b = points[j]
+    const intersects = ((a.y > point.y) !== (b.y > point.y))
+      && point.x < ((b.x - a.x) * (point.y - a.y)) / ((b.y - a.y) || 1e-9) + a.x
+    if (intersects) inside = !inside
+  }
+  return inside
+}
 const getOpeningSegments = (length, openings = []) => {
   const ranges = openings
     .map(opening => {
@@ -108,12 +132,17 @@ const getOpeningSegments = (length, openings = []) => {
   return segments
 }
 const getRoomOpeningPlacement = (room, opening) => {
-  const side = ROOM_SIDES.some(item => item.value === opening.side) ? opening.side : 'bottom'
+  const edges = getRoomEdges(room)
+  const edge = edges[Math.max(0, Math.min(edges.length - 1, Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)))] || edges[0]
+  if (!edge) return { x: 0, y: 0, angle: 0, length: 1, edgeIndex: 0 }
   const offset = clamp(opening.offset, 0.05, 0.95)
-  if (side === 'top') return { x: room.x + offset * room.width, y: room.y, angle: 180, length: room.width }
-  if (side === 'right') return { x: room.x + room.width, y: room.y + offset * room.height, angle: -90, length: room.height }
-  if (side === 'left') return { x: room.x, y: room.y + offset * room.height, angle: 90, length: room.height }
-  return { x: room.x + offset * room.width, y: room.y + room.height, angle: 0, length: room.width }
+  return {
+    x: edge.x1 + (edge.x2 - edge.x1) * offset,
+    y: edge.y1 + (edge.y2 - edge.y1) * offset,
+    angle: edge.angle,
+    length: edge.length,
+    edgeIndex: edge.edgeIndex,
+  }
 }
 const getWallMetrics = wall => {
   const dx = wall.x2 - wall.x1
