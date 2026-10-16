@@ -144,3 +144,9 @@ test('Doors and windows support precise width, position, and Room wall-side cont
   assert.match(source, /updateOpening\(opening\.id, \{ side: event\.target\.value \}\)/)
   assert.match(source, /disabled=\{Boolean\(selectedEntity\.locked\)\}/)
 })
+
+test('restoring active project preserves canonical reusable Rooms when legacy top-level floorplans exist', async () => {
+  const source = await readSource('../src/App.jsx')
+
+  assert.match(source, /const sourceRooms = Array\.isArray\(savedState\?\.rooms\)\s*\?\s*savedState\.rooms\s*:\s*\(savedProjectRecord\?\.rooms \|\| \[\]\)/)
+})
