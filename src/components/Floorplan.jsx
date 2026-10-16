@@ -2707,9 +2707,9 @@ export default function Floorplan({
                         <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} disabled={Boolean(selectedEntity.locked)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
                         <div className="floorplan-opening-actions">
                           <div className="floorplan-dimension-input">
-                            <label htmlFor={opening.id + '-side'}>Sisi dinding</label>
-                            <select id={opening.id + '-side'} className="floorplan-field" value={ROOM_SIDES.some(side => side.value === opening.side) ? opening.side : 'bottom'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { side: event.target.value })}>
-                              {ROOM_SIDES.map(side => <option key={side.value} value={side.value}>{({ top: 'Atas', right: 'Kanan', bottom: 'Bawah', left: 'Kiri' })[side.value]}</option>)}
+                            <label htmlFor={opening.id + '-edge'}>Sisi polygon</label>
+                            <select id={opening.id + '-edge'} className="floorplan-field" value={Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : 0} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { edgeIndex: Number(event.target.value) })}>
+                              {getRoomEdges(selectedEntity).map(edge => <option key={edge.edgeIndex} value={edge.edgeIndex}>Sisi {edge.edgeIndex + 1}</option>)}
                             </select>
                           </div>
                           <div className="floorplan-dimension-input">
