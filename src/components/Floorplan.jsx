@@ -117,7 +117,7 @@ const getRoomDimensionGeometry = (room, edge) => {
   let nx = dy / length, ny = -dx / length
   const midpoint = { x: (edge.x1 + edge.x2) / 2, y: (edge.y1 + edge.y2) / 2 }
   if ((center.x - midpoint.x) * nx + (center.y - midpoint.y) * ny > 0) { nx *= -1; ny *= -1 }
-  const offset = 62
+  const offset = 72
   const x1 = edge.x1 + nx * offset, y1 = edge.y1 + ny * offset
   const x2 = edge.x2 + nx * offset, y2 = edge.y2 + ny * offset
   return { x1, y1, x2, y2, mx: (x1 + x2) / 2, my: (y1 + y2) / 2, length: edge.length, angle: Math.atan2(dy, dx) * 180 / Math.PI }
@@ -1369,19 +1369,17 @@ export default function Floorplan({
     }
     if (tool === 'room' && roomDrawPoints.length) {
       let nextPreview = point
-      if (!roomLengthInputOpen && roomDrawPoints.length >= 2) {
-        const previous = roomDrawPoints[roomDrawPoints.length - 2]
+      if (!roomLengthInputOpen) {
+        // Snap each new vertex independently to horizontal/vertical directions
+        // when the cursor is within a small angular tolerance.
         const origin = roomDrawPoints[roomDrawPoints.length - 1]
-        const referenceAngle = Math.atan2(origin.y - previous.y, origin.x - previous.x)
         const rawAngle = Math.atan2(point.y - origin.y, point.x - origin.x)
         const distance = Math.hypot(point.x - origin.x, point.y - origin.y)
-        const candidates = [0, 1, 2, 3, 4].map(step => referenceAngle + step * Math.PI / 2)
-        const nearest = candidates.reduce((best, angle) => {
-          const delta = Math.atan2(Math.sin(rawAngle - angle), Math.cos(rawAngle - angle))
-          return Math.abs(delta) < Math.abs(best.delta) ? { angle, delta } : best
-        }, { angle: rawAngle, delta: Infinity })
-        if (Math.abs(nearest.delta) <= 4 * Math.PI / 180) {
-          nextPreview = { x: origin.x + Math.cos(nearest.angle) * distance, y: origin.y + Math.sin(nearest.angle) * distance }
+        const quarterTurn = Math.PI / 2
+        const nearestAngle = Math.round(rawAngle / quarterTurn) * quarterTurn
+        const delta = Math.atan2(Math.sin(rawAngle - nearestAngle), Math.cos(rawAngle - nearestAngle))
+        if (Math.abs(delta) <= 5 * Math.PI / 180) {
+          nextPreview = { x: origin.x + Math.cos(nearestAngle) * distance, y: origin.y + Math.sin(nearestAngle) * distance }
         }
       }
       setPreviewPoint(nextPreview)
@@ -2120,11 +2118,11 @@ export default function Floorplan({
                           </g>
                         })}
                         <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
-                          <line x1={bounds.x} y1={bounds.y - 48} x2={bounds.x + bounds.width} y2={bounds.y - 48} />
-                          <line x1={bounds.x} y1={bounds.y - 54} x2={bounds.x} y2={bounds.y - 42} />
+                          <line x1={bounds.x} y1={bounds.y - 112} x2={bounds.x + bounds.width} y2={bounds.y - 48} />
+                          <line x1={bounds.x} y1={bounds.y - 118} x2={bounds.x} y2={bounds.y - 106} />
                           <line x1={bounds.x + bounds.width} y1={bounds.y - 54} x2={bounds.x + bounds.width} y2={bounds.y - 42} />
-                          <line x1={bounds.x + bounds.width + 48} y1={bounds.y} x2={bounds.x + bounds.width + 48} y2={bounds.y + bounds.height} />
-                          <line x1={bounds.x + bounds.width + 42} y1={bounds.y} x2={bounds.x + bounds.width + 54} y2={bounds.y} />
+                          <line x1={bounds.x + bounds.width + 112} y1={bounds.y} x2={bounds.x + bounds.width + 48} y2={bounds.y + bounds.height} />
+                          <line x1={bounds.x + bounds.width + 106} y1={bounds.y} x2={bounds.x + bounds.width + 118} y2={bounds.y} />
                           <line x1={bounds.x + bounds.width + 42} y1={bounds.y + bounds.height} x2={bounds.x + bounds.width + 54} y2={bounds.y + bounds.height} />
                         </g>
                         <text x={bounds.x + bounds.width / 2} y={bounds.y - 54} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke">{(bounds.width / 100).toFixed(2) + ' m total'}</text>
