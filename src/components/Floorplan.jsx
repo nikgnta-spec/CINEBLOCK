@@ -1581,12 +1581,12 @@ export default function Floorplan({
       if (drag.type === 'room') {
         const nextWidth = Math.round(clamp(
           original.width + dx * drag.signX,          40,
-          drag.signX < 0 ? Math.min(MAP_WIDTH, original.x + original.width) : Math.max(40, MAP_WIDTH - original.x),
+          Number.MAX_SAFE_INTEGER,
         ))
         const nextHeight = Math.round(clamp(
           original.height + dy * drag.signY,
           40,
-          drag.signY < 0 ? Math.min(MAP_HEIGHT, original.y + original.height) : Math.max(40, MAP_HEIGHT - original.y),
+          Number.MAX_SAFE_INTEGER,
         ))
         const nextRoom = {
           ...original,
@@ -1613,8 +1613,8 @@ export default function Floorplan({
           ...original,
           width: nextWidth,
           height: nextHeight,
-          x: Math.round(clamp(original.x + shiftX * Math.cos(angle) - shiftY * Math.sin(angle), 0, MAP_WIDTH)),
-          y: Math.round(clamp(original.y + shiftX * Math.sin(angle) + shiftY * Math.cos(angle), 0, MAP_HEIGHT)),
+          x: Math.round(original.x + shiftX * Math.cos(angle) - shiftY * Math.sin(angle)),
+          y: Math.round(original.y + shiftX * Math.sin(angle) + shiftY * Math.cos(angle)),
         }
         updateLayout(previous => ({
           ...previous,
@@ -1676,10 +1676,10 @@ export default function Floorplan({
         if (drag.type === 'wall') {
           return {
             ...item,
-            x1: Math.round(clamp(drag.original.x1 + dx, 0, MAP_WIDTH)),
-            y1: Math.round(clamp(drag.original.y1 + dy, 0, MAP_HEIGHT)),
-            x2: Math.round(clamp(drag.original.x2 + dx, 0, MAP_WIDTH)),
-            y2: Math.round(clamp(drag.original.y2 + dy, 0, MAP_HEIGHT)),
+            x1: Math.round(drag.original.x1 + dx),
+            y1: Math.round(drag.original.y1 + dy),
+            x2: Math.round(drag.original.x2 + dx),
+            y2: Math.round(drag.original.y2 + dy),
           }
         }
         return item
