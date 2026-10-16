@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
+import { snapRoomPoint } from '../src/utils/roomSnapping.js'
 
 const readSource = path => readFile(new URL(path, import.meta.url), 'utf8')
 
@@ -126,20 +127,37 @@ test('Room dimensions are shown outside every polygon edge and can be toggled', 
 
 test('Room drawing snaps positionally to existing vertices with alignment guides and Alt bypass', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
-  assert.match(source, /const snapRoomPoint = \(point, origin, anchors, tolerance\) =>/)
+  const snapping = await readSource('../src/utils/roomSnapping.js')
+  assert.match(source, /import \{ snapRoomPoint \} from '\.\.\/utils\/roomSnapping'/)
   assert.match(source, /\.\.\.layout\.rooms\.flatMap\(room => getRoomPoints\(room\)\)/)
-  assert.match(source, /const xTargets = \[origin, \.\.\.anchors\]/)
-  assert.match(source, /const yTargets = \[origin, \.\.\.anchors\]/)
-  assert.match(source, /const nearestX = xTargets\.reduce/)
-  assert.match(source, /const nearestY = yTargets\.reduce/)
-  assert.match(source, /if \(nearestX\.anchor\)\s*\{\s*guides\.push\(\{ axis: 'vertical'/)
-  assert.match(source, /if \(nearestY\.anchor\)\s*\{\s*guides\.push\(\{ axis: 'horizontal'/)
-  assert.match(source, /return \{ point: \{ x: snappedX, y: snappedY \}, guides \}/)
+  assert.match(snapping, /const xAnchor = nearestOnAxis\(point\.x, 'x'\)/)
+  assert.match(snapping, /const yAnchor = nearestOnAxis\(point\.y, 'y'\)/)
+  assert.match(snapping, /if \(xAnchor\) guides\.push\(\{ axis: 'vertical'/)
+  assert.match(snapping, /if \(yAnchor\) guides\.push\(\{ axis: 'horizontal'/)
+  assert.match(snapping, /return \{ point: \{ x: snappedX, y: snappedY \}, guides \}/)
   assert.match(source, /svgRef\.current\?\.getBoundingClientRect\(\)\?\.width \|\| canvasSize\.width/)
   assert.match(source, /event\.altKey/)
   assert.match(source, /roomSnapGuides\.map/)
   assert.match(source, /strokeDasharray="5 4"/)
   assert.match(source, /9 \* viewBox\.width/)
+})
+
+test('Room snapping combines X and Y from different vertices and keeps single-axis snapping', () => {
+  const origin = { x: 100, y: 100 }
+  const vertexX = { x: 300, y: 200 }
+  const vertexY = { x: 500, y: 400 }
+
+  const both = snapRoomPoint({ x: 304, y: 396 }, origin, [vertexX, vertexY], 8)
+  assert.deepEqual(both.point, { x: 300, y: 400 })
+  assert.deepEqual(both.guides.map(guide => guide.axis).sort(), ['horizontal', 'vertical'])
+
+  const onlyX = snapRoomPoint({ x: 304, y: 270 }, origin, [vertexX, vertexY], 8)
+  assert.deepEqual(onlyX.point, { x: 300, y: 270 })
+  assert.deepEqual(onlyX.guides.map(guide => guide.axis), ['vertical'])
+
+  const onlyY = snapRoomPoint({ x: 650, y: 396 }, origin, [vertexX, vertexY], 8)
+  assert.deepEqual(onlyY.point, { x: 650, y: 400 })
+  assert.deepEqual(onlyY.guides.map(guide => guide.axis), ['horizontal'])
 })
 
 test('Room dimensions distinguish individual wall lengths from overall bounds and keep openings draggable', async () => {
