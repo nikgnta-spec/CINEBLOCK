@@ -117,6 +117,16 @@ test('Room dimensions are shown outside every polygon edge and can be toggled', 
   assert.match(source, /\(edge\.length \/ 100\)\.toFixed\(2\) \+ ' m'/)
 })
 
+test('Room drawing snaps positionally to existing vertices with alignment guides and Alt bypass', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const snapRoomPoint = \(point, origin, anchors, tolerance\) =>/)
+  assert.match(source, /\.\.\.layout\.rooms\.flatMap\(room => getRoomPoints\(room\)\)/)
+  assert.match(source, /event\.altKey/)
+  assert.match(source, /roomSnapGuides\.map/)
+  assert.match(source, /strokeDasharray="5 4"/)
+  assert.match(source, /9 \* viewBox\.width/)
+})
+
 test('Room dimensions distinguish individual wall lengths from overall bounds and keep openings draggable', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /m total/)
