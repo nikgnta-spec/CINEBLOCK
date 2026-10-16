@@ -148,33 +148,44 @@ const getRoomDimensionLayouts = (room, edges) => {
   const prepared = edges.map(edge => {
     const dimension = getRoomDimensionGeometry(room, edge)
     const horizontal = Math.abs(edge.x2 - edge.x1) >= Math.abs(edge.y2 - edge.y1)
-    const edgeMidX = (edge.x1 + edge.x2) / 2
-    const edgeMidY = (edge.y1 + edge.y2) / 2
+    const midpoint = { x: (edge.x1 + edge.x2) / 2, y: (edge.y1 + edge.y2) / 2 }
     const side = horizontal
-      ? (dimension.my < edgeMidY ? 'top' : 'bottom')
-      : (dimension.mx < edgeMidX ? 'left' : 'right')
-    const sideKey = (horizontal ? 'h-' : 'v-') + side
-    return { edge, dimension, sideKey, sort: horizontal ? edgeMidX : edgeMidY }
+      ? (dimension.my < midpoint.y ? 'top' : 'bottom')
+      : (dimension.mx < midpoint.x ? 'left' : 'right')
+    const coordinate = horizontal ? dimension.my : dimension.mx
+    // Only dimensions on effectively the same line compete for a lane.
+    // Parallel edges elsewhere on the same side retain the normal 72-unit offset.
+    const lineKey = (horizontal ? 'h-' : 'v-') + side + '-' + Math.round(coordinate / 18)
+    const intervalStart = horizontal ? Math.min(edge.x1, edge.x2) : Math.min(edge.y1, edge.y2)
+    const intervalEnd = horizontal ? Math.max(edge.x1, edge.x2) : Math.max(edge.y1, edge.y2)
+    return { edge, dimension, sideKey: (horizontal ? 'h-' : 'v-') + side, lineKey, horizontal, intervalStart, intervalEnd }
   })
   const groups = new Map()
   prepared.forEach(item => {
-    if (!groups.has(item.sideKey)) groups.set(item.sideKey, [])
-    groups.get(item.sideKey).push(item)
+    if (!groups.has(item.lineKey)) groups.set(item.lineKey, [])
+    groups.get(item.lineKey).push(item)
   })
   for (const group of groups.values()) {
-    group.sort((a, b) => a.sort - b.sort || a.edge.edgeIndex - b.edge.edgeIndex)
-    group.forEach((item, level) => {
+    group.sort((a, b) => a.intervalStart - b.intervalStart || a.edge.edgeIndex - b.edge.edgeIndex)
+    const lanes = []
+    group.forEach(item => {
+      // Leave label-sized breathing room before treating two dimensions as non-overlapping.
+      const paddedStart = item.intervalStart - 34
+      const paddedEnd = item.intervalEnd + 34
+      let level = lanes.findIndex(lane => lane.every(interval => paddedEnd < interval.start || paddedStart > interval.end))
+      if (level < 0) level = lanes.length
+      if (!lanes[level]) lanes[level] = []
+      lanes[level].push({ start: paddedStart, end: paddedEnd })
       const offset = 72 + level * 30
-      const edge = item.edge
-      const dx = edge.x2 - edge.x1, dy = edge.y2 - edge.y1
-      const horizontal = Math.abs(dx) >= Math.abs(dy)
-      const midpoint = { x: (edge.x1 + edge.x2) / 2, y: (edge.y1 + edge.y2) / 2 }
-      const sign = horizontal ? Math.sign(item.dimension.my - midpoint.y) : Math.sign(item.dimension.mx - midpoint.x)
-      if (horizontal) {
-        item.dimension.y1 = item.dimension.y2 = midpoint.y + (sign || -1) * offset
+      const midpoint = { x: (item.edge.x1 + item.edge.x2) / 2, y: (item.edge.y1 + item.edge.y2) / 2 }
+      const sign = item.horizontal
+        ? Math.sign(item.dimension.my - midpoint.y) || -1
+        : Math.sign(item.dimension.mx - midpoint.x) || 1
+      if (item.horizontal) {
+        item.dimension.y1 = item.dimension.y2 = midpoint.y + sign * offset
         item.dimension.my = item.dimension.y1
       } else {
-        item.dimension.x1 = item.dimension.x2 = midpoint.x + (sign || 1) * offset
+        item.dimension.x1 = item.dimension.x2 = midpoint.x + sign * offset
         item.dimension.mx = item.dimension.x1
       }
       item.dimension.x1 = Math.round(item.dimension.x1 * 100) / 100
