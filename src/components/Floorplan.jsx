@@ -1189,7 +1189,7 @@ export default function Floorplan({
     if (type === 'camera') onSelectedShotIdChange?.(item.shotId || '')
     else if (!alreadySelected || currentSelection.length <= 1) onSelectedShotIdChange?.('')
     if (item.locked || (tool === 'room' && type !== 'room') || (tool === 'wall' && type !== 'wall')) return
-    if (tool === 'path') setTool('select')
+    if (tool === 'path' || (tool === 'room' && type === 'room')) setTool('select')
     const point = getPoint(event)
 
     if (alreadySelected && currentSelection.length > 1) {
@@ -3102,6 +3102,29 @@ export default function Floorplan({
                     <label htmlFor="room-label">Nama ruang</label>
                     <input id="room-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
                   </section>
+                  {Array.isArray(selectedEntity.connectedRoomIds) && selectedEntity.connectedRoomIds.some(id => layout.rooms.some(room => room.id === id)) && (
+                    <section className="floorplan-inspector-section">
+                      <div className="floorplan-section-title">Sambungan Room</div>
+                      <p className="floorplan-field-note">Room ini terhubung dengan {selectedEntity.connectedRoomIds.filter(id => layout.rooms.some(room => room.id === id)).map(id => layout.rooms.find(room => room.id === id)?.label || 'Room').join(', ')}.</p>
+                      <button type="button" className="floorplan-opening-add" onClick={() => {
+                        const connectedIds = new Set(selectedEntity.connectedRoomIds || [])
+                        updateLayout(previous => ({
+                          ...previous,
+                          rooms: previous.rooms.map(room => {
+                            if (room.id === selectedEntity.id) {
+                              const next = { ...room }
+                              delete next.connectedRoomIds
+                              return next
+                            }
+                            if (!connectedIds.has(room.id)) return room
+                            return { ...room, connectedRoomIds: (room.connectedRoomIds || []).filter(id => id !== selectedEntity.id) }
+                          }),
+                        }))
+                      }} disabled={Boolean(selectedEntity.locked)}>
+                        Lepaskan sambungan Room
+                      </button>
+                    </section>
+                  )}
                   <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Ukuran ruangan</div>
                     <p className="floorplan-field-note">Atur ukuran keseluruhan denah secara presisi. Bentuk polygon dipertahankan; titik-titik pada sumbu terkait akan diskalakan.</p>
