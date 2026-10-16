@@ -151,6 +151,7 @@ function PrintFloorplan({ scene, layout }) {
                 const width = Math.min(Number(opening.width) || 48, p.length)
                 return (
                   <g key={'room-opening-' + opening.id} transform={'translate(' + p.x + ' ' + p.y + ') rotate(' + p.angle + ')'} fill="none" stroke="#111827" strokeWidth="2">
+                    <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill="#111827" stroke="none">{opening.type === 'doorway' ? 'PINTU TANPA DAUN' : opening.type === 'door' ? 'PINTU' : 'JENDELA'}</text>
                     {opening.type === 'door' ? (
                       <>
                         <path d={'M ' + (-width / 2) + ' 0 V ' + (-width)} />
@@ -197,6 +198,7 @@ function PrintFloorplan({ scene, layout }) {
                 const center = Math.max(0, Math.min(1, Number(opening.offset) || 0.5)) * metric.length
                 return (
                   <g key={'wall-opening-' + opening.id} transform={'translate(' + (wall.x1 + metric.ux * center) + ' ' + (wall.y1 + metric.uy * center) + ') rotate(' + metric.angle + ')'} fill="none" stroke="#111827" strokeWidth="2">
+                    <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill="#111827" stroke="none">{opening.type === 'doorway' ? 'PINTU TANPA DAUN' : opening.type === 'door' ? 'PINTU' : 'JENDELA'}</text>
                     {opening.type === 'door' ? (
                       <>
                         <path d={'M ' + (-width / 2) + ' 0 V ' + (-width)} />
