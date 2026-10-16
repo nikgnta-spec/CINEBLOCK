@@ -213,21 +213,25 @@ function normalizeFloorplanCoordinate(value, max) {
 function normalizeRoomPolygon(room, index = 0) {
   if (!room || typeof room !== 'object') return null
   const legacyRectangle = !Array.isArray(room.points) || room.points.length < 3
-  const x = Number(room.x) || 0
-  const y = Number(room.y) || 0
-  const width = Math.max(12, Number(room.width) || 100)
-  const height = Math.max(12, Number(room.height) || 80)
+  const x = normalizeFloorplanCoordinate(room.x, 1000)
+  const y = normalizeFloorplanCoordinate(room.y, 650)
+  const width = Math.max(12, Math.min(1000, Number(room.width) || 100))
+  const height = Math.max(12, Math.min(650, Number(room.height) || 80))
   const points = legacyRectangle
     ? [{ x, y }, { x: x + width, y }, { x: x + width, y: y + height }, { x, y: y + height }]
     : room.points.slice(0, 500).map(point => ({ x: Number(point.x) || 0, y: Number(point.y) || 0 }))
   const oldSideToEdge = { top: 0, right: 1, bottom: 2, left: 3 }
   const openings = (Array.isArray(room.openings) ? room.openings : []).map(opening => {
-    const next = { ...opening }
+    const next = opening && typeof opening === 'object' ? { ...opening } : {}
     if (Number.isInteger(next.edgeIndex)) {
       next.edgeIndex = Math.max(0, Math.min(points.length - 1, next.edgeIndex))
     } else {
       next.edgeIndex = legacyRectangle ? (oldSideToEdge[next.side] ?? 2) : 0
     }
+    next.id = typeof next.id === 'string' && next.id ? next.id : crypto.randomUUID()
+    next.type = next.type === 'window' ? 'window' : 'door'
+    next.offset = Math.max(0.02, Math.min(0.98, Number.isFinite(Number(next.offset)) ? Number(next.offset) : 0.5))
+    next.width = Math.max(12, Math.min(500, Number(next.width) || (next.type === 'window' ? 58 : 48)))
     delete next.side
     return next
   })
