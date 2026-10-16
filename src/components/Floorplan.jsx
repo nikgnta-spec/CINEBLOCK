@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Undo2, Redo2,
+  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Undo2, Redo2, Lock, Unlock,
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
 import {
@@ -327,6 +327,8 @@ export default function Floorplan({
   onRenameScene,
   floorplans,
   onFloorplansChange,
+  projectRooms = null,
+  onProjectRoomsChange,
   selectedShotId,
   onSelectedShotIdChange,
 }) {
@@ -353,7 +355,13 @@ export default function Floorplan({
   const autoCreatedShotsByCameraRef = useRef(new Map())
 
   const scene = scenes.find(item => item.id === activeSceneId) || scenes[0]
-  const layout = scene ? (floorplans?.[scene.id] || EMPTY_LAYOUT) : EMPTY_LAYOUT
+  const storedLayout = scene ? (floorplans?.[scene.id] || EMPTY_LAYOUT) : EMPTY_LAYOUT
+  const reusableRoomMode = Array.isArray(projectRooms)
+  const layout = scene
+    ? { ...storedLayout, rooms: reusableRoomMode
+      ? projectRooms.filter(room => (scene.roomIds || []).includes(room.id))
+      : (storedLayout.rooms || []) }
+    : EMPTY_LAYOUT
   layoutRef.current = layout
   const allObjects = [
     ...layout.rooms.map(item => ({ ...item, entityType: 'room' })),
@@ -478,10 +486,32 @@ export default function Floorplan({
 
   const updateLayout = updater => {
     if (!scene) return
-    onFloorplansChange(previous => {
-      const currentLayout = previous?.[scene.id] || EMPTY_LAYOUT
-      return { ...previous, [scene.id]: updater(currentLayout) }
-    })
+    const stored = floorplans?.[scene.id] || EMPTY_LAYOUT
+    const currentLayout = { ...stored, rooms: layoutRef.current?.rooms || [] }
+    const nextLayout = updater(currentLayout)
+    if (reusableRoomMode && JSON.stringify(nextLayout.rooms || []) !== JSON.stringify(currentLayout.rooms || [])) {
+      const beforeRooms = currentLayout.rooms || []
+      const afterRooms = nextLayout.rooms || []
+      const beforeIds = new Set(beforeRooms.map(room => room.id))
+      const afterIds = new Set(afterRooms.map(room => room.id))
+      const nextRoomIds = (scene.roomIds || []).filter(id => afterIds.has(id))
+      afterRooms.forEach(room => {
+        if (!beforeIds.has(room.id)) nextRoomIds.push(room.id)
+      })
+      onProjectRoomsChange?.(previousRooms => {
+        const roomMap = new Map((previousRooms || []).map(room => [room.id, room]))
+        afterRooms.forEach(room => roomMap.set(room.id, room))
+        return [...roomMap.values()]
+      })
+      onChange?.(previousScenes => previousScenes.map(item => item.id === scene.id
+        ? { ...item, roomIds: [...new Set(nextRoomIds)] }
+        : item))
+    }
+    const { rooms: ignoredRooms, ...persistedLayout } = nextLayout
+    onFloorplansChange(previous => ({
+      ...previous,
+      [scene.id]: reusableRoomMode ? persistedLayout : nextLayout,
+    }))
   }
 
   const applyEntitySelection = (items, primary = null) => {
@@ -827,8 +857,11 @@ export default function Floorplan({
     if (tool === 'pan') return
     event.stopPropagation()
     event.preventDefault()
-    const point = getPoint(event)
     applyEntitySelection([{ type, id: item.id }], { type, id: item.id })
+    setSelectedWaypoint(null)
+    setSelected({ type, id: item.id })
+    if (item.locked) return
+    const point = getPoint(event)
     if (type !== 'camera') onSelectedShotIdChange?.('')
     beginDragHistory()
     dragRef.current = {
@@ -847,7 +880,7 @@ export default function Floorplan({
   }
 
   const beginWallEndpointDrag = (wall, endpoint, event) => {
-    if (tool === 'pan') return
+    if (tool === 'pan' || wall.locked) return
     event.stopPropagation()
     event.preventDefault()
     applyEntitySelection([{ type: 'wall', id: wall.id }], { type: 'wall', id: wall.id })
@@ -886,7 +919,7 @@ export default function Floorplan({
 
     if (type === 'camera') onSelectedShotIdChange?.(item.shotId || '')
     else if (!alreadySelected || currentSelection.length <= 1) onSelectedShotIdChange?.('')
-    if (tool === 'room' || tool === 'wall') return
+    if (item.locked || tool === 'room' || tool === 'wall') return
     if (tool === 'path') setTool('select')
     const point = getPoint(event)
 
@@ -894,7 +927,8 @@ export default function Floorplan({
       const items = currentSelection.map(entry => ({
         ...entry,
         original: (layout[entry.type + 's'] || []).find(candidate => candidate.id === entry.id),
-      })).filter(entry => entry.original)
+      })).filter(entry => entry.original && !entry.original.locked)
+      if (!items.length) return
       beginDragHistory()
       dragRef.current = { mode: 'multi-move', start: point, items }
     } else {
@@ -905,7 +939,7 @@ export default function Floorplan({
   }
 
   const beginWaypointDrag = (type, item, pathIndex, event) => {
-    if (tool === 'pan') return
+    if (tool === 'pan' || item.locked) return
     event.stopPropagation()
     const point = getPoint(event)
     const waypoint = (item.path || [])[pathIndex]
@@ -927,7 +961,7 @@ export default function Floorplan({
   }
 
   const beginRotate = (type, item, event) => {
-    if (tool === 'pan') return
+    if (tool === 'pan' || item.locked) return
     event.stopPropagation()
     const point = getPoint(event)
     applyEntitySelection([{ type, id: item.id }], { type, id: item.id })
@@ -976,7 +1010,7 @@ export default function Floorplan({
   }, [tool, selectedCanHavePath])
 
   const appendWaypoint = point => {
-    if (!selectedEntity || !selectedType || (selectedType === 'camera' && !selectedCameraCanHavePath) || selectedType === 'light' || selectedType === 'room' || selectedType === 'wall') return
+    if (!selectedEntity || selectedEntity.locked || !selectedType || (selectedType === 'camera' && !selectedCameraCanHavePath) || selectedType === 'light' || selectedType === 'room' || selectedType === 'wall') return
     setSelectedWaypoint(null)
     updateLayout(previous => ({
       ...previous,
@@ -987,7 +1021,7 @@ export default function Floorplan({
   }
 
   const addOpening = type => {
-    if (!selectedEntity || !['room', 'wall'].includes(selectedType)) return
+    if (!selectedEntity || selectedEntity.locked || !['room', 'wall'].includes(selectedType)) return
     const opening = {
       id: makeId(),
       type,
@@ -1000,12 +1034,27 @@ export default function Floorplan({
   }
 
   const removeOpening = openingId => {
-    if (!selectedEntity || !['room', 'wall'].includes(selectedType)) return
+    if (!selectedEntity || selectedEntity.locked || !['room', 'wall'].includes(selectedType)) return
     updateSelected({ openings: (selectedEntity.openings || []).filter(opening => opening.id !== openingId) })
   }
 
+  const updateOpening = (openingId, patch) => {
+    if (!selectedEntity || selectedEntity.locked || !['room', 'wall'].includes(selectedType)) return
+    const openings = (selectedEntity.openings || []).map(opening => {
+      if (opening.id !== openingId) return opening
+      const next = { ...opening, ...patch }
+      const length = selectedType === 'room'
+        ? (['left', 'right'].includes(next.side) ? selectedEntity.height : selectedEntity.width)
+        : getWallMetrics(selectedEntity).length
+      const openingWidth = Math.min(Math.max(1, Number(next.width) || 1), Math.max(1, length))
+      const minimumOffset = Math.min(0.49, openingWidth / (2 * Math.max(1, length)))
+      return { ...next, width: openingWidth, offset: clamp(next.offset, minimumOffset, 1 - minimumOffset) }
+    })
+    updateSelected({ openings })
+  }
+
   const beginOpeningDrag = (hostType, host, opening, event) => {
-    if (tool === 'pan') return
+    if (tool === 'pan' || host.locked) return
     event.stopPropagation()
     event.preventDefault()
     applyEntitySelection([{ type: hostType, id: host.id }], { type: hostType, id: host.id })
@@ -1171,7 +1220,7 @@ export default function Floorplan({
       updateLayout(previous => {
         const next = { ...previous }
         for (const collection of ['rooms', 'walls', 'props', 'actors', 'cameras', 'lights']) {
-          const selectedById = new Map(drag.items.filter(entry => entry.type + 's' === collection).map(entry => [entry.id, entry.original]))
+          const selectedById = new Map(drag.items.filter(entry => entry.type + 's' === collection && !entry.original?.locked).map(entry => [entry.id, entry.original]))
           if (!selectedById.size) continue
           next[collection] = previous[collection].map(item => {
             const original = selectedById.get(item.id)
@@ -1293,6 +1342,7 @@ export default function Floorplan({
           }
         }
         if (drag.type === 'room') {
+          if (item.locked) return item
           return {
             ...item,
             x: Math.round(clamp(drag.original.x + dx, 0, MAP_WIDTH - item.width)),
@@ -1392,7 +1442,7 @@ export default function Floorplan({
   }
 
   const deleteSelectedWaypoint = () => {
-    if (!selectedWaypoint || !selected || selectedWaypoint.type !== selected.type || selectedWaypoint.id !== selected.id) return
+    if (!selectedWaypoint || !selected || selectedEntity?.locked || selectedWaypoint.type !== selected.type || selectedWaypoint.id !== selected.id) return
     const { type, id, index } = selectedWaypoint
     const item = (layout[type + 's'] || []).find(entry => entry.id === id)
     if (!item || !Array.isArray(item.path) || !item.path[index]) return
@@ -1541,7 +1591,7 @@ export default function Floorplan({
       return shot ? ('Shot ' + shot.num + (shot.subject ? ' — ' + shot.subject : '')) : 'Unlinked camera'
     }
     if (type === 'light') return (item.label || 'Light') + ' — ' + (item.lightType || 'Key')
-    if (type === 'prop') return item.propType || 'Prop'
+    if (type === 'prop') return item.label || item.customPropType || item.propType || 'Prop'
     const fallback = ({ room: 'Room', wall: 'Wall', door: 'Pintu', window: 'Jendela', actor: 'Actor' })[type] || type
     return item.label || fallback
   }
@@ -1594,9 +1644,38 @@ export default function Floorplan({
           </button>
         </div>
         <span className="floorplan-tool-divider" />
+        {reusableRoomMode && (
+          <div className="floorplan-tool-group" role="group" aria-label="Room reusable">
+            <label className="floorplan-structure-label" htmlFor="reuse-room-select">Pakai Room</label>
+            <select
+              id="reuse-room-select"
+              className="floorplan-field"
+              value=""
+              onChange={event => {
+                const roomId = event.target.value
+                if (!roomId || !scene || (scene.roomIds || []).includes(roomId)) return
+                onChange?.(previous => previous.map(item => item.id === scene.id
+                  ? { ...item, roomIds: [...(item.roomIds || []), roomId] }
+                  : item))
+              }}
+              aria-label="Pakai Room yang sudah ada"
+            >
+              <option value="">Pakai Room yang sudah ada…</option>
+              {projectRooms.map(room => {
+                const alreadyUsed = (scene?.roomIds || []).includes(room.id)
+                const usedByOtherScenes = scenes.filter(item => (item.roomIds || []).includes(room.id) && item.id !== scene?.id).length
+                return (
+                  <option key={room.id} value={room.id} disabled={alreadyUsed}>
+                    {(room.label || 'Room tanpa nama')}{alreadyUsed ? ' — sudah dipakai di scene ini' : usedByOtherScenes ? ' — digunakan scene lain' : ''}
+                  </option>
+                )
+              })}
+            </select>
+          </div>
+        )}
         <div className="floorplan-structure-group" role="group" aria-label="Struktur">
           <span className="floorplan-structure-label">Struktur</span>
-          <button className={'floorplan-tool-button' + (tool === 'room' ? ' active' : '')} onClick={() => setTool('room')} title="Gambar ruang dengan drag" aria-label="Gambar ruang" aria-pressed={tool === 'room'}>
+          <button className={'floorplan-tool-button' + (tool === 'room' ? ' active' : '')} onClick={() => setTool('room')} title="Buat Room baru dengan drag" aria-label="Buat Room baru" aria-pressed={tool === 'room'}>
             <Square size={18} /><span>Ruang</span>
           </button>
           <button className={'floorplan-tool-button' + (tool === 'wall' ? ' active' : '')} onClick={() => setTool('wall')} title="Gambar dinding dengan menggeser kedua ujungnya" aria-label="Gambar dinding" aria-pressed={tool === 'wall'}>
@@ -2166,6 +2245,20 @@ export default function Floorplan({
                 <button className="floorplan-icon-button danger" onClick={deleteSelected} aria-label="Hapus objek terpilih" title="Hapus objek terpilih"><Trash2 size={17} /></button>
               </div>
 
+              <section className="floorplan-inspector-section">
+                <button
+                  type="button"
+                  className="floorplan-opening-add"
+                  aria-pressed={Boolean(selectedEntity.locked)}
+                  onClick={() => updateSelected({ locked: !selectedEntity.locked })}
+                  title={selectedEntity.locked ? 'Buka kunci agar objek bisa digeser atau diubah' : 'Kunci agar objek tidak bisa digeser atau diubah'}
+                >
+                  {selectedEntity.locked ? <Unlock size={16} /> : <Lock size={16} />}
+                  {selectedEntity.locked ? 'Buka Kunci Objek' : 'Kunci Objek'}
+                </button>
+                {selectedEntity.locked && <p className="floorplan-field-note">Objek terkunci: tidak bisa digeser, diputar, diubah ukuran, atau diedit jalurnya. Buka kunci untuk mengubah geometri.</p>}
+              </section>
+
               {selectedType === 'actor' && (
                 <>
                   <section className="floorplan-inspector-section">
@@ -2356,16 +2449,65 @@ export default function Floorplan({
 
               {selectedType === 'room' && (
                 <>
+                  {reusableRoomMode && (scenes.filter(item => (item.roomIds || []).includes(selectedEntity.id)).length > 1) && (
+                    <section className="floorplan-inspector-section" role="status">
+                      <strong>Room digunakan bersama</strong>
+                      <p>Perubahan geometri Room ini akan memengaruhi {scenes.filter(item => (item.roomIds || []).includes(selectedEntity.id)).length} Scene yang menggunakannya.</p>
+                    </section>
+                  )}
                   <section className="floorplan-inspector-section">
                     <label htmlFor="room-label">Nama ruang</label>
                     <input id="room-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
                   </section>
                   <section className="floorplan-inspector-section">
-                    <div className="floorplan-section-title">Dimensi</div>
-                    <div className="floorplan-dimension-summary">
-                      <div><span>Panjang</span><strong>{formatMeters(selectedEntity.width)}</strong></div>
-                      <div><span>Lebar</span><strong>{formatMeters(selectedEntity.height)}</strong></div>
+                    <div className="floorplan-section-title">Dimensi (meter)</div>
+                    <div className="floorplan-opening-actions">
+                      <div className="floorplan-dimension-input">
+                        <label htmlFor="room-width">Panjang (m)</label>
+                        <input
+                          id="room-width"
+                          className="floorplan-field"
+                          type="number"
+                          min="0.40"
+                          max="10.00"
+                          step="0.01"
+                          value={(Number(selectedEntity.width || 100) / 100).toFixed(2)}
+                          disabled={Boolean(selectedEntity.locked)}
+                          onChange={event => {
+                            const meters = Number(event.target.value)
+                            if (!Number.isFinite(meters) || meters < 0.4 || meters > 10) return
+                            const width = Math.round(meters * 100)
+                            updateSelected({
+                              width,
+                              x: Math.min(Number(selectedEntity.x) || 0, MAP_WIDTH - width),
+                            })
+                          }}
+                        />
+                      </div>
+                      <div className="floorplan-dimension-input">
+                        <label htmlFor="room-height">Lebar (m)</label>
+                        <input
+                          id="room-height"
+                          className="floorplan-field"
+                          type="number"
+                          min="0.40"
+                          max="6.50"
+                          step="0.01"
+                          value={(Number(selectedEntity.height || 80) / 100).toFixed(2)}
+                          disabled={Boolean(selectedEntity.locked)}
+                          onChange={event => {
+                            const meters = Number(event.target.value)
+                            if (!Number.isFinite(meters) || meters < 0.4 || meters > 6.5) return
+                            const height = Math.round(meters * 100)
+                            updateSelected({
+                              height,
+                              y: Math.min(Number(selectedEntity.y) || 0, MAP_HEIGHT - height),
+                            })
+                          }}
+                        />
+                      </div>
                     </div>
+                    <p className="floorplan-field-note">Masukkan ukuran dalam meter. Panjang 0,40–10 m, lebar 0,40–6,50 m.</p>
                   </section>
                   <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Bukaan</div>
@@ -2375,9 +2517,33 @@ export default function Floorplan({
                     </div>
                     {(selectedEntity.openings || []).map(opening => (
                       <div className="floorplan-opening-row" key={opening.id}>
-                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Door' : 'Window'}</span>
-                        <span className="floorplan-opening-hint">Geser untuk memindahkan</span>
-                        <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
+                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Pintu' : 'Jendela'}</span>
+                        <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} disabled={Boolean(selectedEntity.locked)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
+                        <div className="floorplan-opening-actions">
+                          <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-side'}>Sisi dinding</label>
+                            <select id={opening.id + '-side'} className="floorplan-field" value={ROOM_SIDES.some(side => side.value === opening.side) ? opening.side : 'bottom'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { side: event.target.value })}>
+                              {ROOM_SIDES.map(side => <option key={side.value} value={side.value}>{({ top: 'Atas', right: 'Kanan', bottom: 'Bawah', left: 'Kiri' })[side.value]}</option>)}
+                            </select>
+                          </div>
+                          <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-width'}>Lebar (m)</label>
+                            <input id={opening.id + '-width'} className="floorplan-field" type="number" min="0.30" max="5.00" step="0.01" value={(Number(opening.width || 48) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                              const meters = Number(event.target.value)
+                              if (!Number.isFinite(meters) || meters < 0.3 || meters > 5) return
+                              updateOpening(opening.id, { width: Math.round(meters * 100) })
+                            }} />
+                          </div>
+                          <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-offset'}>Posisi (%)</label>
+                            <input id={opening.id + '-offset'} className="floorplan-field" type="number" min="5" max="95" step="1" value={Math.round((Number(opening.offset) || 0.5) * 100)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                              const percent = Number(event.target.value)
+                              if (!Number.isFinite(percent) || percent < 5 || percent > 95) return
+                              updateOpening(opening.id, { offset: percent / 100 })
+                            }} />
+                          </div>
+                        </div>
+                        <span className="floorplan-opening-hint">Bisa digeser langsung di denah.</span>
                       </div>
                     ))}
                   </section>
@@ -2399,10 +2565,29 @@ export default function Floorplan({
                       <button className="floorplan-opening-add" onClick={() => addOpening('door')}><FloorplanObjectIcon type="door" size={18} /> Tambah pintu</button>
                       <button className="floorplan-opening-add" onClick={() => addOpening('window')}><FloorplanObjectIcon type="window" size={18} /> Tambah jendela</button>
                     </div>
-                    {(selectedEntity.openings || []).map(opening => (                      <div className="floorplan-opening-row" key={opening.id}>
-                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Door' : 'Window'}</span>
-                        <span className="floorplan-opening-hint">Geser di kanvas untuk memindahkan</span>
-                        <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
+                    {(selectedEntity.openings || []).map(opening => (
+                      <div className="floorplan-opening-row" key={opening.id}>
+                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Pintu' : 'Jendela'}</span>
+                        <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} disabled={Boolean(selectedEntity.locked)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
+                        <div className="floorplan-opening-actions">
+                          <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-width'}>Lebar (m)</label>
+                            <input id={opening.id + '-width'} className="floorplan-field" type="number" min="0.30" max="5.00" step="0.01" value={(Number(opening.width || 48) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                              const meters = Number(event.target.value)
+                              if (!Number.isFinite(meters) || meters < 0.3 || meters > 5) return
+                              updateOpening(opening.id, { width: Math.round(meters * 100) })
+                            }} />
+                          </div>
+                          <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-offset'}>Posisi (%)</label>
+                            <input id={opening.id + '-offset'} className="floorplan-field" type="number" min="5" max="95" step="1" value={Math.round((Number(opening.offset) || 0.5) * 100)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                              const percent = Number(event.target.value)
+                              if (!Number.isFinite(percent) || percent < 5 || percent > 95) return
+                              updateOpening(opening.id, { offset: percent / 100 })
+                            }} />
+                          </div>
+                        </div>
+                        <span className="floorplan-opening-hint">Bisa digeser langsung di denah.</span>
                       </div>
                     ))}
                   </section>
@@ -2410,12 +2595,55 @@ export default function Floorplan({
               )}
 
               {selectedType === 'prop' && (
-                <section className="floorplan-inspector-section">
-                  <label htmlFor="prop-type">Tipe properti</label>
-                  <select id="prop-type" className="floorplan-field" value={selectedEntity.propType || 'Custom'} onChange={event => updateSelected({ propType: event.target.value, label: event.target.value })}>
-                    {PROP_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
-                  </select>
-                </section>
+                <>
+                  <section className="floorplan-inspector-section">
+                    <label htmlFor="prop-label">Nama properti</label>
+                    <input id="prop-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
+                  </section>
+                  <section className="floorplan-inspector-section">
+                    <label htmlFor="prop-type">Tipe properti</label>
+                    <select id="prop-type" className="floorplan-field" value={selectedEntity.propType || 'Custom'} onChange={event => updateSelected({ propType: event.target.value, ...(event.target.value === 'Custom' ? {} : { customPropType: '' }), label: selectedEntity.label || event.target.value })}>
+                      {PROP_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+                    </select>
+                  </section>
+                  {(selectedEntity.propType || 'Custom') === 'Custom' && (
+                    <section className="floorplan-inspector-section">
+                      <label htmlFor="prop-custom-type">Tipe kustom</label>
+                      <input
+                        id="prop-custom-type"
+                        className="floorplan-field"
+                        value={selectedEntity.customPropType || ''}
+                        maxLength={80}
+                        placeholder="Contoh: Lemari senjata, Vas bunga"
+                        disabled={Boolean(selectedEntity.locked)}
+                        onChange={event => updateSelected({ customPropType: event.target.value })}
+                      />
+                      <p className="floorplan-field-note">Tulis tipe properti sendiri. Nama properti di atas tetap bisa diatur terpisah.</p>
+                    </section>
+                  )}
+                  <section className="floorplan-inspector-section">
+                    <div className="floorplan-section-title">Dimensi (meter)</div>
+                    <div className="floorplan-opening-actions">
+                      <div className="floorplan-dimension-input">
+                        <label htmlFor="prop-width">Panjang (m)</label>
+                        <input id="prop-width" className="floorplan-field" type="number" min="0.10" max="5.00" step="0.01" value={(Number(selectedEntity.width || 52) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                          const meters = Number(event.target.value)
+                          if (!Number.isFinite(meters) || meters < 0.1 || meters > 5) return
+                          updateSelected({ width: Math.round(meters * 100) })
+                        }} />
+                      </div>
+                      <div className="floorplan-dimension-input">
+                        <label htmlFor="prop-height">Lebar (m)</label>
+                        <input id="prop-height" className="floorplan-field" type="number" min="0.10" max="5.00" step="0.01" value={(Number(selectedEntity.height || 36) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                          const meters = Number(event.target.value)
+                          if (!Number.isFinite(meters) || meters < 0.1 || meters > 5) return
+                          updateSelected({ height: Math.round(meters * 100) })
+                        }} />
+                      </div>
+                    </div>
+                    <p className="floorplan-field-note">Panjang dan lebar bisa diketik manual. Ukuran 0,10–5,00 m.</p>
+                  </section>
+                </>
               )}
             </>
           ) : (
