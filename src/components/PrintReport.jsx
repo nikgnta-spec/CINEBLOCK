@@ -205,7 +205,9 @@ function PrintFloorplan({ scene, layout }) {
                 const uy = (edge.y2 - edge.y1) / (edge.length || 1)
                 return <line key={edge.edgeIndex + '-' + index} x1={edge.x1 + ux * segment.start} y1={edge.y1 + uy * segment.start} x2={edge.x1 + ux * segment.end} y2={edge.y1 + uy * segment.end} stroke="#111827" strokeWidth="3" />
               }))}
-              {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && <text x={bounds.x + 9} y={bounds.y + 36} fontSize="12" fill="#374151">{Number(room.ceilingHeight).toFixed(1) + ' m ceiling'}</text>}
+              <text x={bounds.x + 9} y={bounds.y + 18} fontSize="13" fontWeight="700" fill="#111827">{room.label || 'Room'}</text>
+              <text x={bounds.x + 9} y={bounds.y + 36} fontSize="12" fill="#374151">{meters(bounds.maxX - bounds.x) + ' × ' + meters(bounds.maxY - bounds.y)}</text>
+              {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && <text x={bounds.x + 9} y={bounds.y + 52} fontSize="12" fill="#374151">{Number(room.ceilingHeight).toFixed(1) + ' m ceiling'}</text>}
               {edges.map(edge => {
                 const horizontal = Math.abs(edge.x2 - edge.x1) >= Math.abs(edge.y2 - edge.y1)
                 const mx = (edge.x1 + edge.x2) / 2
