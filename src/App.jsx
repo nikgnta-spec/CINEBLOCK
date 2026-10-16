@@ -979,7 +979,7 @@ export default function App() {
                 onFloorplansChange={setFloorplans}
               />
             </div>
-            <div style={{ display: tab === 'floorplan' ? 'block' : 'none' }}>
+            <div className="floorplan-tab-panel" style={{ display: tab === 'floorplan' ? 'flex' : 'none' }}>
               <Floorplan
                 isActive={tab === 'floorplan'}
                 scenes={scenes}
