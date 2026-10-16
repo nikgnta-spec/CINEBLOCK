@@ -903,6 +903,18 @@ export default function Floorplan({
     setTool('select')
   }
 
+  const beginRoomVertexDrag = (room, vertexIndex, event) => {
+    if (tool === 'pan' || room.locked) return
+    event.stopPropagation()
+    event.preventDefault()
+    applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id })
+    beginDragHistory()
+    dragRef.current = { mode: 'room-vertex', id: room.id, vertexIndex, start: getPoint(event), originalPoints: getRoomPoints(room).map(point => ({ ...point })) }
+    svgRef.current?.setPointerCapture?.(event.pointerId)
+    setSelected({ type: 'room', id: room.id })
+    setTool('select')
+  }
+
   const beginResize = (type, item, sx, sy, event) => {
     if (tool === 'pan') return
     event.stopPropagation()
@@ -1376,11 +1388,10 @@ export default function Floorplan({
           next[collection] = previous[collection].map(item => {
             const original = selectedById.get(item.id)
             if (!original) return item
-            if (collection === 'rooms') return {
-              ...item,
-              x: Math.round(clamp(original.x + dx, 0, MAP_WIDTH - item.width)),
-              y: Math.round(clamp(original.y + dy, 0, MAP_HEIGHT - item.height)),
-            }
+            if (collection === 'rooms') return { ...item, points: getRoomPoints(original).map(vertex => ({
+              x: Math.round(clamp(vertex.x + dx, 0, MAP_WIDTH)),
+              y: Math.round(clamp(vertex.y + dy, 0, MAP_HEIGHT)),
+            })) }
             if (collection === 'walls') return {
               ...item,
               x1: Math.round(clamp(original.x1 + dx, 0, MAP_WIDTH)),
@@ -1397,6 +1408,16 @@ export default function Floorplan({
         }
         return next
       })
+      return
+    }
+
+    if (drag.mode === 'room-vertex') {
+      const dx = point.x - drag.start.x
+      const dy = point.y - drag.start.y
+      const nextPoints = drag.originalPoints.map((vertex, index) => index === drag.vertexIndex
+        ? { x: Math.round(clamp(vertex.x + dx, 0, MAP_WIDTH)), y: Math.round(clamp(vertex.y + dy, 0, MAP_HEIGHT)) }
+        : vertex)
+      updateLayout(previous => ({ ...previous, rooms: previous.rooms.map(room => room.id === drag.id ? { ...room, points: nextPoints } : room) }))
       return
     }
 
@@ -1494,11 +1515,10 @@ export default function Floorplan({
         }
         if (drag.type === 'room') {
           if (item.locked) return item
-          return {
-            ...item,
-            x: Math.round(clamp(drag.original.x + dx, 0, MAP_WIDTH - item.width)),
-            y: Math.round(clamp(drag.original.y + dy, 0, MAP_HEIGHT - item.height)),
-          }
+          return { ...item, points: getRoomPoints(drag.original).map(vertex => ({
+            x: Math.round(clamp(vertex.x + dx, 0, MAP_WIDTH)),
+            y: Math.round(clamp(vertex.y + dy, 0, MAP_HEIGHT)),
+          })) }
         }
         if (drag.type === 'wall') {
           return {
@@ -1534,7 +1554,7 @@ export default function Floorplan({
       const hits = allObjects.filter(object => {
         const type = object.entityType
         const box = type === 'room'
-          ? { left: object.x, top: object.y, right: object.x + object.width, bottom: object.y + object.height }
+          ? (() => { const bounds = getRoomBounds(object); return { left: bounds.x, top: bounds.y, right: bounds.x + bounds.width, bottom: bounds.y + bounds.height } })()
           : type === 'wall'
             ? { left: Math.min(object.x1, object.x2), top: Math.min(object.y1, object.y2), right: Math.max(object.x1, object.x2), bottom: Math.max(object.y1, object.y2) }
             : {
@@ -1582,7 +1602,7 @@ export default function Floorplan({
     }
     setDrawStart(null)
     setPreviewPoint(null)
-    if (completedDrag && ['move', 'multi-move', 'resize', 'wall-endpoint', 'waypoint', 'rotate', 'opening'].includes(completedDrag.mode)) {
+    if (completedDrag && ['move', 'multi-move', 'resize', 'room-vertex', 'wall-endpoint', 'waypoint', 'rotate', 'opening'].includes(completedDrag.mode)) {
       finishDragHistory()
     }
     dragRef.current = null
@@ -2650,54 +2670,26 @@ export default function Floorplan({
                     <input id="room-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
                   </section>
                   <section className="floorplan-inspector-section">
-                    <div className="floorplan-section-title">Dimensi (meter)</div>
-                    <div className="floorplan-opening-actions">
-                      <div className="floorplan-dimension-input">
-                        <label htmlFor="room-width">Panjang (m)</label>
-                        <input
-                          id="room-width"
-                          className="floorplan-field"
-                          type="number"
-                          min="0.40"
-                          max="10.00"
-                          step="0.01"
-                          value={(Number(selectedEntity.width || 100) / 100).toFixed(2)}
-                          disabled={Boolean(selectedEntity.locked)}
-                          onChange={event => {
-                            const meters = Number(event.target.value)
-                            if (!Number.isFinite(meters) || meters < 0.4 || meters > 10) return
-                            const width = Math.round(meters * 100)
-                            updateSelected({
-                              width,
-                              x: Math.min(Number(selectedEntity.x) || 0, MAP_WIDTH - width),
-                            })
-                          }}
-                        />
-                      </div>
-                      <div className="floorplan-dimension-input">
-                        <label htmlFor="room-height">Lebar (m)</label>
-                        <input
-                          id="room-height"
-                          className="floorplan-field"
-                          type="number"
-                          min="0.40"
-                          max="6.50"
-                          step="0.01"
-                          value={(Number(selectedEntity.height || 80) / 100).toFixed(2)}
-                          disabled={Boolean(selectedEntity.locked)}
-                          onChange={event => {
-                            const meters = Number(event.target.value)
-                            if (!Number.isFinite(meters) || meters < 0.4 || meters > 6.5) return
-                            const height = Math.round(meters * 100)
-                            updateSelected({
-                              height,
-                              y: Math.min(Number(selectedEntity.y) || 0, MAP_HEIGHT - height),
-                            })
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <p className="floorplan-field-note">Masukkan ukuran dalam meter. Panjang 0,40–10 m, lebar 0,40–6,50 m.</p>
+                    <div className="floorplan-section-title">Geometri polygon</div>
+                    <p className="floorplan-field-note">{getRoomPoints(selectedEntity).length} titik · bentuk dapat diedit dengan menyeret vertex di canvas.</p>
+                  </section>
+                  <section className="floorplan-inspector-section">
+                    <label htmlFor="room-ceiling-height">Tinggi ruangan (m)</label>
+                    <input id="room-ceiling-height" className="floorplan-field" type="number" min="1" max="10" step="0.1" placeholder="Belum diisi" value={Number.isFinite(Number(selectedEntity.ceilingHeight)) && Number(selectedEntity.ceilingHeight) > 0 ? selectedEntity.ceilingHeight : ''} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                      const value = event.target.value
+                      if (value === '') {
+                        updateLayout(previous => ({ ...previous, rooms: previous.rooms.map(room => {
+                          if (room.id !== selectedEntity.id) return room
+                          const next = { ...room }
+                          delete next.ceilingHeight
+                          return next
+                        }) }))
+                      } else {
+                        const meters = Number(value)
+                        if (Number.isFinite(meters) && meters >= 1 && meters <= 10) updateSelected({ ceilingHeight: meters })
+                      }
+                    }} />
+                    <p className="floorplan-field-note">Room hasil migrasi tidak diberi tinggi otomatis. Isi manual jika sudah diketahui.</p>
                   </section>
                   <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Bukaan</div>
