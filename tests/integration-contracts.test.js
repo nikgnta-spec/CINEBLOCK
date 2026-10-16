@@ -537,6 +537,8 @@ test('Connected Rooms use one combined bounding box for overall dimensions', asy
   assert.match(source, /const connectedRoomGroup = \(\(\) => \{/)
   assert.match(source, /const connectedGroupPoints = connectedRoomGroup\.flatMap\(getRoomPoints\)/)
   assert.match(source, /const totalBounds = hasConnectedRooms \? connectedBounds : bounds/)
+  assert.match(source, /const isSharedBoundaryEdge = edge => connectedRoomGroup\.some/)
+  assert.match(source, /const visibleDimensionLayouts = dimensionLayouts\.filter\(\(\{ edge \}\) => !isSharedBoundaryEdge\(edge\)\)/)
   assert.match(source, /const isDimensionGroupActive = active && hasConnectedRooms/)
   assert.match(source, /!horizontalIsSingleEdge && \(!hasConnectedRooms \|\| isDimensionGroupActive\)/)
   assert.match(source, /!verticalIsSingleEdge && \(!hasConnectedRooms \|\| isDimensionGroupActive\)/)
