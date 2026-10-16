@@ -1265,7 +1265,7 @@ export default function Floorplan({
       return
     }
     const previous = roomDrawPoints[roomDrawPoints.length - 1]
-    const snapTolerance = 9 * viewBox.width / Math.max(1, canvasSize.width)
+    const snapTolerance = 12 * viewBox.width / Math.max(1, canvasSize.width)
     const anchors = [
       ...layout.rooms.flatMap(room => getRoomPoints(room)),
       ...(layout.walls || []).flatMap(wall => [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]),
@@ -2123,15 +2123,6 @@ export default function Floorplan({
               </defs>
               <rect x={-MAP_WIDTH * 2} y={-MAP_HEIGHT * 2} width={MAP_WIDTH * 5} height={MAP_HEIGHT * 5} fill="var(--bg)" />
               <rect x={-MAP_WIDTH * 2} y={-MAP_HEIGHT * 2} width={MAP_WIDTH * 5} height={MAP_HEIGHT * 5} fill="url(#floorplan-grid)" pointerEvents="none" />
-              <g pointerEvents="none">
-                {roomSnapGuides.map((guide, index) => <line key={'snap-guide-active-' + index}
-                  x1={guide.axis === 'horizontal' ? viewBox.x : guide.x}
-                  y1={guide.axis === 'vertical' ? viewBox.y : guide.y}
-                  x2={guide.axis === 'horizontal' ? viewBox.x + viewBox.width : guide.x}
-                  y2={guide.axis === 'vertical' ? viewBox.y + viewBox.height : guide.y}
-                  stroke="var(--accent)" strokeWidth="1" strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />)}
-              </g>
-
               {layout.rooms.map(room => {
                 const points = getRoomPoints(room)
                 const pointString = points.map(point => point.x + ',' + point.y).join(' ')
@@ -2613,6 +2604,14 @@ export default function Floorplan({
                   pointerEvents="none"
                 />
               )}
+              <g pointerEvents="none">
+                {roomSnapGuides.map((guide, index) => <line key={'snap-guide-active-' + index}
+                  x1={guide.axis === 'horizontal' ? viewBox.x : guide.x}
+                  y1={guide.axis === 'vertical' ? viewBox.y : guide.y}
+                  x2={guide.axis === 'horizontal' ? viewBox.x + viewBox.width : guide.x}
+                  y2={guide.axis === 'vertical' ? viewBox.y + viewBox.height : guide.y}
+                  stroke="var(--accent)" strokeWidth="1.5" strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />)}
+              </g>
             </svg>
             <div className="floorplan-view-controls" role="group" aria-label="Kontrol tampilan denah">
               <button type="button" className="floorplan-view-control-button" onClick={() => zoomCanvas(1.25)} disabled={viewBox.width >= MAP_WIDTH * 2.5} title="Perkecil tampilan" aria-label="Perkecil tampilan"><Minus size={16} /></button>
