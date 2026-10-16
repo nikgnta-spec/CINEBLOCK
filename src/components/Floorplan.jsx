@@ -836,9 +836,11 @@ export default function Floorplan({
   const getPoint = event => {
     const rect = svgRef.current?.getBoundingClientRect()
     if (!rect || !rect.width || !rect.height) return { x: 0, y: 0 }
+    // Workspace coordinates are intentionally unbounded: users can draw and pan
+    // beyond the original 10 × 6 area without hitting an invisible canvas edge.
     return {
-      x: clamp(viewBox.x + ((event.clientX - rect.left) / rect.width) * viewBox.width, 0, MAP_WIDTH),
-      y: clamp(viewBox.y + ((event.clientY - rect.top) / rect.height) * viewBox.height, 0, MAP_HEIGHT),
+      x: viewBox.x + ((event.clientX - rect.left) / rect.width) * viewBox.width,
+      y: viewBox.y + ((event.clientY - rect.top) / rect.height) * viewBox.height,
     }
   }
 
@@ -2132,8 +2134,8 @@ export default function Floorplan({
                   <path d="M 50 0 L 0 0 0 50" fill="none" stroke="var(--border)" strokeWidth="0.8" strokeOpacity="0.5" />
                 </pattern>
               </defs>
-              <rect x={-MAP_WIDTH * 2} y={-MAP_HEIGHT * 2} width={MAP_WIDTH * 5} height={MAP_HEIGHT * 5} fill="var(--bg)" />
-              <rect x={-MAP_WIDTH * 2} y={-MAP_HEIGHT * 2} width={MAP_WIDTH * 5} height={MAP_HEIGHT * 5} fill="url(#floorplan-grid)" pointerEvents="none" />
+              <rect x={viewBox.x - viewBox.width * 2} y={viewBox.y - viewBox.height * 2} width={viewBox.width * 5} height={viewBox.height * 5} fill="var(--bg)" />
+              <rect x={viewBox.x - viewBox.width * 2} y={viewBox.y - viewBox.height * 2} width={viewBox.width * 5} height={viewBox.height * 5} fill="url(#floorplan-grid)" pointerEvents="none" />
               {layout.rooms.map(room => {
                 const points = getRoomPoints(room)
                 const pointString = points.map(point => point.x + ',' + point.y).join(' ')
