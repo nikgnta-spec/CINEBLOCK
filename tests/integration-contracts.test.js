@@ -536,7 +536,7 @@ test('Connected Rooms use one combined bounding box for overall dimensions', asy
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /const connectedRoomGroup = \(\(\) => \{/)
   assert.match(source, /const connectedGroupPoints = connectedRoomGroup\.flatMap\(getRoomPoints\)/)
-  assert.match(source, /const totalBounds = hasConnectedRooms \? connectedBounds : bounds/)
+  assert.match(source, /const totalBounds = bounds/)
   assert.match(source, /const isSharedBoundaryEdge = edge => connectedRoomGroup\.some/)
   assert.match(source, /const visibleDimensionLayouts = dimensionLayouts/)
   assert.match(source, /const groupTotalBounds = hasConnectedRooms \? connectedBounds : null/)
@@ -556,7 +556,7 @@ test('Confirming a Room connection snaps walls flush while retaining shared wall
   const handler = source.slice(handlerStart, handlerEnd)
   assert.match(handler, /const signedDistance = \(movingEdge\.a\.x - targetEdge\.a\.x\)/)
   assert.match(handler, /getRoomPoints\(room\)\.map\(point => \(\{ x: Math\.round\(point\.x \+ shift\.x\), y: Math\.round\(point\.y \+ shift\.y\) \}\)\)/)
-  assert.match(source, /edges\.filter\(edge => !isSharedRoomEdge\(edge\)\)\.map/)
+  assert.match(source, /\{edges\.map\(edge => \{/)
   assert.match(source, /const isSharedRoomEdge = edge => connectedRooms\.some/)
 })
 
