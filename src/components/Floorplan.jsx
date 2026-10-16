@@ -151,6 +151,8 @@ const pointInPolygon = (point, points) => {
   }
   return inside
 }
+const openingLabel = opening => opening.type === 'window' ? 'Jendela' : opening.type === 'doorway' ? (opening.label || 'Pintu Tanpa Daun') : 'Pintu'
+
 const DoorSwingSymbol = ({ opening, width }) => {
   const direction = opening.swingDirection === 'out' ? -1 : 1
   const leafCount = opening.doorType === 'double' ? 2 : 1
@@ -1194,6 +1196,7 @@ export default function Floorplan({
       width: type === 'door' ? 48 : 58,
       height: type === 'door' ? 210 : 120,
       ...(type === 'door' ? { swingDirection: 'in', doorType: 'single' } : {}),
+      ...(type === 'doorway' ? { label: 'Pintu Tanpa Daun', swingDirection: 'in' } : {}),
       ...(selectedType === 'room' ? { edgeIndex: Math.max(0, getRoomPoints(selectedEntity).length - 1) } : {}),
     }
     updateSelected({ openings: [...(selectedEntity.openings || []), opening] })
@@ -2204,12 +2207,12 @@ export default function Floorplan({
                       return (
                         <g key={opening.id} transform={'translate(' + placement.x + ' ' + placement.y + ') rotate(' + placement.angle + ')'} data-floorplan-object="true" style={{ cursor: 'grab' }} onPointerDownCapture={event => beginOpeningDrag('room', room, opening, event)} onClick={event => event.stopPropagation()}>
                           <rect x={-(Math.min(Number(opening.width ?? 48), placement.length) / 2) - 8} y="-16" width={Math.min(Number(opening.width ?? 48), placement.length) + 16} height="32" fill="transparent" pointerEvents="all" />
-                          <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type === 'door' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">{opening.type === 'door' ? 'Pintu' : 'Jendela'}</text>
+                          <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type !== 'window' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">{openingLabel(opening)}</text>
                           
                           {opening.type === 'door' ? (
                             <DoorSwingSymbol opening={opening} width={openingWidth} />
-                          ) : (
-                            <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+                          ) : opening.type === 'doorway' ? null : (
+                             <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
                               <path d={'M ' + (-openingWidth / 2) + ' -4 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 0 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 4 H ' + (openingWidth / 2)} />
                               <path d={'M ' + (-openingWidth / 2) + ' -7 V 7 M ' + (openingWidth / 2) + ' -7 V 7'} />
                             </g>
@@ -2258,14 +2261,14 @@ export default function Floorplan({
                           onClick={event => event.stopPropagation()}
                         >
                           <rect x={-(openingWidth / 2) - 8} y="-16" width={openingWidth + 16} height="32" fill="transparent" pointerEvents="all" />
-                          <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type === 'door' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">
-                            {opening.type === 'door' ? 'Pintu' : 'Jendela'}
+                          <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type !== 'window' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">
+                            {openingLabel(opening)}
                            </text>
                            {opening.type === 'door' && <text x="0" y="25" textAnchor="middle" fontSize="9" fontWeight="600" fill="#fbbf24" stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">{'Daun pintu ' + (Number(opening.width ?? 48) / 100).toFixed(2) + ' m'}</text>}
                            {opening.type === 'door' ? (
                             <DoorSwingSymbol opening={opening} width={openingWidth} />
-                          ) : (
-                            <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+                          ) : opening.type === 'doorway' ? null : (
+                             <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
                               <path d={'M ' + (-openingWidth / 2) + ' -4 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 0 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 4 H ' + (openingWidth / 2)} />
                               <path d={'M ' + (-openingWidth / 2) + ' -7 V 7 M ' + (openingWidth / 2) + ' -7 V 7'} />
                             </g>
@@ -2923,11 +2926,12 @@ export default function Floorplan({
                     <div className="floorplan-section-title">Bukaan</div>
                     <div className="floorplan-opening-actions">
                       <button className="floorplan-opening-add" onClick={() => addOpening('door')}><FloorplanObjectIcon type="door" size={18} /> Tambah pintu</button>
+                       <button className="floorplan-opening-add" onClick={() => addOpening('doorway')}><FloorplanObjectIcon type="door" size={18} /> Tambah pintu tanpa daun</button>
                       <button className="floorplan-opening-add" onClick={() => addOpening('window')}><FloorplanObjectIcon type="window" size={18} /> Tambah jendela</button>
                     </div>
                     {(selectedEntity.openings || []).map(opening => (
                       <div className="floorplan-opening-row" key={opening.id}>
-                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Pintu' : 'Jendela'}</span>
+                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{openingLabel(opening)}</span>
                         <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} disabled={Boolean(selectedEntity.locked)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
                         <div className="floorplan-opening-actions">
                           <div className="floorplan-dimension-input">
@@ -2962,6 +2966,19 @@ export default function Floorplan({
                               updateOpening(opening.id, { height: Math.round(clamp(meters, 0, 4) * 100) })
                             }} />
                           </div>
+                          {opening.type === 'doorway' && <>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-label'}>Nama pintu</label>
+                              <input id={opening.id + '-label'} className="floorplan-field" type="text" maxLength={80} value={opening.label || 'Pintu Tanpa Daun'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { label: event.target.value })} />
+                            </div>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-swing'}>Arah buka</label>
+                              <select id={opening.id + '-swing'} className="floorplan-field" value={opening.swingDirection === 'out' ? 'out' : 'in'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { swingDirection: event.target.value })}>
+                                <option value="in">Ke dalam</option>
+                                <option value="out">Ke luar</option>
+                              </select>
+                            </div>
+                          </>}
                           {opening.type === 'door' && <>
                             <div className="floorplan-dimension-input">
                               <label htmlFor={opening.id + '-swing'}>Arah buka</label>
@@ -3007,11 +3024,12 @@ export default function Floorplan({
                     <div className="floorplan-section-title">Bukaan</div>
                     <div className="floorplan-opening-actions">
                       <button className="floorplan-opening-add" onClick={() => addOpening('door')}><FloorplanObjectIcon type="door" size={18} /> Tambah pintu</button>
+                       <button className="floorplan-opening-add" onClick={() => addOpening('doorway')}><FloorplanObjectIcon type="door" size={18} /> Tambah pintu tanpa daun</button>
                       <button className="floorplan-opening-add" onClick={() => addOpening('window')}><FloorplanObjectIcon type="window" size={18} /> Tambah jendela</button>
                     </div>
                     {(selectedEntity.openings || []).map(opening => (
                       <div className="floorplan-opening-row" key={opening.id}>
-                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Pintu' : 'Jendela'}</span>
+                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{openingLabel(opening)}</span>
                         <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} disabled={Boolean(selectedEntity.locked)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
                         <div className="floorplan-opening-actions">
                           <div className="floorplan-dimension-input">
@@ -3040,6 +3058,19 @@ export default function Floorplan({
                               updateOpening(opening.id, { height: Math.round(clamp(meters, 0, 4) * 100) })
                             }} />
                           </div>
+                          {opening.type === 'doorway' && <>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-label'}>Nama pintu</label>
+                              <input id={opening.id + '-label'} className="floorplan-field" type="text" maxLength={80} value={opening.label || 'Pintu Tanpa Daun'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { label: event.target.value })} />
+                            </div>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-swing'}>Arah buka</label>
+                              <select id={opening.id + '-swing'} className="floorplan-field" value={opening.swingDirection === 'out' ? 'out' : 'in'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { swingDirection: event.target.value })}>
+                                <option value="in">Ke dalam</option>
+                                <option value="out">Ke luar</option>
+                              </select>
+                            </div>
+                          </>}
                           {opening.type === 'door' && <>
                             <div className="floorplan-dimension-input">
                               <label htmlFor={opening.id + '-swing'}>Arah buka</label>
