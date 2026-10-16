@@ -862,6 +862,25 @@ export default function Floorplan({
   }
 
   const handleCanvasWheel = event => {
+    const canvas = svgRef.current
+    const editor = canvas?.closest('.floorplan-editor')
+    const inspector = editor?.querySelector('.floorplan-inspector')
+    const inspectorRect = inspector?.getBoundingClientRect()
+    const pointerIsOverInspector = inspectorRect
+      && event.clientX >= inspectorRect.left
+      && event.clientX <= inspectorRect.right
+      && event.clientY >= inspectorRect.top
+      && event.clientY <= inspectorRect.bottom
+
+    // If the pointer is visually over the properties panel, route the wheel
+    // there instead of zooming the SVG, even if hit-testing overlaps the canvas.
+    if (pointerIsOverInspector && inspector) {
+      event.preventDefault()
+      event.stopPropagation()
+      inspector.scrollTop += event.deltaY
+      return
+    }
+
     event.preventDefault()
     event.stopPropagation()
     zoomCanvas(event.deltaY < 0 ? 0.9 : 1.1, event.clientX, event.clientY)
