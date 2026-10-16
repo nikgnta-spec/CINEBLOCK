@@ -2261,7 +2261,7 @@ export default function Floorplan({
                           <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type === 'door' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">
                             {opening.type === 'door' ? 'Pintu' : 'Jendela'}
                            </text>
-                           {opening.type === 'door' && <text x="0" y="25" textAnchor="middle" fontSize="9" fontWeight="600" fill="#fbbf24" stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">{'Daun pintu ' + (Number(opening.width ?? 48) / 100).toFixed(2) + ' m'}</text>
+                           {opening.type === 'door' && <text x="0" y="25" textAnchor="middle" fontSize="9" fontWeight="600" fill="#fbbf24" stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">{'Daun pintu ' + (Number(opening.width ?? 48) / 100).toFixed(2) + ' m'}</text>}
                            {opening.type === 'door' ? (
                             <DoorSwingSymbol opening={opening} width={openingWidth} />
                           ) : (
