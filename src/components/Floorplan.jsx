@@ -1084,6 +1084,14 @@ export default function Floorplan({
   }
 
   const handleCanvasPointerDownCapture = event => {
+    // Path mode must intercept object pointer handlers: rooms and props can
+    // visually cover the selected actor, but must never steal a waypoint click.
+    if (tool === 'path' && event.button === 0) {
+      event.preventDefault()
+      event.stopPropagation()
+      return
+    }
+
     // Navigation takes priority over any object handler, including on top of objects.
     if (event.button !== 1 && !(event.button === 0 && spaceHeld) && tool !== 'pan') return
     event.preventDefault()
@@ -1125,15 +1133,27 @@ export default function Floorplan({
     }
   }
 
-  const handleCanvasClick = event => {
+  const handleCanvasClickCapture = event => {
     if (tool !== 'path') return
-    if (event.target?.closest?.('[data-floorplan-object="true"], [data-floorplan-waypoint="true"]')) return
+    // Handle clicks before an SVG object's own onClick/onPointerDown can
+    // select a room or prop that overlaps the actor whose path is being drawn.
+    event.preventDefault()
+    event.stopPropagation()
     // Double-click finishes the path and returns to Select/Move.
     if (event.detail > 1) {
       setTool('select')
       return
     }
     appendWaypoint(getPoint(event))
+  }
+
+  const handleCanvasClick = event => {
+    // Path clicks are handled in capture phase so underlying objects cannot
+    // intercept them.
+    if (tool === 'path') {
+      event.preventDefault()
+      event.stopPropagation()
+    }
   }
 
   const handleCanvasPointerMove = event => {
@@ -1791,6 +1811,7 @@ export default function Floorplan({
               onTouchMove={handleCanvasTouchMove}
               onTouchEnd={handleCanvasTouchEnd}
               onTouchCancel={handleCanvasTouchEnd}
+              onClickCapture={handleCanvasClickCapture}
               onClick={handleCanvasClick}
               onPointerMove={handleCanvasPointerMove}
               onPointerUp={handleCanvasPointerUp}
