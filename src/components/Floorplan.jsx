@@ -1354,7 +1354,36 @@ export default function Floorplan({
     setRoomManualAngle(null)
   }
 
+  const getRoomAndWallSnapAnchors = () => [
+    ...layout.rooms.flatMap(room => getRoomPoints(room)),
+    ...(layout.walls || []).flatMap(wall => [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]),
+  ]
+
+  const snapPointToRoomAndWallGeometry = (point, origin = null) => {
+    const anchors = getRoomAndWallSnapAnchors()
+    const snapTolerance = 12 * viewBox.width / Math.max(1, svgRef.current?.getBoundingClientRect()?.width || canvasSize.width)
+    if (!anchors.length) return { point, guides: [] }
+    // For the first wall endpoint, use geometry anchors as candidates without
+    // privileging the raw cursor position. For later points, also snap to the
+    // wall's starting point just as Room drawing snaps to its previous vertex.
+    return origin
+      ? snapRoomPoint(point, origin, anchors, snapTolerance)
+      : snapRoomPoint(point, anchors[0], anchors.slice(1), snapTolerance)
+  }
+
   const handleCanvasPointerDownCapture = event => {
+    if (tool === 'wall' && event.button === 0 && !spaceHeld && !event.target?.closest?.('foreignObject')) {
+      // Capture before Room/object handlers so a wall can start directly on
+      // existing Room geometry instead of selecting the Room and aborting.
+      event.preventDefault()
+      event.stopPropagation()
+      const point = getPoint(event)
+      const snapped = snapPointToRoomAndWallGeometry(point)
+      setDrawStart(snapped.point)
+      setPreviewPoint(snapped.point)
+      setRoomSnapGuides(snapped.guides)
+      return
+    }
     if (tool === 'room' && event.button === 0 && !spaceHeld && !event.target?.closest?.('foreignObject')) {
       event.preventDefault()
       event.stopPropagation()
@@ -1478,7 +1507,18 @@ export default function Floorplan({
       return
     }
     if (drawStart) {
-      setPreviewPoint(point)
+      if (tool === 'wall') {
+        if (event.altKey) {
+          setPreviewPoint(point)
+          setRoomSnapGuides([])
+        } else {
+          const snapped = snapPointToRoomAndWallGeometry(point, drawStart)
+          setPreviewPoint(snapped.point)
+          setRoomSnapGuides(snapped.guides)
+        }
+      } else {
+        setPreviewPoint(point)
+      }
       return
     }
     if (!drag) return
@@ -1807,6 +1847,7 @@ export default function Floorplan({
     }
     setDrawStart(null)
     setPreviewPoint(null)
+    if (tool === 'wall') setRoomSnapGuides([])
     if (completedDrag && ['move', 'multi-move', 'resize', 'room-vertex', 'room-edge', 'wall-endpoint', 'waypoint', 'rotate', 'opening'].includes(completedDrag.mode)) {
       finishDragHistory()
     }
