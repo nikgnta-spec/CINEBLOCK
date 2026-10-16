@@ -186,6 +186,20 @@ function PrintFloorplan({ scene, layout }) {
                 const y1 = horizontal ? my + ny * offset : Math.min(edge.y1, edge.y2)
                 const y2 = horizontal ? my + ny * offset : Math.max(edge.y1, edge.y2)
                 const label = meters(edge.length)
+                const totalLength = edges.filter(item => Math.abs(item.y2 - item.y1) < Math.abs(item.x2 - item.x1)).reduce((sum, item) => sum + item.length, 0)
+                const totalWidth = edges.filter(item => Math.abs(item.y2 - item.y1) >= Math.abs(item.x2 - item.x1)).reduce((sum, item) => sum + item.length, 0)
+                const showTotal = edge.edgeIndex === edges.reduce((best, item) => {
+                  const itemHorizontal = Math.abs(item.x2 - item.x1) >= Math.abs(item.y2 - item.y1)
+                  const bestHorizontal = Math.abs(edges[best].x2 - edges[best].x1) >= Math.abs(edges[best].y2 - edges[best].y1)
+                  if (itemHorizontal !== bestHorizontal) return best
+                  return item.length > edges[best].length ? item.edgeIndex : best
+                }, edge.edgeIndex)
+                const totalValue = horizontal ? totalLength : totalWidth
+                const totalOffset = 112
+                const tx1 = horizontal ? Math.min(edge.x1, edge.x2) : mx + nx * totalOffset
+                const tx2 = horizontal ? Math.max(edge.x1, edge.x2) : mx + nx * totalOffset
+                const ty1 = horizontal ? my + ny * totalOffset : Math.min(edge.y1, edge.y2)
+                const ty2 = horizontal ? my + ny * totalOffset : Math.max(edge.y1, edge.y2)
                 return <g key={'room-dimension-' + edge.edgeIndex} fill="none" stroke="#64748b" strokeWidth="1.2">
                   <line x1={x1} y1={y1} x2={x2} y2={y2} />
                   {horizontal ? <>
@@ -195,7 +209,18 @@ function PrintFloorplan({ scene, layout }) {
                     <line x1={x1 - 5} y1={y1} x2={x1 + 5} y2={y1} />
                     <line x1={x2 - 5} y1={y2} x2={x2 + 5} y2={y2} />
                   </>}
-                  <text x={(x1 + x2) / 2} y={(y1 + y2) / 2 - 7} fill="#374151" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="12" textAnchor="middle" transform="translate(0 0)">{label}</text>
+                  <text x={(x1 + x2) / 2} y={(y1 + y2) / 2 - 7} fill="#374151" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="12" textAnchor="middle">{label}</text>
+                  {showTotal && <g stroke="#64748b" strokeWidth="1.2">
+                    <line x1={tx1} y1={ty1} x2={tx2} y2={ty2} />
+                    {horizontal ? <>
+                      <line x1={tx1} y1={ty1 - 5} x2={tx1} y2={ty1 + 5} />
+                      <line x1={tx2} y1={ty2 - 5} x2={tx2} y2={ty2 + 5} />
+                    </> : <>
+                      <line x1={tx1 - 5} y1={ty1} x2={tx1 + 5} y2={ty1} />
+                      <line x1={tx2 - 5} y1={ty2} x2={tx2 + 5} y2={ty2} />
+                    </>}
+                    <text x={(tx1 + tx2) / 2} y={(ty1 + ty2) / 2 - 8} fill="#374151" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="12" textAnchor="middle">{meters(totalValue)} total</text>
+                  </g>}
                 </g>
               })}
               {openings.map(opening => {
