@@ -266,7 +266,7 @@ test('Doors and windows support precise width, position, and polygon edge contro
   assert.match(source, /id=\{opening\.id \+ '-width'\}/)
   assert.match(source, /id=\{opening\.id \+ '-offset'\}/)
   assert.match(source, /id=\{opening\.id \+ '-edge'\}/)
-  assert.match(source, /updateOpening\(opening\.id, \{ width: Math\.round\(meters \* 100\) \}\)/)
+  assert.match(source, /updateOpening\(opening\.id, \{ width: Math\.round\(clamp\(meters, 0, 5\) \* 100\) \}\)/)
   assert.match(source, /updateOpening\(opening\.id, \{ offset: percent \/ 100 \}\)/)
   // Openings are attached to a polygon edge by edgeIndex, not legacy cardinal sides.
   assert.match(source, /id=\{opening\.id \+ '-edge'\}/)
@@ -332,4 +332,19 @@ test('Path clicks capture before overlapping Room or Prop handlers can steal sel
   assert.match(source, /if \(tool === 'path' && event\.button === 0\) \{[\s\S]*?event\.stopPropagation\(\)[\s\S]*?return/)
   assert.match(source, /const handleCanvasClickCapture = event => \{[\s\S]*?if \(tool !== 'path'\) return[\s\S]*?appendWaypoint\(getPoint\(event\)\)/)
   assert.match(source, /onClickCapture=\{handleCanvasClickCapture\}/)
+})
+
+
+test('Leafless doorway is a distinct opening type with editable label and direction', async () => {
+  const floorplan = await readSource('../src/components/Floorplan.jsx')
+  const app = await readSource('../src/App.jsx')
+  const report = await readSource('../src/components/PrintReport.jsx')
+
+  assert.match(floorplan, /addOpening\('doorway'\)/)
+  assert.match(floorplan, /opening\.type === 'doorway' \? null/)
+  assert.match(floorplan, /id=\{opening\.id \+ '-label'\}/)
+  assert.match(floorplan, /opening\.type === 'doorway' && <>/)
+  assert.match(app, /\['window', 'doorway'\]\.includes\(opening\.type\)/)
+  assert.match(app, /opening\.type === 'doorway'.*label:/)
+  assert.match(report, /opening\.type === 'doorway' \? \(opening\.label \|\| 'Pintu Tanpa Daun'\)/)
 })
