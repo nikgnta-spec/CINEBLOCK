@@ -122,6 +122,28 @@ const getRoomDimensionGeometry = (room, edge) => {
   const x2 = edge.x2 + nx * offset, y2 = edge.y2 + ny * offset
   return { x1, y1, x2, y2, mx: (x1 + x2) / 2, my: (y1 + y2) / 2, length: edge.length, angle: Math.atan2(dy, dx) * 180 / Math.PI }
 }
+const snapRoomPoint = (point, origin, anchors, tolerance) => {
+  if (!origin) return point
+  const candidates = [
+    { x: point.x, y: origin.y, axis: 'horizontal' },
+    { x: origin.x, y: point.y, axis: 'vertical' },
+    ...anchors.flatMap(anchor => [
+      { x: anchor.x, y: point.y, axis: 'align-x' },
+      { x: point.x, y: anchor.y, axis: 'align-y' },
+      { x: anchor.x, y: anchor.y, axis: 'vertex' },
+    ]),
+  ]
+  let best = point
+  let bestDistance = tolerance
+  for (const candidate of candidates) {
+    const distance = Math.hypot(candidate.x - point.x, candidate.y - point.y)
+    if (distance <= bestDistance) {
+      best = { x: candidate.x, y: candidate.y }
+      bestDistance = distance
+    }
+  }
+  return best
+}
 const pointInPolygon = (point, points) => {
   let inside = false
   for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
@@ -1234,15 +1256,8 @@ export default function Floorplan({
       return
     }
     const previous = roomDrawPoints[roomDrawPoints.length - 1]
-    const dx = point.x - previous.x
-    const dy = point.y - previous.y
-    const distance = Math.hypot(dx, dy)
-    const angle = Math.atan2(dy, dx)
-    const snapAngle = Math.round(angle / (Math.PI / 2)) * (Math.PI / 2)
-    const angleDelta = Math.atan2(Math.sin(angle - snapAngle), Math.cos(angle - snapAngle))
-    const snappedPoint = Math.abs(angleDelta) <= 5 * Math.PI / 180
-      ? { x: previous.x + Math.cos(snapAngle) * distance, y: previous.y + Math.sin(snapAngle) * distance }
-      : point
+    const snapTolerance = 14 * viewBox.width / Math.max(1, canvasSize.width)
+    const snappedPoint = snapRoomPoint(point, previous, roomDrawPoints.slice(0, -1), snapTolerance)
     if (Math.hypot(snappedPoint.x - previous.x, snappedPoint.y - previous.y) < 4) {
       setRoomDrawMessage('Garis terlalu pendek.')
       return
@@ -1377,20 +1392,11 @@ export default function Floorplan({
       return
     }
     if (tool === 'room' && roomDrawPoints.length) {
-      let nextPreview = point
-      if (!roomLengthInputOpen) {
-        // Snap each new vertex independently to horizontal/vertical directions
-        // when the cursor is within a small angular tolerance.
-        const origin = roomDrawPoints[roomDrawPoints.length - 1]
-        const rawAngle = Math.atan2(point.y - origin.y, point.x - origin.x)
-        const distance = Math.hypot(point.x - origin.x, point.y - origin.y)
-        const quarterTurn = Math.PI / 2
-        const nearestAngle = Math.round(rawAngle / quarterTurn) * quarterTurn
-        const delta = Math.atan2(Math.sin(rawAngle - nearestAngle), Math.cos(rawAngle - nearestAngle))
-        if (Math.abs(delta) <= 5 * Math.PI / 180) {
-          nextPreview = { x: origin.x + Math.cos(nearestAngle) * distance, y: origin.y + Math.sin(nearestAngle) * distance }
-        }
-      }
+      const origin = roomDrawPoints[roomDrawPoints.length - 1]
+      const snapTolerance = 14 * viewBox.width / Math.max(1, canvasSize.width)
+      const nextPreview = roomLengthInputOpen
+        ? point
+        : snapRoomPoint(point, origin, roomDrawPoints.slice(0, -1), snapTolerance)
       setPreviewPoint(nextPreview)
       return
     }
