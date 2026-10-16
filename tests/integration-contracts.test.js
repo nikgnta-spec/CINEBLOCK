@@ -12,6 +12,15 @@ test('App wires shared scene and floorplan state into both planning tabs', async
   assert.match(source, /<Floorplan[\s\S]*?scenes=\{scenes\}[\s\S]*?onChange=\{setScenes\}[\s\S]*?floorplans=\{floorplans\}[\s\S]*?onFloorplansChange=\{setFloorplans\}/)
 })
 
+test('PDF dimensions avoid duplicate bounding dimensions and shared-wall measurements for connected Rooms', async () => {
+  const source = await readSource('../src/components/PrintReport.jsx')
+  assert.match(source, /connectedRoomGroup\.length === 1 && \(\(\) =>/)
+  assert.match(source, /edges\.filter\(edge =>/)
+  assert.match(source, /roomEdges\(other\)\.some\(otherEdge =>/)
+  assert.match(source, /isConnectedGroupOwner && \(\(\) =>/)
+  assert.match(source, /total gabungan/)
+})
+
 test('Floorplan resolves and edits linked shots by stable IDs, not row numbers', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
 
