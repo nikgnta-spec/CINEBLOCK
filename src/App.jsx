@@ -570,9 +570,7 @@ export default function App({ initialWorkspace = null, cloudProjectId = '' } = {
         const sourceFloorplans = savedState?.floorplans ?? savedProjectRecord?.floorplans
         const sourceRooms = Array.isArray(savedState?.rooms)
           ? savedState.rooms
-          : savedState?.floorplans
-            ? []
-            : (savedProjectRecord?.rooms || [])
+          : (savedProjectRecord?.rooms || [])
         const migratedCurrent = migrateReusableRooms(
           legacyScenes,
           sourceFloorplans,
