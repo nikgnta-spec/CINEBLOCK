@@ -343,7 +343,7 @@ export default function Floorplan({
   const [previewPoint, setPreviewPoint] = useState(null)
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: MAP_WIDTH, height: MAP_HEIGHT })
   const [historyRevision, setHistoryRevision] = useState(0)
-  const [canvasPixelWidth, setCanvasPixelWidth] = useState(800)
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 520 })
   const selectionRef = useRef([])
   const layoutRef = useRef(null)
   const dragHistoryBeforeRef = useRef(null)
@@ -368,8 +368,8 @@ export default function Floorplan({
     const canvas = svgRef.current
     if (!canvas || typeof ResizeObserver === 'undefined') return undefined
     const observer = new ResizeObserver(entries => {
-      const width = entries[0]?.contentRect.width
-      if (width) setCanvasPixelWidth(width)
+      const { width, height } = entries[0].contentRect
+      if (width && height) setCanvasSize({ width, height })
     })
     observer.observe(canvas)
     return () => observer.disconnect()
@@ -1544,11 +1544,11 @@ export default function Floorplan({
     wall: 'Wall', prop: 'Prop',
   })[type] || type
   const objectCount = layout.rooms.length + layout.walls.length + layout.props.length + layout.actors.length + layout.cameras.length + layout.lights.length
-  const targetScaleMeters = Math.max(0.01, viewBox.width * 84 / Math.max(1, canvasPixelWidth) / 100)
+  const targetScaleMeters = Math.max(0.01, viewBox.width * 84 / Math.max(1, canvasSize.width) / 100)
   const scalePower = 10 ** Math.floor(Math.log10(targetScaleMeters))
   const scaleUnit = targetScaleMeters / scalePower
   const scaleMeters = (scaleUnit <= 1 ? 1 : scaleUnit <= 2 ? 2 : scaleUnit <= 5 ? 5 : 10) * scalePower
-  const scaleBarWidth = Math.max(36, Math.min(120, scaleMeters * 100 / viewBox.width * canvasPixelWidth))
+  const scaleBarWidth = Math.max(36, Math.min(120, scaleMeters * 100 / viewBox.width * canvasSize.width))
   const selectedPath = selectedEntity?.path || []
   if (!scene) return null
 
@@ -1636,7 +1636,9 @@ export default function Floorplan({
               ref={svgRef}
               className={'floorplan-canvas' + (tool === 'select' ? ' can-select' : tool === 'pan' ? ' can-pan' : ' can-draw')}
               viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
-              preserveAspectRatio="none"
+              width={canvasSize.width}
+              height={canvasSize.height}
+              preserveAspectRatio="xMidYMid meet"
               role="img"
               aria-label="Kanvas Floorplan tampak atas"
               onPointerDown={handleCanvasPointerDown}
