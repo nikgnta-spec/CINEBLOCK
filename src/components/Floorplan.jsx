@@ -372,6 +372,10 @@ export default function Floorplan({
   const [spaceHeld, setSpaceHeld] = useState(false)
   const pinchRef = useRef(null)
   const [drawStart, setDrawStart] = useState(null)
+  const [roomDrawPoints, setRoomDrawPoints] = useState([])
+  const [roomLengthInputOpen, setRoomLengthInputOpen] = useState(false)
+  const [roomLengthInput, setRoomLengthInput] = useState('')
+  const [roomDrawMessage, setRoomDrawMessage] = useState('')
   const [previewPoint, setPreviewPoint] = useState(null)
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: MAP_WIDTH, height: MAP_HEIGHT })
   const [historyRevision, setHistoryRevision] = useState(0)
@@ -1112,7 +1116,85 @@ export default function Floorplan({
     setTool('select')
   }
 
+  const finishRoomDrawing = points => {
+    if (points.length < 3) {
+      setRoomDrawMessage('Room membutuhkan minimal 3 titik.')
+      return false
+    }
+    const cleanPoints = points.map(point => ({ x: Math.round(point.x), y: Math.round(point.y) }))
+    const area = Math.abs(cleanPoints.reduce((sum, point, index) => {
+      const next = cleanPoints[(index + 1) % cleanPoints.length]
+      return sum + point.x * next.y - next.x * point.y
+    }, 0)) / 2
+    if (area < 16) {
+      setRoomDrawMessage('Bentuk terlalu kecil atau tidak valid.')
+      return false
+    }
+    const room = {
+      id: makeId(),
+      points: cleanPoints,
+      label: 'Room ' + padNum(layout.rooms.length + 1),
+      openings: [],
+    }
+    updateLayout(previous => ({ ...previous, rooms: [...previous.rooms, room] }))
+    applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id })
+    onSelectedShotIdChange?.('')
+    setRoomDrawPoints([])
+    setPreviewPoint(null)
+    setRoomDrawMessage('')
+    setRoomLengthInputOpen(false)
+    setTool('select')
+    return true
+  }
+
+  const addRoomDrawingPoint = point => {
+    setRoomDrawMessage('')
+    if (!roomDrawPoints.length) {
+      setRoomDrawPoints([point])
+      setPreviewPoint(point)
+      return
+    }
+    const first = roomDrawPoints[0]
+    const rect = svgRef.current?.getBoundingClientRect()
+    const closeTolerance = 15 * (rect?.width ? viewBox.width / rect.width : 1)
+    if (Math.hypot(point.x - first.x, point.y - first.y) <= closeTolerance) {
+      finishRoomDrawing(roomDrawPoints)
+      return
+    }
+    const previous = roomDrawPoints[roomDrawPoints.length - 1]
+    if (Math.hypot(point.x - previous.x, point.y - previous.y) < 4) {
+      setRoomDrawMessage('Garis terlalu pendek.')
+      return
+    }
+    setRoomDrawPoints(points => [...points, point])
+    setPreviewPoint(point)
+  }
+
+  const confirmManualRoomLength = () => {
+    const meters = Number(roomLengthInput)
+    if (!Number.isFinite(meters) || meters <= 0 || !roomDrawPoints.length || !previewPoint) {
+      setRoomLengthInputOpen(false)
+      return
+    }
+    const origin = roomDrawPoints[roomDrawPoints.length - 1]
+    const dx = previewPoint.x - origin.x
+    const dy = previewPoint.y - origin.y
+    const angle = Math.atan2(dy, dx)
+    const distance = meters * 100
+    const nextPoint = { x: origin.x + Math.cos(angle) * distance, y: origin.y + Math.sin(angle) * distance }
+    setRoomDrawPoints(points => [...points, nextPoint])
+    setPreviewPoint(nextPoint)
+    setRoomLengthInputOpen(false)
+    setRoomLengthInput('')
+  }
+
   const handleCanvasPointerDownCapture = event => {
+    if (tool === 'room' && event.button === 0 && !spaceHeld) {
+      event.preventDefault()
+      event.stopPropagation()
+      addRoomDrawingPoint(getPoint(event))
+      return
+    }
     // Path mode must intercept object pointer handlers: rooms and props can
     // visually cover the selected actor, but must never steal a waypoint click.
     if (tool === 'path' && event.button === 0) {
@@ -1209,6 +1291,10 @@ export default function Floorplan({
         height: Math.abs(point.y - drag.start.y),
         additive: drag.additive,
       })
+      return
+    }
+    if (tool === 'room' && roomDrawPoints.length) {
+      setPreviewPoint(point)
       return
     }
     if (drawStart) {
@@ -1655,11 +1741,30 @@ export default function Floorplan({
         return
       }
       if (key === 'escape') {
+        if (tool === 'room' && roomDrawPoints.length) {
+          event.preventDefault()
+          setRoomDrawPoints([])
+          setPreviewPoint(null)
+          setRoomLengthInputOpen(false)
+          setRoomDrawMessage('')
+          return
+        }
         event.preventDefault()
         applyEntitySelection([])
         setSelectedWaypoint(null)
         onSelectedShotIdChange?.('')
         setTool('select')
+        return
+      }
+      if (tool === 'room' && roomDrawPoints.length && key === 'enter') {
+        event.preventDefault()
+        finishRoomDrawing(roomDrawPoints)
+        return
+      }
+      if (tool === 'room' && roomDrawPoints.length && key === 'tab') {
+        event.preventDefault()
+        setRoomLengthInputOpen(true)
+        setRoomLengthInput('')
         return
       }
       if (key === 'v') {
