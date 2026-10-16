@@ -1134,15 +1134,27 @@ export default function Floorplan({
       return
     }
 
-    // Persist the connection on both Room records. Selection is temporary UI
-    // state and must not be used to represent a lasting Room connection.
-    // Keep the polygons, names, walls and all openings completely separate.
+    // Snap the dropped Room exactly onto the target Room's wall line before
+    // persisting the connection. This removes hairline gaps while preserving
+    // each Room's own shape, openings, and label.
+    const movingEdge = roomMergePrompt.movingEdge
+    const targetEdge = roomMergePrompt.targetEdge
+    const dx = targetEdge.b.x - targetEdge.a.x
+    const dy = targetEdge.b.y - targetEdge.a.y
+    const edgeLength = Math.hypot(dx, dy) || 1
+    const normal = { x: -dy / edgeLength, y: dx / edgeLength }
+    const signedDistance = (movingEdge.a.x - targetEdge.a.x) * normal.x + (movingEdge.a.y - targetEdge.a.y) * normal.y
+    const shift = { x: -normal.x * signedDistance, y: -normal.y * signedDistance }
     updateLayout(previous => ({
       ...previous,
       rooms: previous.rooms.map(room => {
         if (room.id !== moving.id && room.id !== target.id) return room
         const connectedRoomIds = new Set(Array.isArray(room.connectedRoomIds) ? room.connectedRoomIds : [])
         connectedRoomIds.add(room.id === moving.id ? target.id : moving.id)
+        if (room.id === moving.id) {
+          const points = getRoomPoints(room).map(point => ({ x: Math.round(point.x + shift.x), y: Math.round(point.y + shift.y) }))
+          return { ...room, points, connectedRoomIds: [...connectedRoomIds] }
+        }
         return { ...room, connectedRoomIds: [...connectedRoomIds] }
       }),
     }))
@@ -2427,12 +2439,27 @@ export default function Floorplan({
                 const groupSelected = selectedItems.some(entry => entry.type === 'room' && entry.id === room.id)
                 const bounds = getRoomBounds(room)
                 const edges = getRoomEdges(room)
+                const connectedRoomIds = new Set(Array.isArray(room.connectedRoomIds) ? room.connectedRoomIds : [])
+                const connectedRooms = layout.rooms.filter(candidate => connectedRoomIds.has(candidate.id))
+                const isSharedRoomEdge = edge => connectedRooms.some(other => getRoomEdges(other).some(otherEdge => {
+                  const dx = edge.x2 - edge.x1, dy = edge.y2 - edge.y1
+                  const otherDx = otherEdge.x2 - otherEdge.x1, otherDy = otherEdge.y2 - otherEdge.y1
+                  const length = Math.hypot(dx, dy) || 1
+                  const otherLength = Math.hypot(otherDx, otherDy) || 1
+                  if (Math.abs(dx * otherDy - dy * otherDx) / (length * otherLength) > 0.02) return false
+                  if (Math.abs(dx * (otherEdge.y1 - edge.y1) - dy * (otherEdge.x1 - edge.x1)) / length > 2) return false
+                  const ux = dx / length, uy = dy / length
+                  const project = point => (point.x - edge.x1) * ux + (point.y - edge.y1) * uy
+                  const start = Math.max(0, Math.min(project({ x: otherEdge.x1, y: otherEdge.y1 }), project({ x: otherEdge.x2, y: otherEdge.y2 })))
+                  const end = Math.min(length, Math.max(project({ x: otherEdge.x1, y: otherEdge.y1 }), project({ x: otherEdge.x2, y: otherEdge.y2 })))
+                  return end - start > 2
+                }))
                 const centroid = points.reduce((sum, point) => ({ x: sum.x + point.x / points.length, y: sum.y + point.y / points.length }), { x: 0, y: 0 })
                 return (
                   <g key={room.id} data-floorplan-object="true" onPointerEnter={() => setHoveredRoomEdge({ roomId: room.id, edgeIndex: null })} onPointerLeave={() => setHoveredRoomEdge(current => current?.roomId === room.id ? null : current)} onPointerDown={event => beginObjectDrag('room', room, event)} onClick={event => event.stopPropagation()}>
                     <polygon points={pointString} fill={active ? 'var(--bg-hover)' : 'var(--bg-subtle)'} stroke="none" />
                     {groupSelected && !active && <polygon points={pointString} fill="none" stroke="var(--accent)" strokeWidth="2" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
-                    {edges.map(edge => {
+                    {edges.filter(edge => !isSharedRoomEdge(edge)).map(edge => {
                       const edgeOpenings = openings.filter(opening => (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)) === edge.edgeIndex)
                       return getOpeningSegments(edge.length, edgeOpenings).map((segment, index) => {
                         const ux = (edge.x2 - edge.x1) / (edge.length || 1)
@@ -2448,7 +2475,7 @@ export default function Floorplan({
                         {'Tinggi ' + Number(room.ceilingHeight).toFixed(1) + ' m'}
                       </text>
                     )}
-                    {showRoomDimensions && (active || hoveredRoomEdge?.roomId === room.id) && (() => {
+                    {showRoomDimensions && (() => {
                       const bounds = getRoomBounds(room)
                       const dimensionLayouts = getRoomDimensionLayouts(room, edges)
                       // Connected Rooms form one dimension group: compute a single outer
@@ -2480,6 +2507,7 @@ export default function Floorplan({
                         : bounds
                       const hasConnectedRooms = connectedRoomGroup.length > 1
                       const isDimensionGroupActive = active && hasConnectedRooms
+                      const isTotalDimensionOwner = !hasConnectedRooms || room.id === [...connectedRoomGroup].map(item => item.id).sort()[0]
                       const totalBounds = hasConnectedRooms ? connectedBounds : bounds
                       const groupEdges = connectedRoomGroup.flatMap(getRoomEdges)
                       const isSharedBoundaryEdge = edge => connectedRoomGroup.some(other => other.id !== room.id &&
@@ -2505,7 +2533,7 @@ export default function Floorplan({
                       const horizontalTotalY = totalBounds.y - 112 - maxHorizontalLevel * 30
                       const verticalTotalX = totalBounds.x + totalBounds.width + 112 + maxVerticalLevel * 30
                       return <g pointerEvents="none" opacity={active ? 1 : 0.58}>
-                        {visibleDimensionLayouts.map(({ edge, dimension: d }) => {
+                        {(active || hoveredRoomEdge?.roomId === room.id) && visibleDimensionLayouts.map(({ edge, dimension: d }) => {
                           const label = (edge.length / 100).toFixed(2) + ' m'
                           return <g key={'dimension-' + edge.edgeIndex}>
                             <line x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2} stroke="var(--text-muted)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
@@ -2514,7 +2542,7 @@ export default function Floorplan({
                             <text x={d.mx} y={d.my - 5} textAnchor="middle" fontSize="11" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{label}</text>
                           </g>
                         })}
-                        {!horizontalIsSingleEdge && (!hasConnectedRooms || isDimensionGroupActive) && <>
+                        {isTotalDimensionOwner && !horizontalIsSingleEdge && <>
                           <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
                             <line x1={totalBounds.x} y1={horizontalTotalY} x2={totalBounds.x + totalBounds.width} y2={horizontalTotalY} />
                             <line x1={totalBounds.x} y1={horizontalTotalY - 6} x2={totalBounds.x} y2={horizontalTotalY + 6} />
@@ -2522,7 +2550,7 @@ export default function Floorplan({
                           </g>
                           <text x={totalBounds.x + totalBounds.width / 2} y={horizontalTotalY - 8} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{(totalBounds.width / 100).toFixed(2) + ' m total'}</text>
                         </>}
-                        {!verticalIsSingleEdge && (!hasConnectedRooms || isDimensionGroupActive) && <>
+                        {isTotalDimensionOwner && !verticalIsSingleEdge && <>
                           <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
                             <line x1={verticalTotalX} y1={totalBounds.y} x2={verticalTotalX} y2={totalBounds.y + totalBounds.height} />
                             <line x1={verticalTotalX - 6} y1={totalBounds.y} x2={verticalTotalX + 6} y2={totalBounds.y} />
