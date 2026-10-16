@@ -2381,7 +2381,7 @@ export default function Floorplan({
                         <text x={bounds.x + bounds.width + 124} y={bounds.y + bounds.height / 2} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" transform={'rotate(90 ' + (bounds.x + bounds.width + 124) + ' ' + (bounds.y + bounds.height / 2) + ')'}>{(bounds.height / 100).toFixed(2) + ' m total'}</text>
                       </g>
                     })()}
-                    {active && edges.map(edge => <line key={'edge-hit-' + edge.edgeIndex} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} stroke="transparent" strokeWidth="14" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerEnter={() => setHoveredRoomEdge({ roomId: room.id, edgeIndex: edge.edgeIndex })} onPointerLeave={() => setHoveredRoomEdge(current => current?.roomId === room.id && current.edgeIndex === edge.edgeIndex ? null : current)} onPointerDown={event => beginRoomEdgeDrag(room, edge.edgeIndex, event)} onDoubleClick={event => addRoomVertexOnEdge(room, edge.edgeIndex, event)} />)}
+                    {active && edges.map(edge => <line key={'edge-hit-' + edge.edgeIndex} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} stroke="transparent" strokeWidth="14" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerEnter={() => setHoveredRoomEdge(current => current?.roomId === room.id ? current : current)} onClick={event => { event.preventDefault(); event.stopPropagation(); setHoveredRoomEdge({ roomId: room.id, edgeIndex: edge.edgeIndex }); applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id }); setSelected({ type: 'room', id: room.id }) }} onPointerDown={event => { if (event.detail > 1) addRoomVertexOnEdge(room, edge.edgeIndex, event); else beginRoomEdgeDrag(room, edge.edgeIndex, event) }} onDoubleClick={event => addRoomVertexOnEdge(room, edge.edgeIndex, event)} />)}
                     {active && points.map((point, index) => (
                       <circle key={'vertex-' + index} cx={point.x} cy={point.y} r="6" fill="var(--bg)" stroke="var(--accent)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerDown={event => beginRoomVertexDrag(room, index, event)} onDoubleClick={event => { event.preventDefault(); event.stopPropagation(); setRoomVertexPrompt({ roomId: room.id, vertexIndex: index, point: { ...point } }) }} />
                     ))}
@@ -3089,10 +3089,10 @@ export default function Floorplan({
                     </div>
                     <p className="floorplan-field-note">{getRoomPoints(selectedEntity).length} titik · panjang/lebar mengikuti bounding box polygon.</p>
                     <div className="floorplan-opening-actions">
-                      <button type="button" disabled={Boolean(selectedEntity.locked) || hoveredRoomEdge?.roomId !== selectedEntity.id} onClick={() => addRoomVertexAtEdgeMidpoint(selectedEntity)}>Tambah titik di sisi yang disorot</button>
+                      <button type="button" disabled={Boolean(selectedEntity.locked) || hoveredRoomEdge?.roomId !== selectedEntity.id} onClick={() => addRoomVertexAtEdgeMidpoint(selectedEntity)}>Tambah titik pada sisi terpilih</button>
                       <button type="button" disabled={Boolean(selectedEntity.locked) || selectedRoomVertex?.roomId !== selectedEntity.id} onClick={deleteSelectedRoomVertex}>Hapus titik terpilih</button>
                     </div>
-                    <p className="floorplan-field-note">Arahkan kursor ke sisi dinding lalu pilih Tambah titik. Untuk menghapus, klik titik kuning lalu pilih Hapus titik terpilih atau tekan Delete.</p>
+                    <p className="floorplan-field-note">Klik sisi dinding untuk memilihnya, lalu tekan Tambah titik. Pilih titik kuning untuk menghapusnya dengan tombol Hapus titik terpilih atau tekan Delete.</p>
                   </section>
                   <section className="floorplan-inspector-section">
                     <label htmlFor="room-ceiling-height">Tinggi ruangan (m)</label>
