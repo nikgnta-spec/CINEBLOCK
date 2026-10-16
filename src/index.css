@@ -940,7 +940,22 @@ button:focus-visible,
   .print-scene-meta { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px; color: #4b5563; font-size: 8pt; }
   .print-scene-meta span { padding: 3px 7px; border: 1px solid #d1d5db; border-radius: 20px; }
   .print-plan-svg { display: block; width: 100%; height: auto; max-height: 218mm; border: 1px solid #d1d5db; background: #fff; }
-  .print-plan-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 8px 0 0; color: #4b5563; font-size: 7pt; }
+  .print-plan-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 7px 14px;
+    padding: 10px 0 0;
+    color: #374151;
+    font-size: 9pt;
+    line-height: 1.4;
+    break-inside: avoid;
+  }
+  .print-plan-legend span {
+    display: inline-block;
+    white-space: nowrap;
+    font-weight: 500;
+  }
   .print-muted { color: #6b7280; font-size: 8pt; }
   .print-report-footer { margin-top: 12px; padding-top: 6px; color: #6b7280; border-top: 1px solid #d1d5db; font-size: 7pt; }
 
