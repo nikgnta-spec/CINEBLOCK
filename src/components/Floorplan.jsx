@@ -129,12 +129,12 @@ const getRoomDimensionGeometry = (room, edge) => {
 const snapRoomPoint = (point, origin, anchors, tolerance) => {
   if (!origin) return { point, guides: [] }
   const candidates = [
+    // Snap in four directions: up/down align Y, left/right align X.
     { x: point.x, y: origin.y, guide: { axis: 'horizontal', x: origin.x, y: origin.y } },
     { x: origin.x, y: point.y, guide: { axis: 'vertical', x: origin.x, y: origin.y } },
     ...anchors.flatMap(anchor => [
       { x: point.x, y: anchor.y, guide: { axis: 'horizontal', x: anchor.x, y: anchor.y } },
       { x: anchor.x, y: point.y, guide: { axis: 'vertical', x: anchor.x, y: anchor.y } },
-      { x: anchor.x, y: anchor.y, guide: { axis: 'point', x: anchor.x, y: anchor.y } },
     ]),
   ]
   let best = point
