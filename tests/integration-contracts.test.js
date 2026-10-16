@@ -130,7 +130,9 @@ test('Room drawing snaps positionally to existing vertices with alignment guides
 test('Room dimensions distinguish individual wall lengths from overall bounds and keep openings draggable', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /m total/)
-  assert.match(source, /bounds\.x \+ bounds\.width \+ 48/)
+  assert.match(source, /y1 = y2 = guideY/)
+  assert.match(source, /x1 = x2 = guideX/)
+  assert.match(source, /angle: 0/)
   const roomRender = source.slice(source.indexOf('layout.rooms.map(room => {'), source.indexOf('layout\.walls\.map'))
   assert.ok(roomRender.indexOf("key={'edge-hit-'") < roomRender.indexOf("onPointerDown={event => beginOpeningDrag('room', room, opening, event)}"))
 })
@@ -142,7 +144,7 @@ test('Door opening controls expose swing direction and single or double leaves',
   assert.match(source, /opening\.doorType === 'double'/)
   assert.match(source, /opening\.id \+ '-swing'/)
   assert.match(source, /opening\.id \+ '-door-type'/)
-  assert.match(source, /const offset = 62/)
+  assert.match(source, /const offset = 72/)
 })
 test('Dragging a Room edge translates both endpoint vertices in parallel', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
@@ -158,7 +160,7 @@ test('Room drawing is point-by-point with close, Escape, live dimensions and man
 
   assert.match(source, /const addRoomDrawingPoint = point =>/)
   assert.match(source, /const finishRoomDrawing = points =>/)
-  assert.match(source, /setRoomDrawPoints\(points => \[\.\.\.points, point\]\)/)
+  assert.match(source, /setRoomDrawPoints\(points => \[\.\.\.points, snappedPoint\]\)/)
   assert.match(source, /const confirmManualRoomLength =/)
   assert.match(source, /Panjang garis dalam meter/)
   assert.match(source, /roomDrawPoints.length && key === 'enter'/)
