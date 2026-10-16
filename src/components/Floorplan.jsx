@@ -169,8 +169,13 @@ const getRoomDimensionLayouts = (room, edges) => {
     group.forEach(item => {
       // All dimensions on one exterior side use a shared rectangular baseline.
       // Add another lane only when the projected label ranges would collide.
-      const paddedStart = item.intervalStart - 34
-      const paddedEnd = item.intervalEnd + 34
+      // Lane collision is determined by label footprints, not full wall spans.
+      // Adjacent wall segments can share one straight dimension row when their labels
+      // have enough room, matching conventional floor-plan dimension chains.
+      const labelCenter = (item.intervalStart + item.intervalEnd) / 2
+      const labelHalfWidth = 30
+      const paddedStart = labelCenter - labelHalfWidth
+      const paddedEnd = labelCenter + labelHalfWidth
       let level = lanes.findIndex(lane => lane.every(interval => paddedEnd < interval.start || paddedStart > interval.end))
       if (level < 0) level = lanes.length
       if (!lanes[level]) lanes[level] = []
