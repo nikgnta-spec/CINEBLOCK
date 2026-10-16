@@ -2440,11 +2440,54 @@ export default function Floorplan({
                     <input id="room-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
                   </section>
                   <section className="floorplan-inspector-section">
-                    <div className="floorplan-section-title">Dimensi</div>
-                    <div className="floorplan-dimension-summary">
-                      <div><span>Panjang</span><strong>{formatMeters(selectedEntity.width)}</strong></div>
-                      <div><span>Lebar</span><strong>{formatMeters(selectedEntity.height)}</strong></div>
+                    <div className="floorplan-section-title">Dimensi (meter)</div>
+                    <div className="floorplan-opening-actions">
+                      <div className="floorplan-dimension-input">
+                        <label htmlFor="room-width">Panjang (m)</label>
+                        <input
+                          id="room-width"
+                          className="floorplan-field"
+                          type="number"
+                          min="0.40"
+                          max="10.00"
+                          step="0.01"
+                          value={(Number(selectedEntity.width || 100) / 100).toFixed(2)}
+                          disabled={Boolean(selectedEntity.locked)}
+                          onChange={event => {
+                            const meters = Number(event.target.value)
+                            if (!Number.isFinite(meters) || meters < 0.4 || meters > 10) return
+                            const width = Math.round(meters * 100)
+                            updateSelected({
+                              width,
+                              x: Math.min(Number(selectedEntity.x) || 0, MAP_WIDTH - width),
+                            })
+                          }}
+                        />
+                      </div>
+                      <div className="floorplan-dimension-input">
+                        <label htmlFor="room-height">Lebar (m)</label>
+                        <input
+                          id="room-height"
+                          className="floorplan-field"
+                          type="number"
+                          min="0.40"
+                          max="6.50"
+                          step="0.01"
+                          value={(Number(selectedEntity.height || 80) / 100).toFixed(2)}
+                          disabled={Boolean(selectedEntity.locked)}
+                          onChange={event => {
+                            const meters = Number(event.target.value)
+                            if (!Number.isFinite(meters) || meters < 0.4 || meters > 6.5) return
+                            const height = Math.round(meters * 100)
+                            updateSelected({
+                              height,
+                              y: Math.min(Number(selectedEntity.y) || 0, MAP_HEIGHT - height),
+                            })
+                          }}
+                        />
+                      </div>
                     </div>
+                    <p className="floorplan-field-note">Masukkan ukuran dalam meter. Panjang 0,40–10 m, lebar 0,40–6,50 m.</p>
                   </section>
                   <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Bukaan</div>
