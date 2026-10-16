@@ -2395,14 +2395,23 @@ export default function Floorplan({
                 )
               })}
 
-              {drawStart && previewPoint && tool === 'room' && (
-                <rect
-                  x={Math.min(drawStart.x, previewPoint.x)} y={Math.min(drawStart.y, previewPoint.y)}
-                  width={Math.abs(previewPoint.x - drawStart.x)} height={Math.abs(previewPoint.y - drawStart.y)}
-                  fill="var(--bg-hover)" stroke="var(--text-muted)" strokeWidth="2" strokeDasharray="6 4"
-                  vectorEffect="non-scaling-stroke" pointerEvents="none"
-                />
+              {tool === 'room' && roomDrawPoints.length > 0 && previewPoint && (() => {
+                const points = [...roomDrawPoints, previewPoint]
+                const last = roomDrawPoints[roomDrawPoints.length - 1]
+                const length = Math.hypot(previewPoint.x - last.x, previewPoint.y - last.y)
+                const pointString = points.map(point => point.x + ',' + point.y).join(' ')
+                const closeTolerance = 15 * viewBox.width / Math.max(1, canvasSize.width)
+                const close = Math.hypot(previewPoint.x - roomDrawPoints[0].x, previewPoint.y - roomDrawPoints[0].y) <= closeTolerance
+                return <g pointerEvents="none"><polyline points={pointString} fill={roomDrawPoints.length >= 2 ? 'var(--bg-hover)' : 'none'} fillOpacity="0.45" stroke="var(--text-muted)" strokeWidth="2" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" /><circle cx={roomDrawPoints[0].x} cy={roomDrawPoints[0].y} r={close ? 9 : 5} fill={close ? 'var(--accent)' : 'var(--bg)'} stroke="var(--accent)" strokeWidth="2" vectorEffect="non-scaling-stroke" /><text x={(last.x + previewPoint.x) / 2 + 6} y={(last.y + previewPoint.y) / 2 - 8} fontSize="13" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke">{(length / 100).toFixed(2) + ' m'}</text></g>
+              })()}
+              {tool === 'room' && roomLengthInputOpen && previewPoint && (
+                <foreignObject x={previewPoint.x + 10} y={previewPoint.y + 10} width="150" height="48" style={{ overflow: 'visible', pointerEvents: 'all' }}>
+                  <div xmlns="http://www.w3.org/1999/xhtml" style={{ background: 'var(--bg)', border: '1px solid var(--border-strong)', borderRadius: '6px', padding: '5px', color: 'var(--text)', pointerEvents: 'all' }} onPointerDown={event => event.stopPropagation()}>
+                    <input autoFocus aria-label="Panjang garis dalam meter" type="number" min="0.01" step="0.01" value={roomLengthInput} onChange={event => setRoomLengthInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); confirmManualRoomLength() } if (event.key === 'Escape') { event.preventDefault(); setRoomLengthInputOpen(false) } }} style={{ width: '100%', background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '4px', padding: '4px' }} />
+                  </div>
+                </foreignObject>
               )}
+              {roomDrawMessage && tool === 'room' && <text x={viewBox.x + 16} y={viewBox.y + 28} fill="var(--text)" fontSize="13" pointerEvents="none">{roomDrawMessage}</text>}
               {drawStart && previewPoint && tool === 'wall' && (
                 <line x1={drawStart.x} y1={drawStart.y} x2={previewPoint.x} y2={previewPoint.y}
                   stroke="var(--text)" strokeWidth="3" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />
