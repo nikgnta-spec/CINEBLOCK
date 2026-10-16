@@ -175,6 +175,29 @@ function PrintFloorplan({ scene, layout }) {
             maxX: Math.max(...points.map(point => point.x)),
             maxY: Math.max(...points.map(point => point.y)),
           }
+          // Mirror the editor's connected-room group measurements in the PDF.
+          const roomById = new Map(rooms.map(item => [item.id, item]))
+          const visitedRoomIds = new Set([room.id])
+          const roomQueue = [room.id]
+          while (roomQueue.length) {
+            const current = roomById.get(roomQueue.shift())
+            ;(current?.connectedRoomIds || []).forEach(id => {
+              if (roomById.has(id) && !visitedRoomIds.has(id)) {
+                visitedRoomIds.add(id)
+                roomQueue.push(id)
+              }
+            })
+          }
+          const connectedRoomGroup = [...visitedRoomIds].map(id => roomById.get(id)).filter(Boolean)
+          const connectedPoints = connectedRoomGroup.flatMap(roomPoints)
+          const connectedBounds = connectedPoints.length ? {
+            x: Math.min(...connectedPoints.map(point => point.x)),
+            y: Math.min(...connectedPoints.map(point => point.y)),
+            maxX: Math.max(...connectedPoints.map(point => point.x)),
+            maxY: Math.max(...connectedPoints.map(point => point.y)),
+          } : bounds
+          const isConnectedGroupOwner = connectedRoomGroup.length > 1
+            && room.id === connectedRoomGroup.map(item => item.id).sort()[0]
           return (
             <g key={'room-outline-' + room.id}>
               {edges.flatMap(edge => openingSegments(edge.length, openings.filter(opening => (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)) === edge.edgeIndex)).map((segment, index) => {
@@ -233,6 +256,22 @@ function PrintFloorplan({ scene, layout }) {
                   <line x1={verticalX - 5} y1={bounds.y} x2={verticalX + 5} y2={bounds.y} />
                   <line x1={verticalX - 5} y1={bounds.maxY} x2={verticalX + 5} y2={bounds.maxY} />
                   <text x={verticalX + 14} y={(bounds.y + bounds.maxY) / 2} fill="#374151" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="12" textAnchor="middle" transform={'rotate(90 ' + (verticalX + 14) + ' ' + ((bounds.y + bounds.maxY) / 2) + ')'}>{meters(totalWidth)} total</text>
+                </g>
+              })()}
+              {isConnectedGroupOwner && (() => {
+                const totalLength = connectedBounds.maxX - connectedBounds.x
+                const totalWidth = connectedBounds.maxY - connectedBounds.y
+                const horizontalY = connectedBounds.y - 160
+                const verticalX = connectedBounds.maxX + 160
+                return <g fill="none" stroke="#475569" strokeWidth="1.4">
+                  <line x1={connectedBounds.x} y1={horizontalY} x2={connectedBounds.maxX} y2={horizontalY} />
+                  <line x1={connectedBounds.x} y1={horizontalY - 5} x2={connectedBounds.x} y2={horizontalY + 5} />
+                  <line x1={connectedBounds.maxX} y1={horizontalY - 5} x2={connectedBounds.maxX} y2={horizontalY + 5} />
+                  <text x={(connectedBounds.x + connectedBounds.maxX) / 2} y={horizontalY - 8} fill="#1d4ed8" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="13" fontWeight="700" textAnchor="middle">{meters(totalLength)} total gabungan</text>
+                  <line x1={verticalX} y1={connectedBounds.y} x2={verticalX} y2={connectedBounds.maxY} />
+                  <line x1={verticalX - 5} y1={connectedBounds.y} x2={verticalX + 5} y2={connectedBounds.y} />
+                  <line x1={verticalX - 5} y1={connectedBounds.maxY} x2={verticalX + 5} y2={connectedBounds.maxY} />
+                  <text x={verticalX + 14} y={(connectedBounds.y + connectedBounds.maxY) / 2} fill="#1d4ed8" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="13" fontWeight="700" textAnchor="middle" transform={'rotate(90 ' + (verticalX + 14) + ' ' + ((connectedBounds.y + connectedBounds.maxY) / 2) + ')'}>{meters(totalWidth)} total gabungan</text>
                 </g>
               })()}
               {openings.map(opening => {
