@@ -1006,7 +1006,8 @@ export default function Floorplan({
 
   const beginOpeningDrag = (hostType, host, opening, event) => {
     if (tool === 'pan') return
-    event.stopPropagation()    event.preventDefault()
+    event.stopPropagation()
+    event.preventDefault()
     applyEntitySelection([{ type: hostType, id: host.id }], { type: hostType, id: host.id })
     beginDragHistory()
     dragRef.current = { mode: 'opening', type: hostType, id: host.id, openingId: opening.id }
