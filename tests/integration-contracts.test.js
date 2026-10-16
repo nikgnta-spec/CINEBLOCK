@@ -173,6 +173,18 @@ test('Room snapping combines X and Y from different vertices and keeps single-ax
   assert.deepEqual(onlyY.guides.map(guide => guide.axis), ['horizontal'])
 })
 
+test('Room dimension layout uses consistent exterior lanes and suppresses duplicate total dimensions', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const getRoomDimensionLayouts = \(room, edges\) =>/)
+  assert.match(source, /const offset = 72 \+ level \* 30/)
+  assert.match(source, /const horizontalIsSingleEdge = edges\.some/)
+  assert.match(source, /const verticalIsSingleEdge = edges\.some/)
+  assert.match(source, /!horizontalIsSingleEdge/)
+  assert.match(source, /!verticalIsSingleEdge/)
+  assert.match(source, /opacity=\{active \? 1 : 0\.58\}/)
+  assert.match(source, /strokeWidth="5" paintOrder="stroke"/)
+})
+
 test('Room dimensions distinguish individual wall lengths from overall bounds and keep openings draggable', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /m total/)
