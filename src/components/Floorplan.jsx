@@ -1188,7 +1188,7 @@ export default function Floorplan({
 
     if (type === 'camera') onSelectedShotIdChange?.(item.shotId || '')
     else if (!alreadySelected || currentSelection.length <= 1) onSelectedShotIdChange?.('')
-    if (item.locked || tool === 'room' || tool === 'wall') return
+    if (item.locked || (tool === 'room' && type !== 'room') || (tool === 'wall' && type !== 'wall')) return
     if (tool === 'path') setTool('select')
     const point = getPoint(event)
 
