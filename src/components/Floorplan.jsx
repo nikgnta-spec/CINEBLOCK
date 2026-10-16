@@ -1963,58 +1963,40 @@ export default function Floorplan({
               <rect x={-MAP_WIDTH * 2} y={-MAP_HEIGHT * 2} width={MAP_WIDTH * 5} height={MAP_HEIGHT * 5} fill="url(#floorplan-grid)" pointerEvents="none" />
 
               {layout.rooms.map(room => {
+                const points = getRoomPoints(room)
+                const pointString = points.map(point => point.x + ',' + point.y).join(' ')
                 const openings = room.openings || []
                 const active = selected?.type === 'room' && selected.id === room.id
                 const groupSelected = selectedItems.some(entry => entry.type === 'room' && entry.id === room.id)
-                const edgeDefs = [
-                  { side: 'top', x: room.x, y: room.y, length: room.width, horizontal: true },
-                  { side: 'right', x: room.x + room.width, y: room.y, length: room.height, horizontal: false },
-                  { side: 'bottom', x: room.x, y: room.y + room.height, length: room.width, horizontal: true },
-                  { side: 'left', x: room.x, y: room.y, length: room.height, horizontal: false },
-                ]
+                const bounds = getRoomBounds(room)
+                const edges = getRoomEdges(room)
+                const centroid = points.reduce((sum, point) => ({ x: sum.x + point.x / points.length, y: sum.y + point.y / points.length }), { x: 0, y: 0 })
                 return (
                   <g key={room.id} data-floorplan-object="true" onPointerDown={event => beginObjectDrag('room', room, event)} onClick={event => event.stopPropagation()}>
-                    <rect
-                      x={room.x} y={room.y} width={room.width} height={room.height}
-                      fill={active ? 'var(--bg-hover)' : 'var(--bg-subtle)'}
-                      stroke="none"
-                    />
-                    {groupSelected && !active && <rect x={room.x} y={room.y} width={room.width} height={room.height} fill="none" stroke="var(--accent)" strokeWidth="2" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
-                    {edgeDefs.flatMap(edge => {
-                      const edgeOpenings = openings.filter(opening => (opening.side || 'bottom') === edge.side)
-                      return getOpeningSegments(edge.length, edgeOpenings).map((segment, index) => (
-                        <line
-                          key={edge.side + '-' + index}
-                          x1={edge.horizontal ? room.x + segment.start : edge.x}
-                          y1={edge.horizontal ? edge.y : room.y + segment.start}
-                          x2={edge.horizontal ? room.x + segment.end : edge.x}
-                          y2={edge.horizontal ? edge.y : room.y + segment.end}
-                          stroke={active ? 'var(--text)' : 'var(--border-strong)'}
-                          strokeWidth={active ? 3.5 : 2.5}
-                          vectorEffect="non-scaling-stroke"
-                          pointerEvents="none"
-                        />
-                      ))
+                    <polygon points={pointString} fill={active ? 'var(--bg-hover)' : 'var(--bg-subtle)'} stroke="none" />
+                    {groupSelected && !active && <polygon points={pointString} fill="none" stroke="var(--accent)" strokeWidth="2" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
+                    {edges.map(edge => {
+                      const edgeOpenings = openings.filter(opening => (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)) === edge.edgeIndex)
+                      return getOpeningSegments(edge.length, edgeOpenings).map((segment, index) => {
+                        const ux = (edge.x2 - edge.x1) / (edge.length || 1)
+                        const uy = (edge.y2 - edge.y1) / (edge.length || 1)
+                        return <line key={edge.edgeIndex + '-' + index} x1={edge.x1 + ux * segment.start} y1={edge.y1 + uy * segment.start} x2={edge.x1 + ux * segment.end} y2={edge.y1 + uy * segment.end} stroke={active ? 'var(--text)' : 'var(--border-strong)'} strokeWidth={active ? 3.5 : 2.5} vectorEffect="non-scaling-stroke" pointerEvents="none" />
+                      })
                     })}
-                    <text x={room.x + 12} y={room.y + 28} fill="var(--text)" fontSize="18" fontWeight="600" pointerEvents="none">
+                    <text x={bounds.x + 12} y={bounds.y + 25} fill="var(--text)" fontSize="18" fontWeight="600" pointerEvents="none" paintOrder="stroke" stroke="var(--bg)" strokeWidth="3">
                       {room.label || 'Room'}
                     </text>
+                    {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && (
+                      <text x={bounds.x + 12} y={bounds.y + 42} fill="var(--text-muted)" fontSize="12" pointerEvents="none" paintOrder="stroke" stroke="var(--bg)" strokeWidth="3">
+                        {Number(room.ceilingHeight).toFixed(1) + ' m'}
+                      </text>
+                    )}
                     {openings.map(opening => {
                       const placement = getRoomOpeningPlacement(room, opening)
                       const openingWidth = Math.min(Number(opening.width) || 48, placement.length)
                       return (
-                        <g
-                          key={opening.id}
-                          transform={'translate(' + placement.x + ' ' + placement.y + ') rotate(' + placement.angle + ')'}
-                          data-floorplan-object="true"
-                          style={{ cursor: 'grab' }}
-                          onPointerDown={event => beginOpeningDrag('room', room, opening, event)}
-                          onClick={event => event.stopPropagation()}
-                        >
-                          <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type === 'door' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">
-                            {opening.type === 'door' ? 'Pintu' : 'Jendela'}
-                          </text>
-
+                        <g key={opening.id} transform={'translate(' + placement.x + ' ' + placement.y + ') rotate(' + placement.angle + ')'} data-floorplan-object="true" style={{ cursor: 'grab' }} onPointerDown={event => beginOpeningDrag('room', room, opening, event)} onClick={event => event.stopPropagation()}>
+                          <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type === 'door' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">{opening.type === 'door' ? 'Pintu' : 'Jendela'}</text>
                           {opening.type === 'door' ? (
                             <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
                               <path d={'M ' + (-openingWidth / 2) + ' 0 V ' + (-openingWidth)} />
@@ -2029,22 +2011,10 @@ export default function Floorplan({
                         </g>
                       )
                     })}
-                    {active && RESIZE_HANDLES.map(handle => (
-                      <rect
-                        key={handle.key}
-                        x={(handle.sx < 0 ? room.x : room.x + room.width) - 5}
-                        y={(handle.sy < 0 ? room.y : room.y + room.height) - 5}
-                        width="10"
-                        height="10"
-                        rx="1.5"
-                        fill="var(--bg)"
-                        stroke="var(--text)"
-                        strokeWidth="1.8"
-                        vectorEffect="non-scaling-stroke"
-                        style={{ cursor: handle.cursor }}
-                        onPointerDown={event => beginResize('room', room, handle.sx, handle.sy, event)}
-                      />
+                    {active && points.map((point, index) => (
+                      <circle key={'vertex-' + index} cx={point.x} cy={point.y} r="6" fill="var(--bg)" stroke="var(--accent)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerDown={event => beginRoomVertexDrag(room, index, event)} />
                     ))}
+                    {active && edges.map(edge => <circle key={'edge-' + edge.edgeIndex} cx={(edge.x1 + edge.x2) / 2} cy={(edge.y1 + edge.y2) / 2} r="3.5" fill="var(--text-muted)" stroke="var(--bg)" strokeWidth="1" vectorEffect="non-scaling-stroke" pointerEvents="none" />)}
                   </g>
                 )
               })}
