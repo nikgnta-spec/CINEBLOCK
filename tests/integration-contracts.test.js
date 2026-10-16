@@ -498,3 +498,10 @@ test('existing Rooms remain draggable while Room drawing tool is active', async 
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /if \(item\.locked \|\| \(tool === 'room' && type !== 'room'\) \|\| \(tool === 'wall' && type !== 'wall'\)\) return/)
 })
+
+test('Room tool switches to move mode when dragging an existing Room and inspector can disconnect it', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /if \(tool === 'path' \|\| \(tool === 'room' && type === 'room'\)\) setTool\('select'\)/)
+  assert.match(source, /Lepaskan sambungan Room/)
+  assert.match(source, /room\.connectedRoomIds: \(room\.connectedRoomIds \|\| \[\]\)\.filter\(id => id !== selectedEntity\.id\)/)
+})
