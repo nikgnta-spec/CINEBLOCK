@@ -96,7 +96,7 @@ export function mergeAdjacentRoomPolygons(movingRoom, targetRoom, candidate) {
     if (!nearest || nearest.distance > 3) return { ...opening, edgeIndex: -1, needsReposition: true }
     return { ...opening, edgeIndex: nearest.edgeIndex, offset: nearest.offset }
   })
-  const targetOpenings = remapOpenings(targetRoom, targetPoints)
+  const targetOpenings = remapOpenings(targetRoom, aligned)
   const movingOpenings = remapOpenings(movingRoom, movingPoints)
   if ([...targetOpenings, ...movingOpenings].some(opening => opening.needsReposition)) return null
   return { ...targetRoom, points: mergedPoints, openings: [...targetOpenings, ...movingOpenings] }
