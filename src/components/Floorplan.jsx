@@ -2434,3 +2434,12 @@ export default function Floorplan({
                     <span className="floorplan-object-row-name">{objectName(object.entityType, object)}</span>
                     <span className="floorplan-object-row-type">{objectTypeLabel(object.entityType)}</span>
                   </button>
+                ))
+              )}
+            </div>
+          )}
+        </aside>
+      </div>
+    </div>
+  )
+}
