@@ -4,7 +4,7 @@ import {
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
 import { snapRoomPoint } from '../utils/roomSnapping'
-import { findRoomMergeCandidate } from '../utils/roomMerge'
+import { findRoomMergeCandidate, snapRoomToEdge } from '../utils/roomMerge'
 import {
   SIZES as SHOT_SIZES,
   ANGLES as SHOT_ANGLES,
@@ -1139,12 +1139,14 @@ export default function Floorplan({
     // each Room's own shape, openings, and label.
     const movingEdge = roomMergePrompt.movingEdge
     const targetEdge = roomMergePrompt.targetEdge
-    const dx = targetEdge.b.x - targetEdge.a.x
-    const dy = targetEdge.b.y - targetEdge.a.y
-    const edgeLength = Math.hypot(dx, dy) || 1
-    const normal = { x: -dy / edgeLength, y: dx / edgeLength }
-    const signedDistance = (movingEdge.a.x - targetEdge.a.x) * normal.x + (movingEdge.a.y - targetEdge.a.y) * normal.y
-    const shift = { x: -normal.x * signedDistance, y: -normal.y * signedDistance }
+    // Align the dropped edge with the target edge using a rigid transform.
+    // This corrects tiny angular and sub-pixel offsets without rounding vertices
+    // independently (which can reintroduce hairline gaps along the shared wall).
+    const snappedPoints = snapRoomToEdge(moving, movingEdge, targetEdge)
+    if (!snappedPoints) {
+      setRoomMergePrompt({ ...roomMergePrompt, error: 'Dinding tidak dapat disejajarkan. Coba geser Room sedikit lalu sambungkan kembali.' })
+      return
+    }
     updateLayout(previous => ({
       ...previous,
       rooms: previous.rooms.map(room => {
@@ -1152,8 +1154,7 @@ export default function Floorplan({
         const connectedRoomIds = new Set(Array.isArray(room.connectedRoomIds) ? room.connectedRoomIds : [])
         connectedRoomIds.add(room.id === moving.id ? target.id : moving.id)
         if (room.id === moving.id) {
-          const points = getRoomPoints(room).map(point => ({ x: Math.round(point.x + shift.x), y: Math.round(point.y + shift.y) }))
-          return { ...room, points, connectedRoomIds: [...connectedRoomIds] }
+          return { ...room, points: snappedPoints, connectedRoomIds: [...connectedRoomIds] }
         }
         return { ...room, connectedRoomIds: [...connectedRoomIds] }
       }),
