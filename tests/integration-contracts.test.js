@@ -503,5 +503,5 @@ test('Room tool switches to move mode when dragging an existing Room and inspect
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /if \(tool === 'path' \|\| \(tool === 'room' && type === 'room'\)\) setTool\('select'\)/)
   assert.match(source, /Lepaskan sambungan Room/)
-  assert.match(source, /room\.connectedRoomIds: \(room\.connectedRoomIds \|\| \[\]\)\.filter\(id => id !== selectedEntity\.id\)/)
+  assert.match(source, /connectedRoomIds: \(room\.connectedRoomIds \|\| \[\]\)\.filter\(id => id !== selectedEntity\.id\)/)
 })
