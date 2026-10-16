@@ -854,7 +854,7 @@ export default function Floorplan({
   }
 
   const beginResize = (type, item, sx, sy, event) => {
-    if (tool === 'pan' || (type === 'room' && item.locked)) return
+    if (tool === 'pan' || item.locked) return
     event.stopPropagation()
     event.preventDefault()
     const point = getPoint(event)
@@ -877,7 +877,7 @@ export default function Floorplan({
   }
 
   const beginWallEndpointDrag = (wall, endpoint, event) => {
-    if (tool === 'pan') return
+    if (tool === 'pan' || wall.locked) return
     event.stopPropagation()
     event.preventDefault()
     applyEntitySelection([{ type: 'wall', id: wall.id }], { type: 'wall', id: wall.id })
@@ -896,7 +896,7 @@ export default function Floorplan({
 
   const beginObjectDrag = (type, item, event) => {
     event.stopPropagation()
-    if (tool === 'pan' || (type === 'room' && item.locked)) return
+    if (tool === 'pan' || item.locked) return
 
     if (event.shiftKey) {
       const wasSelected = selectionRef.current.some(entry => entry.type === type && entry.id === item.id)
@@ -916,7 +916,7 @@ export default function Floorplan({
 
     if (type === 'camera') onSelectedShotIdChange?.(item.shotId || '')
     else if (!alreadySelected || currentSelection.length <= 1) onSelectedShotIdChange?.('')
-    if (tool === 'room' || tool === 'wall') return
+    if (item.locked || tool === 'room' || tool === 'wall') return
     if (tool === 'path') setTool('select')
     const point = getPoint(event)
 
@@ -924,7 +924,8 @@ export default function Floorplan({
       const items = currentSelection.map(entry => ({
         ...entry,
         original: (layout[entry.type + 's'] || []).find(candidate => candidate.id === entry.id),
-      })).filter(entry => entry.original)
+      })).filter(entry => entry.original && !entry.original.locked)
+      if (!items.length) return
       beginDragHistory()
       dragRef.current = { mode: 'multi-move', start: point, items }
     } else {
@@ -935,7 +936,7 @@ export default function Floorplan({
   }
 
   const beginWaypointDrag = (type, item, pathIndex, event) => {
-    if (tool === 'pan') return
+    if (tool === 'pan' || item.locked) return
     event.stopPropagation()
     const point = getPoint(event)
     const waypoint = (item.path || [])[pathIndex]
@@ -957,7 +958,7 @@ export default function Floorplan({
   }
 
   const beginRotate = (type, item, event) => {
-    if (tool === 'pan') return
+    if (tool === 'pan' || item.locked) return
     event.stopPropagation()
     const point = getPoint(event)
     applyEntitySelection([{ type, id: item.id }], { type, id: item.id })
@@ -1017,7 +1018,7 @@ export default function Floorplan({
   }
 
   const addOpening = type => {
-    if (!selectedEntity || !['room', 'wall'].includes(selectedType)) return
+    if (!selectedEntity || selectedEntity.locked || !['room', 'wall'].includes(selectedType)) return
     const opening = {
       id: makeId(),
       type,
@@ -1030,12 +1031,12 @@ export default function Floorplan({
   }
 
   const removeOpening = openingId => {
-    if (!selectedEntity || !['room', 'wall'].includes(selectedType)) return
+    if (!selectedEntity || selectedEntity.locked || !['room', 'wall'].includes(selectedType)) return
     updateSelected({ openings: (selectedEntity.openings || []).filter(opening => opening.id !== openingId) })
   }
 
   const beginOpeningDrag = (hostType, host, opening, event) => {
-    if (tool === 'pan') return
+    if (tool === 'pan' || host.locked) return
     event.stopPropagation()
     event.preventDefault()
     applyEntitySelection([{ type: hostType, id: host.id }], { type: hostType, id: host.id })
@@ -1201,7 +1202,7 @@ export default function Floorplan({
       updateLayout(previous => {
         const next = { ...previous }
         for (const collection of ['rooms', 'walls', 'props', 'actors', 'cameras', 'lights']) {
-          const selectedById = new Map(drag.items.filter(entry => entry.type + 's' === collection && !(collection === 'rooms' && entry.original?.locked)).map(entry => [entry.id, entry.original]))
+          const selectedById = new Map(drag.items.filter(entry => entry.type + 's' === collection && !entry.original?.locked).map(entry => [entry.id, entry.original]))
           if (!selectedById.size) continue
           next[collection] = previous[collection].map(item => {
             const original = selectedById.get(item.id)
@@ -2226,6 +2227,20 @@ export default function Floorplan({
                 <button className="floorplan-icon-button danger" onClick={deleteSelected} aria-label="Hapus objek terpilih" title="Hapus objek terpilih"><Trash2 size={17} /></button>
               </div>
 
+              <section className="floorplan-inspector-section">
+                <button
+                  type="button"
+                  className="floorplan-opening-add"
+                  aria-pressed={Boolean(selectedEntity.locked)}
+                  onClick={() => updateSelected({ locked: !selectedEntity.locked })}
+                  title={selectedEntity.locked ? 'Buka kunci agar objek bisa digeser atau diubah' : 'Kunci agar objek tidak bisa digeser atau diubah'}
+                >
+                  {selectedEntity.locked ? <Unlock size={16} /> : <Lock size={16} />}
+                  {selectedEntity.locked ? 'Buka Kunci Objek' : 'Kunci Objek'}
+                </button>
+                {selectedEntity.locked && <p className="floorplan-field-note">Objek terkunci: tidak bisa digeser, diputar, diubah ukuran, atau diedit jalurnya. Buka kunci untuk mengubah geometri.</p>}
+              </section>
+
               {selectedType === 'actor' && (
                 <>
                   <section className="floorplan-inspector-section">
@@ -2423,19 +2438,6 @@ export default function Floorplan({
                     </section>
                   )}
                   <section className="floorplan-inspector-section">
-                    <button
-                      type="button"
-                      className="floorplan-opening-add"
-                      aria-pressed={Boolean(selectedEntity.locked)}
-                      onClick={() => updateSelected({ locked: !selectedEntity.locked })}
-                      title={selectedEntity.locked ? 'Buka kunci agar Room bisa digeser atau diubah ukurannya' : 'Kunci agar Room tidak bisa digeser atau diubah ukurannya'}
-                    >
-                      {selectedEntity.locked ? <Unlock size={16} /> : <Lock size={16} />}
-                      {selectedEntity.locked ? 'Buka Kunci Room' : 'Kunci Room'}
-                    </button>
-                    {selectedEntity.locked && <p className="floorplan-field-note">Room terkunci: tidak bisa digeser atau diubah ukurannya. Buka kunci untuk mengedit geometri.</p>}
-                  </section>
-                  <section className="floorplan-inspector-section">
                     <label htmlFor="room-label">Nama ruang</label>
                     <input id="room-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
                   </section>
@@ -2532,12 +2534,40 @@ export default function Floorplan({
               )}
 
               {selectedType === 'prop' && (
-                <section className="floorplan-inspector-section">
-                  <label htmlFor="prop-type">Tipe properti</label>
-                  <select id="prop-type" className="floorplan-field" value={selectedEntity.propType || 'Custom'} onChange={event => updateSelected({ propType: event.target.value, label: event.target.value })}>
-                    {PROP_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
-                  </select>
-                </section>
+                <>
+                  <section className="floorplan-inspector-section">
+                    <label htmlFor="prop-label">Nama properti</label>
+                    <input id="prop-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
+                  </section>
+                  <section className="floorplan-inspector-section">
+                    <label htmlFor="prop-type">Tipe properti</label>
+                    <select id="prop-type" className="floorplan-field" value={selectedEntity.propType || 'Custom'} onChange={event => updateSelected({ propType: event.target.value, label: selectedEntity.label || event.target.value })}>
+                      {PROP_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+                    </select>
+                  </section>
+                  <section className="floorplan-inspector-section">
+                    <div className="floorplan-section-title">Dimensi (meter)</div>
+                    <div className="floorplan-opening-actions">
+                      <div className="floorplan-dimension-input">
+                        <label htmlFor="prop-width">Panjang (m)</label>
+                        <input id="prop-width" className="floorplan-field" type="number" min="0.10" max="5.00" step="0.01" value={(Number(selectedEntity.width || 52) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                          const meters = Number(event.target.value)
+                          if (!Number.isFinite(meters) || meters < 0.1 || meters > 5) return
+                          updateSelected({ width: Math.round(meters * 100) })
+                        }} />
+                      </div>
+                      <div className="floorplan-dimension-input">
+                        <label htmlFor="prop-height">Lebar (m)</label>
+                        <input id="prop-height" className="floorplan-field" type="number" min="0.10" max="5.00" step="0.01" value={(Number(selectedEntity.height || 36) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                          const meters = Number(event.target.value)
+                          if (!Number.isFinite(meters) || meters < 0.1 || meters > 5) return
+                          updateSelected({ height: Math.round(meters * 100) })
+                        }} />
+                      </div>
+                    </div>
+                    <p className="floorplan-field-note">Panjang dan lebar bisa diketik manual. Ukuran 0,10–5,00 m.</p>
+                  </section>
+                </>
               )}
             </>
           ) : (
