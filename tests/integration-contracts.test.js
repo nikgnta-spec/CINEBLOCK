@@ -447,7 +447,7 @@ test('Delete and Backspace remove a selected Room vertex without allowing invali
 test('Room inspector exposes explicit add/remove vertex controls', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /addRoomVertexAtEdgeMidpoint/)
-  assert.match(source, /Tambah titik di sisi yang disorot/)
+  assert.match(source, /Tambah titik pada sisi terpilih/)
   assert.match(source, /Hapus titik terpilih/)
   assert.match(source, /selectedRoomVertex\?\.roomId !== selectedEntity\.id/)
 })
