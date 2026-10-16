@@ -1573,7 +1573,7 @@ export default function Floorplan({
       return shot ? ('Shot ' + shot.num + (shot.subject ? ' — ' + shot.subject : '')) : 'Unlinked camera'
     }
     if (type === 'light') return (item.label || 'Light') + ' — ' + (item.lightType || 'Key')
-    if (type === 'prop') return item.propType || 'Prop'
+    if (type === 'prop') return item.label || item.customPropType || item.propType || 'Prop'
     const fallback = ({ room: 'Room', wall: 'Wall', door: 'Pintu', window: 'Jendela', actor: 'Actor' })[type] || type
     return item.label || fallback
   }
@@ -2541,10 +2541,25 @@ export default function Floorplan({
                   </section>
                   <section className="floorplan-inspector-section">
                     <label htmlFor="prop-type">Tipe properti</label>
-                    <select id="prop-type" className="floorplan-field" value={selectedEntity.propType || 'Custom'} onChange={event => updateSelected({ propType: event.target.value, label: selectedEntity.label || event.target.value })}>
+                    <select id="prop-type" className="floorplan-field" value={selectedEntity.propType || 'Custom'} onChange={event => updateSelected({ propType: event.target.value, ...(event.target.value === 'Custom' ? {} : { customPropType: '' }), label: selectedEntity.label || event.target.value })}>
                       {PROP_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
                     </select>
                   </section>
+                  {(selectedEntity.propType || 'Custom') === 'Custom' && (
+                    <section className="floorplan-inspector-section">
+                      <label htmlFor="prop-custom-type">Tipe kustom</label>
+                      <input
+                        id="prop-custom-type"
+                        className="floorplan-field"
+                        value={selectedEntity.customPropType || ''}
+                        maxLength={80}
+                        placeholder="Contoh: Lemari senjata, Vas bunga"
+                        disabled={Boolean(selectedEntity.locked)}
+                        onChange={event => updateSelected({ customPropType: event.target.value })}
+                      />
+                      <p className="floorplan-field-note">Tulis tipe properti sendiri. Nama properti di atas tetap bisa diatur terpisah.</p>
+                    </section>
+                  )}
                   <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Dimensi (meter)</div>
                     <div className="floorplan-opening-actions">
