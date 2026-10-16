@@ -531,3 +531,15 @@ test('dragging a connected Room keeps it hosted to its shared wall', async () =>
   assert.match(source, /if \(type !== 'room' && alreadySelected && currentSelection\.length > 1\)/)
   assert.match(source, /if \(candidate && !alreadyConnected\) setRoomMergePrompt\(candidate\)/)
 })
+
+test('Connected Rooms use one combined bounding box for overall dimensions', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const connectedRoomGroup = \(\(\) => \{/)
+  assert.match(source, /const connectedGroupPoints = connectedRoomGroup\.flatMap\(getRoomPoints\)/)
+  assert.match(source, /const totalBounds = hasConnectedRooms \? connectedBounds : bounds/)
+  assert.match(source, /const isDimensionGroupActive = active && hasConnectedRooms/)
+  assert.match(source, /!horizontalIsSingleEdge && \(!hasConnectedRooms \|\| isDimensionGroupActive\)/)
+  assert.match(source, /!verticalIsSingleEdge && \(!hasConnectedRooms \|\| isDimensionGroupActive\)/)
+  assert.match(source, /\(totalBounds\.width \/ 100\)\.toFixed\(2\) \+ ' m total'/)
+  assert.match(source, /\(totalBounds\.height \/ 100\)\.toFixed\(2\) \+ ' m total'/)
+})
