@@ -144,8 +144,7 @@ function PrintFloorplan({ scene, layout }) {
             maxX: Math.max(...points.map(point => point.x)),
             maxY: Math.max(...points.map(point => point.y)),
           }
-          const roomLength = bounds.maxX - bounds.x
-          const roomWidth = bounds.maxY - bounds.y
+          const center = { x: (bounds.x + bounds.maxX) / 2, y: (bounds.y + bounds.maxY) / 2 }
           return (
             <g key={'room-outline-' + room.id}>
               {edges.flatMap(edge => openingSegments(edge.length, openings.filter(opening => (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)) === edge.edgeIndex)).map((segment, index) => {
@@ -154,8 +153,31 @@ function PrintFloorplan({ scene, layout }) {
                 return <line key={edge.edgeIndex + '-' + index} x1={edge.x1 + ux * segment.start} y1={edge.y1 + uy * segment.start} x2={edge.x1 + ux * segment.end} y2={edge.y1 + uy * segment.end} stroke="#111827" strokeWidth="3" />
               }))}
               <text x={bounds.x + 9} y={bounds.y + 20} fontSize="16" fontWeight="700" fill="#111827">{room.label || 'Room'}</text>
-              <text x={bounds.x + 9} y={bounds.y + 36} fontSize="12" fontWeight="600" fill="#374151" stroke="#fafafa" strokeWidth="3" paintOrder="stroke">{meters(roomLength)} × {meters(roomWidth)}</text>
-              {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && <text x={bounds.x + 9} y={bounds.y + 51} fontSize="12" fill="#374151">{Number(room.ceilingHeight).toFixed(1) + ' m ceiling'}</text>}
+              {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && <text x={bounds.x + 9} y={bounds.y + 36} fontSize="12" fill="#374151">{Number(room.ceilingHeight).toFixed(1) + ' m ceiling'}</text>}
+              {edges.map(edge => {
+                const horizontal = Math.abs(edge.x2 - edge.x1) >= Math.abs(edge.y2 - edge.y1)
+                const mx = (edge.x1 + edge.x2) / 2
+                const my = (edge.y1 + edge.y2) / 2
+                const nx = mx < center.x ? -1 : 1
+                const ny = my < center.y ? -1 : 1
+                const offset = 72
+                const x1 = horizontal ? Math.min(edge.x1, edge.x2) : mx + nx * offset
+                const x2 = horizontal ? Math.max(edge.x1, edge.x2) : mx + nx * offset
+                const y1 = horizontal ? my + ny * offset : Math.min(edge.y1, edge.y2)
+                const y2 = horizontal ? my + ny * offset : Math.max(edge.y1, edge.y2)
+                const label = meters(edge.length)
+                return <g key={'room-dimension-' + edge.edgeIndex} fill="none" stroke="#64748b" strokeWidth="1.2">
+                  <line x1={x1} y1={y1} x2={x2} y2={y2} />
+                  {horizontal ? <>
+                    <line x1={x1} y1={y1 - 5} x2={x1} y2={y1 + 5} />
+                    <line x1={x2} y1={y2 - 5} x2={x2} y2={y2 + 5} />
+                  </> : <>
+                    <line x1={x1 - 5} y1={y1} x2={x1 + 5} y2={y1} />
+                    <line x1={x2 - 5} y1={y2} x2={x2 + 5} y2={y2} />
+                  </>}
+                  <text x={(x1 + x2) / 2} y={(y1 + y2) / 2 - 7} fill="#374151" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="12" textAnchor="middle" transform="translate(0 0)">{label}</text>
+                </g>
+              })}
               {openings.map(opening => {
                 const p = roomOpeningPlacement(room, opening)
                 const width = Math.min(Number(opening.width) || 48, p.length)
@@ -172,9 +194,13 @@ function PrintFloorplan({ scene, layout }) {
                         <path d={'M ' + (-width / 2) + ' -7 V 7 M ' + (width / 2) + ' -7 V 7'} />
                       </>
                     )}
-                    <text x="0" y={opening.type === 'door' ? width + 16 : 20} fontSize="11" fontWeight="600" fill="#374151" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{opening.type === 'door' ? 'Pintu' : 'Jendela'} {meters(width)} × {meters(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)))}</text>
                   </g>
                 )
+              })}
+              {openings.map(opening => {
+                const p = roomOpeningPlacement(room, opening)
+                const width = Math.min(Number(opening.width) || 48, p.length)
+                return <text key={'room-opening-dimension-' + opening.id} x={p.x} y={p.y + 24} fontSize="11" fontWeight="600" fill="#374151" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{opening.type === 'door' ? 'Pintu' : 'Jendela'} {meters(width)} × {meters(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)))}</text>
               })}
             </g>
           )
@@ -214,9 +240,15 @@ function PrintFloorplan({ scene, layout }) {
                         <path d={'M ' + (-width / 2) + ' -7 V 7 M ' + (width / 2) + ' -7 V 7'} />
                       </>
                     )}
-                    <text x="0" y={opening.type === 'door' ? width + 16 : 20} fontSize="11" fontWeight="600" fill="#374151" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{opening.type === 'door' ? 'Pintu' : 'Jendela'} {meters(width)} × {meters(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)))}</text>
                   </g>
                 )
+              })}
+              {openings.map(opening => {
+                const width = Math.min(Number(opening.width) || 48, metric.length)
+                const center = Math.max(0, Math.min(1, Number(opening.offset) || 0.5)) * metric.length
+                const x = wall.x1 + metric.ux * center
+                const y = wall.y1 + metric.uy * center
+                return <text key={'wall-opening-dimension-' + opening.id} x={x} y={y + 24} fontSize="11" fontWeight="600" fill="#374151" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{opening.type === 'door' ? 'Pintu' : 'Jendela'} {meters(width)} × {meters(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)))}</text>
               })}
             </g>
           )
