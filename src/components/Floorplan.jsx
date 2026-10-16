@@ -191,6 +191,11 @@ function FloorplanObjectIcon({ type, size = 20 }) {
           <path d="M-16 -5 H16 M-16 5 H16" />
           <path d="M-16 5 V-17 A22 22 0 0 1 6 5" />
         </g>
+      ) : type === 'doorway' ? (
+        <g>
+          <path d="M-20 -5 H-9 M9 -5 H20 M-20 5 H-9 M9 5 H20" />
+          <path d="M-9 -8 V8 M9 -8 V8" />
+        </g>
       ) : type === 'window' ? (
         <g>
           <path d="M-20 -7 H20 M-20 0 H20 M-20 7 H20" />
@@ -1039,7 +1044,7 @@ export default function Floorplan({
       id: makeId(),
       type,
       offset: 0.5,
-      width: type === 'door' ? 48 : 58,
+      width: type === 'door' || type === 'doorway' ? 48 : 58,
       ...(selectedType === 'room' ? { side: 'bottom' } : {}),
     }
     updateSelected({ openings: [...(selectedEntity.openings || []), opening] })
@@ -1806,13 +1811,18 @@ export default function Floorplan({
                           onClick={event => event.stopPropagation()}
                         >
                           <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type === 'door' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">
-                            {opening.type === 'door' ? 'Pintu' : 'Jendela'}
+                            {opening.type === 'doorway' ? 'Pintu Tanpa Daun' : opening.type === 'door' ? 'Pintu' : 'Jendela'}
                           </text>
 
                           {opening.type === 'door' ? (
                             <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
                               <path d={'M ' + (-openingWidth / 2) + ' 0 V ' + (-openingWidth)} />
                               <path d={'M ' + (-openingWidth / 2) + ' ' + (-openingWidth) + ' A ' + openingWidth + ' ' + openingWidth + ' 0 0 1 ' + (openingWidth / 2) + ' 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
+                            </g>
+                          ) : opening.type === 'doorway' ? (
+                            <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+                              <path d={'M ' + (-openingWidth / 2) + ' -5 H ' + (-openingWidth / 2 + 10) + ' M ' + (openingWidth / 2 - 10) + ' -5 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 5 H ' + (-openingWidth / 2 + 10) + ' M ' + (openingWidth / 2 - 10) + ' 5 H ' + (openingWidth / 2)} />
+                              <path d={'M ' + (-openingWidth / 2 + 10) + ' -8 V 8 M ' + (openingWidth / 2 - 10) + ' -8 V 8'} />
                             </g>
                           ) : (
                             <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
@@ -1880,12 +1890,17 @@ export default function Floorplan({
                           onClick={event => event.stopPropagation()}
                         >
                           <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type === 'door' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">
-                            {opening.type === 'door' ? 'Pintu' : 'Jendela'}
+                            {opening.type === 'doorway' ? 'Pintu Tanpa Daun' : opening.type === 'door' ? 'Pintu' : 'Jendela'}
                            </text>
                            {opening.type === 'door' ? (
                             <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
                               <path d={'M ' + (-openingWidth / 2) + ' 0 V ' + (-openingWidth)} />
                               <path d={'M ' + (-openingWidth / 2) + ' ' + (-openingWidth) + ' A ' + openingWidth + ' ' + openingWidth + ' 0 0 1 ' + (openingWidth / 2) + ' 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
+                            </g>
+                          ) : opening.type === 'doorway' ? (
+                            <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+                              <path d={'M ' + (-openingWidth / 2) + ' -5 H ' + (-openingWidth / 2 + 10) + ' M ' + (openingWidth / 2 - 10) + ' -5 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 5 H ' + (-openingWidth / 2 + 10) + ' M ' + (openingWidth / 2 - 10) + ' 5 H ' + (openingWidth / 2)} />
+                              <path d={'M ' + (-openingWidth / 2 + 10) + ' -8 V 8 M ' + (openingWidth / 2 - 10) + ' -8 V 8'} />
                             </g>
                           ) : (
                             <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
@@ -2526,11 +2541,12 @@ export default function Floorplan({
                     <div className="floorplan-section-title">Bukaan</div>
                     <div className="floorplan-opening-actions">
                       <button className="floorplan-opening-add" onClick={() => addOpening('door')}><FloorplanObjectIcon type="door" size={18} /> Tambah pintu</button>
+                      <button className="floorplan-opening-add" onClick={() => addOpening('doorway')}><FloorplanObjectIcon type="doorway" size={18} /> Pintu tanpa daun</button>
                       <button className="floorplan-opening-add" onClick={() => addOpening('window')}><FloorplanObjectIcon type="window" size={18} /> Tambah jendela</button>
                     </div>
                     {(selectedEntity.openings || []).map(opening => (
                       <div className="floorplan-opening-row" key={opening.id}>
-                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Pintu' : 'Jendela'}</span>
+                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'doorway' ? 'Pintu Tanpa Daun' : opening.type === 'door' ? 'Pintu' : 'Jendela'}</span>
                         <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} disabled={Boolean(selectedEntity.locked)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
                         <div className="floorplan-opening-actions">
                           <div className="floorplan-dimension-input">
@@ -2576,11 +2592,12 @@ export default function Floorplan({
                     <div className="floorplan-section-title">Bukaan</div>
                     <div className="floorplan-opening-actions">
                       <button className="floorplan-opening-add" onClick={() => addOpening('door')}><FloorplanObjectIcon type="door" size={18} /> Tambah pintu</button>
+                      <button className="floorplan-opening-add" onClick={() => addOpening('doorway')}><FloorplanObjectIcon type="doorway" size={18} /> Pintu tanpa daun</button>
                       <button className="floorplan-opening-add" onClick={() => addOpening('window')}><FloorplanObjectIcon type="window" size={18} /> Tambah jendela</button>
                     </div>
                     {(selectedEntity.openings || []).map(opening => (
                       <div className="floorplan-opening-row" key={opening.id}>
-                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Pintu' : 'Jendela'}</span>
+                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'doorway' ? 'Pintu Tanpa Daun' : opening.type === 'door' ? 'Pintu' : 'Jendela'}</span>
                         <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} disabled={Boolean(selectedEntity.locked)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
                         <div className="floorplan-opening-actions">
                           <div className="floorplan-dimension-input">
