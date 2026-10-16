@@ -82,13 +82,15 @@ test('Room picker keeps every project Room visible across Scenes and marks curre
   assert.match(source, /digunakan scene lain/)
 })
 
-test('Object lock prevents direct, resize, and group movement', async () => {
+test('Locked objects remain selectable but cannot move or resize', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
+  const dragHandler = source.slice(source.indexOf('const beginObjectDrag'), source.indexOf('const beginWaypointDrag'))
 
   assert.match(source, /locked: !selectedEntity\.locked/)
-  assert.match(source, /if \(tool === 'pan' \|\| item\.locked\) return/)
+  assert.match(dragHandler, /applyEntitySelection\(\[\{ type, id: item\.id \}\], \{ type, id: item\.id \}\)/)
+  assert.match(dragHandler, /if \(item\.locked \|\| tool === 'room' \|\| tool === 'wall'\) return/)
+  assert.match(source, /const beginResize = \(type, item, sx, sy, event\) => \{\n    if \(tool === 'pan'\) return[\s\S]*?setSelected\(\{ type, id: item\.id \}\)\n    if \(item\.locked\) return/)
   assert.match(source, /!entry\.original\.locked/)
-  assert.match(source, /if \(item\.locked\) return item/)
 })
 
 test('Room dimensions can be entered manually in meters and respect Room lock', async () => {
