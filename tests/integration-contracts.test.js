@@ -39,7 +39,7 @@ test('deleting a scene removes its floorplan layout as well as its shots', async
 test('project and planning data are included in the print report input', async () => {
   const source = await readSource('../src/App.jsx')
 
-  assert.match(source, /<PrintReport project=\{project\} scenes=\{scenes\} floorplans=\{floorplans\}/)
+  assert.match(source, /<PrintReport project={project} scenes={scenes} floorplans={resolvedFloorplans}/)
 })
 
 test('backup import has a pre-read size limit and validates before replacing active state', async () => {
@@ -48,6 +48,27 @@ test('backup import has a pre-read size limit and validates before replacing act
   assert.match(source, /MAX_BACKUP_FILE_SIZE_BYTES = 10 \* 1024 \* 1024/)
   assert.match(source, /file\.size > MAX_BACKUP_FILE_SIZE_BYTES/)
   assert.match(source, /JSON\.parse\(.*text/s)
-  assert.match(source, /setScenes\(targetScenes\)/)
+  assert.match(source, /setScenes(migratedTarget.scenes)/)
   assert.match(source, /catch \(error\) \{[\s\S]*?could not import backup/i)
+})
+
+test('local Room Reusable migration extracts per-Scene rooms without geometry deduplication', async () => {
+  const source = await readSource('../src/App.jsx')
+  const floorplan = await readSource('../src/components/Floorplan.jsx')
+
+  assert.match(source, /function migrateReusableRooms\(savedScenes, savedFloorplans, savedRooms = \[\]\)/)
+  assert.match(source, /scene\.roomIds\.push\(room\.id\)/)
+  assert.match(source, /projectRooms/)
+  assert.match(source, /rooms: Array\.isArray\(rooms\) \? rooms : \[\]/)
+  assert.match(floorplan, /projectRooms\.filter\(room => \(scene\.roomIds \|\| \[\]\)\.includes\(room\.id\)\)/)
+  assert.match(floorplan, /Room digunakan bersama/)
+  assert.match(source, /const resolvedFloorplans = projectRooms === null/)
+})
+
+test('local backup project records include reusable rooms and Scene references', async () => {
+  const source = await readSource('../src/App.jsx')
+
+  assert.match(source, /rooms: projectRooms \|\| \[\]/)
+  assert.match(source, /const backup = \{[\s\S]*?projects: savedProjects/)
+  assert.match(source, /migrateReusableRooms\(targetScenes, target\.floorplans, target\.rooms\)/)
 })
