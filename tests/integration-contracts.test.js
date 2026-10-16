@@ -373,3 +373,16 @@ test('PDF floorplan scales the full measured plan to keep outer dimensions in fr
   assert.match(source, /570 \/ \(planBounds\.maxY - planBounds\.minY \+ 360/)
   assert.match(source, /scale\(' \+ planScale \+ '\)/)
 })
+
+
+test('Door hinge side supports left and right in Floorplan, persistence, and PDF', async () => {
+  const floorplan = await readSource('../src/components/Floorplan.jsx')
+  const app = await readSource('../src/App.jsx')
+  const report = await readSource('../src/components/PrintReport.jsx')
+  assert.match(floorplan, /opening\.id \+ '-hinge-side'/)
+  assert.match(floorplan, /option value="left">Kiri/)
+  assert.match(floorplan, /option value="right">Kanan/)
+  assert.match(floorplan, /const hingeSide = opening\.hingeSide === 'right' \? 'right' : 'left'/)
+  assert.match(app, /hingeSide: opening\.hingeSide === 'right' \? 'right' : 'left'/)
+  assert.match(report, /const hingeX = opening\.hingeSide === 'right' \? width \/ 2 : -width \/ 2/)
+})
