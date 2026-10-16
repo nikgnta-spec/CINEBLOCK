@@ -1728,8 +1728,13 @@ export default function Floorplan({
     }))
   }
 
-  const handleCanvasPointerUp = () => {
+  const handleCanvasPointerUp = event => {
     const completedDrag = dragRef.current
+    // Release pointer capture before opening a dialog. Otherwise the pointer's
+    // click sequence can remain targeted at the SVG instead of the dialog button.
+    if (event?.pointerId != null && svgRef.current?.hasPointerCapture?.(event.pointerId)) {
+      svgRef.current.releasePointerCapture(event.pointerId)
+    }
     if (completedDrag?.mode === 'move' && completedDrag.type === 'room') {
       const movedRoom = layout.rooms.find(room => room.id === completedDrag.id)
       const candidate = movedRoom && findRoomMergeCandidate(movedRoom, layout.rooms, 18)
@@ -3235,7 +3240,7 @@ export default function Floorplan({
       </div>
       {roomMergePrompt && (
         <div className="floorplan-dialog-backdrop" role="presentation" onPointerDown={event => { if (event.target === event.currentTarget) setRoomMergePrompt(null) }}>
-          <section className="floorplan-dialog" role="dialog" aria-modal="true" aria-labelledby="room-merge-title">
+          <section className="floorplan-dialog" role="dialog" aria-modal="true" aria-labelledby="room-merge-title" onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
             <h3 id="room-merge-title">Gabungkan kedua Room?</h3>
             <p>Dua Room sudah berdekatan. Jika digabung, keduanya menjadi satu polygon dan ukuran total dihitung ulang.</p>
             {roomMergePrompt.error && <p role="alert">{roomMergePrompt.error}</p>}
