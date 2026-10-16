@@ -493,3 +493,8 @@ test('Room connections persist independently of selection and Rooms remain dragg
   assert.match(source, /const connectedIds = new Set\(\[item\.id, \.\.\.\(item\.connectedRoomIds \|\| \[\]\)\]\)/)
   assert.match(source, /mode: 'multi-move',[\s\S]*?items: movableRooms\.map\(room => \(\{ type: 'room', id: room\.id, original: room \}\)\)/)
 })
+
+test('existing Rooms remain draggable while Room drawing tool is active', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /if \(item\.locked \|\| \(tool === 'room' && type !== 'room'\) \|\| \(tool === 'wall' && type !== 'wall'\)\) return/)
+})
