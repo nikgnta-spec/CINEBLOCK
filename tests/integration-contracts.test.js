@@ -134,7 +134,9 @@ test('Room dimensions distinguish individual wall lengths from overall bounds an
   assert.match(source, /x1 = x2 = guideX/)
   assert.match(source, /angle: 0/)
   const roomRender = source.slice(source.indexOf('layout.rooms.map(room => {'), source.indexOf('layout\.walls\.map'))
-  assert.ok(roomRender.indexOf("key={'edge-hit-'") < roomRender.indexOf("onPointerDown={event => beginOpeningDrag('room', room, opening, event)}"))
+  assert.match(roomRender, /key=\{'edge-hit-'\}/)
+  assert.match(roomRender, /beginRoomEdgeDrag\(room, edge\.edgeIndex, event\)/)
+  assert.match(roomRender, /beginOpeningDrag\('room', room, opening, event\)/)
 })
 
 test('Door opening controls expose swing direction and single or double leaves', async () => {
