@@ -433,3 +433,13 @@ test('Double-clicking a Room edge inserts a new editable vertex on that edge', a
   assert.match(source, /onDoubleClick=\{event => addRoomVertexOnEdge\(room, edge\.edgeIndex, event\)\}/)
   assert.match(source, /Avoid creating a duplicate vertex close to either endpoint/)
 })
+
+test('Delete and Backspace remove a selected Room vertex without allowing invalid polygons', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const deleteSelectedRoomVertex = \(\) =>/)
+  assert.match(source, /if \(points\.length <= 3\)/)
+  assert.match(source, /const nextPoints = points\.filter\(\(_, index\) => index !== vertexIndex\)/)
+  assert.match(source, /if \(area < 16\)/)
+  assert.match(source, /if \(selectedRoomVertex\) \{[\s\S]*?deleteSelectedRoomVertex\(\)/)
+  assert.match(source, /setSelectedRoomVertex\(\{ roomId: room\.id, vertexIndex \}\)/)
+})
