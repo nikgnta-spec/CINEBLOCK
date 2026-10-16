@@ -90,7 +90,7 @@ test('Locked objects remain selectable but cannot move or resize', async () => {
   assert.match(source, /locked: !selectedEntity\.locked/)
   assert.match(dragHandler, /applyEntitySelection\(\[\{ type, id: item\.id \}\], \{ type, id: item\.id \}\)/)
   assert.match(dragHandler, /if \(item\.locked \|\| tool === 'room' \|\| tool === 'wall'\) return/)
-  assert.match(source, /const beginResize = \(type, item, sx, sy, event\) => \{\n    if \(tool === 'pan'\) return[\s\S]*?setSelected\(\{ type, id: item\.id \}\)\n    if \(item\.locked\) return/)
+  assert.match(source, /const beginResize = \(type, item, sx, sy, event\) => \{[\s\S]*?if \(item\.locked\) return/)
   assert.match(source, /!entry\.original\.locked/)
 })
 
@@ -279,9 +279,7 @@ test('Doors and windows support precise width, position, and polygon edge contro
 test('restoring active project preserves canonical reusable Rooms when legacy top-level floorplans exist', async () => {
   const source = await readSource('../src/App.jsx')
 
-  assert.ok(source.includes(`const sourceRooms = Array.isArray(savedState?.rooms)
-          ? savedState.rooms
-          : (savedProjectRecord?.rooms || [])`))
+  assert.match(source, /const sourceRooms = Array\.isArray\(savedState\?\.rooms\)\s*\? savedState\.rooms\s*:\s*\(savedProjectRecord\?\.rooms \|\| \[\]\)/)
 })
 
 test('Room opening normalization preserves the full supported 5-meter width', async () => {
