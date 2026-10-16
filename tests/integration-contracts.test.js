@@ -48,7 +48,7 @@ test('backup import has a pre-read size limit and validates before replacing act
   assert.match(source, /MAX_BACKUP_FILE_SIZE_BYTES = 10 \* 1024 \* 1024/)
   assert.match(source, /file\.size > MAX_BACKUP_FILE_SIZE_BYTES/)
   assert.match(source, /JSON\.parse\(.*text/s)
-  assert.match(source, /setScenes(migratedTarget.scenes)/)
+  assert.match(source, /setScenes\\(migratedTarget\\.scenes\\)/)
   assert.match(source, /catch \(error\) \{[\s\S]*?could not import backup/i)
 })
 
