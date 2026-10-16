@@ -121,3 +121,11 @@ test('Object locking prevents moving, resizing, rotating, and editing paths or o
   assert.match(source, /!entry\.original\.locked/)
   assert.match(source, /selectedEntity\.locked \|\| !selectedType/)
 })
+
+test('Props Custom type accepts free text and displays the entered type/name', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+
+  assert.match(source, /id="prop-custom-type"/)
+  assert.match(source, /customPropType: event\.target\.value/)
+  assert.match(source, /if \(type === 'prop'\) return item\.label \|\| item\.customPropType \|\| item\.propType \|\| 'Prop'/)
+})
