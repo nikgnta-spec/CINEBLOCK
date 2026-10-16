@@ -93,14 +93,51 @@ test('Locked objects remain selectable but cannot move or resize', async () => {
   assert.match(source, /!entry\.original\.locked/)
 })
 
-test('Room dimensions can be entered manually in meters and respect Room lock', async () => {
+test('Rooms use editable polygon vertices and a manually entered ceiling height', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
 
-  assert.match(source, /id="room-width"/)
-  assert.match(source, /id="room-height"/)
-  assert.match(source, /type="number"/)
-  assert.match(source, /Math\.round\(meters \* 100\)/)
-  assert.match(source, /disabled=\{Boolean\(selectedEntity\.locked\)\}/)
+  assert.match(source, /const getRoomPoints = room =>/)
+  assert.match(source, /const pointInPolygon =/)
+  assert.match(source, /const beginRoomVertexDrag =/)
+  assert.match(source, /mode: 'room-vertex'/)
+  assert.match(source, /id="room-ceiling-height"/)
+  assert.match(source, /placeholder="Belum diisi"/)
+  assert.match(source, /Room hasil migrasi tidak diberi tinggi otomatis/)
+  assert.doesNotMatch(source, /id="room-width"/)
+  assert.doesNotMatch(source, /id="room-height"/)
+})
+
+test('Room drawing is point-by-point with close, Escape, live dimensions and manual lengths', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+
+  assert.match(source, /const addRoomDrawingPoint = point =>/)
+  assert.match(source, /const finishRoomDrawing = points =>/)
+  assert.match(source, /setRoomDrawPoints\(points => \[\.\.\.points, point\]\)/)
+  assert.match(source, /const confirmManualRoomLength =/)
+  assert.match(source, /Panjang garis dalam meter/)
+  assert.match(source, /roomDrawPoints.length && key === 'enter'/)
+  assert.match(source, /roomDrawPoints.length && key === 'tab'/)
+  assert.match(source, /roomDrawPoints.length\) \{/)
+})
+
+test('Room migration converts legacy rectangles and remaps openings without assigning ceiling height', async () => {
+  const source = await readSource('../src/App.jsx')
+
+  assert.match(source, /function normalizeRoomPolygon\(room, index = 0\)/)
+  assert.match(source, /\{ x, y \}, \{ x: x \+ width, y \}, \{ x: x \+ width, y: y \+ height \}, \{ x, y: y \+ height \}/)
+  assert.match(source, /const oldSideToEdge = \{ top: 0, right: 1, bottom: 2, left: 3 \}/)
+  assert.match(source, /delete next\.side/)
+  assert.match(source, /migrated\.rooms/)
+  assert.match(source, /Number\.isFinite\(Number\(room\.ceilingHeight\)\)/)
+})
+
+test('Room PDF export uses polygon outlines and polygon-edge opening positions', async () => {
+  const source = await readSource('../src/components/PrintReport.jsx')
+
+  assert.match(source, /function roomPoints\(room\)/)
+  assert.match(source, /function roomEdges\(room\)/)
+  assert.match(source, /<polygon key=\{'room-fill-' \+ room\.id\}/)
+  assert.match(source, /Number\.isInteger\(opening\.edgeIndex\)/)
 })
 
 test('Props have editable names and manual dimensions in meters', async () => {
