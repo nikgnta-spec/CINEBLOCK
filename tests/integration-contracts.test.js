@@ -39,7 +39,7 @@ test('deleting a scene removes its floorplan layout as well as its shots', async
 test('project and planning data are included in the print report input', async () => {
   const source = await readSource('../src/App.jsx')
 
-  assert.match(source, /<PrintReport project=\\{project\\} scenes=\\{scenes\\} floorplans=\\{resolvedFloorplans\\}/)
+  assert.ok(source.includes('<PrintReport project={project} scenes={scenes} floorplans={resolvedFloorplans}'))
 })
 
 test('backup import has a pre-read size limit and validates before replacing active state', async () => {
@@ -48,7 +48,7 @@ test('backup import has a pre-read size limit and validates before replacing act
   assert.match(source, /MAX_BACKUP_FILE_SIZE_BYTES = 10 \* 1024 \* 1024/)
   assert.match(source, /file\.size > MAX_BACKUP_FILE_SIZE_BYTES/)
   assert.match(source, /JSON\.parse\(.*text/s)
-  assert.match(source, /setScenes\\(migratedTarget\\.scenes\\)/)
+  assert.ok(source.includes('setScenes(migratedTarget.scenes)'))
   assert.match(source, /catch \(error\) \{[\s\S]*?could not import backup/i)
 })
 
