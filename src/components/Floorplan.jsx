@@ -1917,10 +1917,17 @@ export default function Floorplan({
         }
         if (drag.type === 'room') {
           if (item.locked) return item
-          return { ...item, points: getRoomPoints(drag.original).map(vertex => ({
-            x: Math.round(vertex.x + dx),
-            y: Math.round(vertex.y + dy),
-          })) }
+          return {
+            ...item,
+            points: getRoomPoints(drag.original).map(vertex => ({
+              x: Math.round(vertex.x + dx),
+              y: Math.round(vertex.y + dy),
+            })),
+            internalWalls: (drag.original.internalWalls || []).map(wall => ({
+              x1: Math.round(wall.x1 + dx), y1: Math.round(wall.y1 + dy),
+              x2: Math.round(wall.x2 + dx), y2: Math.round(wall.y2 + dy),
+            })),
+          }
         }
         if (drag.type === 'wall') {
           return {
@@ -2477,6 +2484,11 @@ export default function Floorplan({
                         return <line key={edge.edgeIndex + '-' + index} x1={edge.x1 + ux * segment.start} y1={edge.y1 + uy * segment.start} x2={edge.x1 + ux * segment.end} y2={edge.y1 + uy * segment.end} stroke={active ? 'var(--text)' : 'var(--border-strong)'} strokeWidth={active ? 3.5 : 2.5} vectorEffect="non-scaling-stroke" pointerEvents="none" />
                       })
                     })}
+                    {(room.internalWalls || []).map((wall, index) => (
+                      <line key={`internal-wall-${index}`} x1={wall.x1} y1={wall.y1} x2={wall.x2} y2={wall.y2}
+                        stroke={active ? 'var(--text)' : 'var(--border-strong)'} strokeWidth={active ? 3.5 : 2.5}
+                        vectorEffect="non-scaling-stroke" pointerEvents="none" />
+                    ))}
                     <text x={bounds.x + 8} y={bounds.y - 18} fill="var(--text)" fontSize="18" fontWeight="600" pointerEvents="none" paintOrder="stroke" stroke="var(--bg)" strokeWidth="3">
                       {room.label || 'Room'}
                     </text>
