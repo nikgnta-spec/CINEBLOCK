@@ -854,7 +854,7 @@ export default function Floorplan({
   }
 
   const beginResize = (type, item, sx, sy, event) => {
-    if (tool === 'pan') return
+    if (tool === 'pan' || (type === 'room' && item.locked)) return
     event.stopPropagation()
     event.preventDefault()
     const point = getPoint(event)
@@ -896,7 +896,7 @@ export default function Floorplan({
 
   const beginObjectDrag = (type, item, event) => {
     event.stopPropagation()
-    if (tool === 'pan') return
+    if (tool === 'pan' || (type === 'room' && item.locked)) return
 
     if (event.shiftKey) {
       const wasSelected = selectionRef.current.some(entry => entry.type === type && entry.id === item.id)
@@ -1641,9 +1641,15 @@ export default function Floorplan({
               aria-label="Pakai Room yang sudah ada"
             >
               <option value="">Pakai Room yang sudah ada…</option>
-              {projectRooms.filter(room => !(scene?.roomIds || []).includes(room.id)).map(room => (
-                <option key={room.id} value={room.id}>{room.label || 'Room tanpa nama'}</option>
-              ))}
+              {projectRooms.map(room => {
+                const alreadyUsed = (scene?.roomIds || []).includes(room.id)
+                const usedByOtherScenes = scenes.filter(item => (item.roomIds || []).includes(room.id) && item.id !== scene?.id).length
+                return (
+                  <option key={room.id} value={room.id} disabled={alreadyUsed}>
+                    {(room.label || 'Room tanpa nama')}{alreadyUsed ? ' — sudah dipakai di scene ini' : usedByOtherScenes ? ' — digunakan scene lain' : ''}
+                  </option>
+                )
+              })}
             </select>
           </div>
         )}
@@ -2415,6 +2421,19 @@ export default function Floorplan({
                       <p>Perubahan geometri Room ini akan memengaruhi {scenes.filter(item => (item.roomIds || []).includes(selectedEntity.id)).length} Scene yang menggunakannya.</p>
                     </section>
                   )}
+                  <section className="floorplan-inspector-section">
+                    <button
+                      type="button"
+                      className="floorplan-opening-add"
+                      aria-pressed={Boolean(selectedEntity.locked)}
+                      onClick={() => updateSelected({ locked: !selectedEntity.locked })}
+                      title={selectedEntity.locked ? 'Buka kunci agar Room bisa digeser atau diubah ukurannya' : 'Kunci agar Room tidak bisa digeser atau diubah ukurannya'}
+                    >
+                      {selectedEntity.locked ? <Unlock size={16} /> : <Lock size={16} />}
+                      {selectedEntity.locked ? 'Buka Kunci Room' : 'Kunci Room'}
+                    </button>
+                    {selectedEntity.locked && <p className="floorplan-field-note">Room terkunci: tidak bisa digeser atau diubah ukurannya. Buka kunci untuk mengedit geometri.</p>}
+                  </section>
                   <section className="floorplan-inspector-section">
                     <label htmlFor="room-label">Nama ruang</label>
                     <input id="room-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
