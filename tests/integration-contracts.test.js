@@ -103,8 +103,10 @@ test('Rooms use editable polygon vertices and a manually entered ceiling height'
   assert.match(source, /id="room-ceiling-height"/)
   assert.match(source, /placeholder="Belum diisi"/)
   assert.match(source, /Room hasil migrasi tidak diberi tinggi otomatis/)
-  assert.doesNotMatch(source, /id="room-width"/)
-  assert.doesNotMatch(source, /id="room-height"/)
+  assert.match(source, /id="room-length"/)
+  assert.match(source, /id="room-width"/)
+  assert.match(source, /const resizeRoomBounds = \(room, dimension, targetUnits\) =>/)
+  assert.match(source, /step="0\.01"/)
 })
 
 test('Room dimensions are shown outside every polygon edge and can be toggled', async () => {
