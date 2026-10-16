@@ -115,9 +115,15 @@ function PrintFloorplan({ scene, layout }) {
     minY: Math.min(...planPoints.map(point => point.y)),
     maxY: Math.max(...planPoints.map(point => point.y)),
   } : null
+  // Reserve drawing space for dimension guides and labels outside the room polygon.
+  // Fit the complete measured plan into the PDF frame instead of centering only the walls.
+  const planScale = planBounds ? Math.min(
+    900 / (planBounds.maxX - planBounds.minX + 360 || 1),
+    570 / (planBounds.maxY - planBounds.minY + 360 || 1),
+  ) : 1
   const planTranslate = planBounds ? {
-    x: 500 - (planBounds.minX + planBounds.maxX) / 2,
-    y: 325 - (planBounds.minY + planBounds.maxY) / 2,
+    x: 500 - ((planBounds.minX + planBounds.maxX) / 2) * planScale,
+    y: 325 - ((planBounds.minY + planBounds.maxY) / 2) * planScale,
   } : { x: 0, y: 0 }
 
   return (
@@ -133,7 +139,7 @@ function PrintFloorplan({ scene, layout }) {
         <rect width="1000" height="650" fill="#fff" />
         {/* Export only the plan and its measurements, not the editor workspace grid. */}
 
-        <g transform={'translate(' + planTranslate.x + ' ' + planTranslate.y + ')'}>
+        <g transform={'translate(' + planTranslate.x + ' ' + planTranslate.y + ') scale(' + planScale + ')'}>
         {rooms.map(room => (
           <polygon key={'room-fill-' + room.id} points={roomPoints(room).map(point => point.x + ',' + point.y).join(' ')} fill="#fafafa" stroke="none" />
         ))}
