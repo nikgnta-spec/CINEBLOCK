@@ -208,6 +208,45 @@ function normalizeFloorplanCoordinate(value, max) {
   return Number.isFinite(number) ? Math.max(0, Math.min(max, number)) : 0
 }
 
+// Convert legacy rectangular Rooms in memory. Keep ceilingHeight absent for
+// migrated Rooms so existing projects are never silently assigned a height.
+function normalizeRoomPolygon(room, index = 0) {
+  if (!room || typeof room !== 'object') return null
+  const legacyRectangle = !Array.isArray(room.points) || room.points.length < 3
+  const x = normalizeFloorplanCoordinate(room.x, 1000)
+  const y = normalizeFloorplanCoordinate(room.y, 650)
+  const width = Math.max(12, Math.min(1000, Number(room.width) || 100))
+  const height = Math.max(12, Math.min(650, Number(room.height) || 80))
+  const points = legacyRectangle
+    ? [{ x, y }, { x: x + width, y }, { x: x + width, y: y + height }, { x, y: y + height }]
+    : room.points.slice(0, 500).map(point => ({ x: Number(point.x) || 0, y: Number(point.y) || 0 }))
+  const oldSideToEdge = { top: 0, right: 1, bottom: 2, left: 3 }
+  const openings = (Array.isArray(room.openings) ? room.openings : []).map(opening => {
+    const next = opening && typeof opening === 'object' ? { ...opening } : {}
+    if (Number.isInteger(next.edgeIndex)) {
+      next.edgeIndex = Math.max(0, Math.min(points.length - 1, next.edgeIndex))
+    } else {
+      next.edgeIndex = legacyRectangle ? (oldSideToEdge[next.side] ?? 2) : 0
+    }
+    next.id = typeof next.id === 'string' && next.id ? next.id : crypto.randomUUID()
+    next.type = next.type === 'window' ? 'window' : 'door'
+    next.offset = Math.max(0.02, Math.min(0.98, Number.isFinite(Number(next.offset)) ? Number(next.offset) : 0.5))
+    // Legacy bottom and left edges run opposite to the polygon perimeter order.
+    if (legacyRectangle && ['bottom', 'left'].includes(next.side)) next.offset = 1 - next.offset
+    next.width = Math.max(12, Math.min(500, Number(next.width) || (next.type === 'window' ? 58 : 48)))
+    delete next.side
+    return next
+  })
+  return {
+    id: typeof room.id === 'string' && room.id ? room.id : crypto.randomUUID(),
+    points,
+    label: typeof room.label === 'string' ? room.label : 'Room ' + String(index + 1).padStart(2, '0'),
+    ...(Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0
+      ? { ceilingHeight: Number(room.ceilingHeight) } : {}),
+    openings,
+  }
+}
+
 function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
   const result = {}
   if (!Array.isArray(savedScenes)) return result
@@ -242,15 +281,8 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
     }
 
     result[scene.id] = {
-      rooms: (Array.isArray(raw.rooms) ? raw.rooms : []).filter(item => item && typeof item === 'object').slice(0, 200).map((item, index) => ({
-        id: safeId(item),
-        x: coords(item.x, 1000),
-        y: coords(item.y, 650),
-        width: Math.max(12, Math.min(1000, Number(item.width) || 100)),
-        height: Math.max(12, Math.min(650, Number(item.height) || 80)),
-        label: safeLabel(item.label, 'Room ' + String(index + 1).padStart(2, '0')),
-        openings: normalizeOpenings(item.openings, true),
-      })),
+      rooms: (Array.isArray(raw.rooms) ? raw.rooms : []).filter(item => item && typeof item === 'object').slice(0, 200)
+        .map((item, index) => normalizeRoomPolygon(item, index)).filter(Boolean),
       walls: (Array.isArray(raw.walls) ? raw.walls : []).filter(item => item && typeof item === 'object').slice(0, 500).map(item => ({
         id: safeId(item),
         x1: coords(item.x1, 1000),
@@ -398,7 +430,9 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
 function migrateReusableRooms(savedScenes, savedFloorplans, savedRooms = []) {
   const scenes = (savedScenes || []).map(scene => ({ ...scene, roomIds: Array.isArray(scene.roomIds) ? [...scene.roomIds] : [] }))
   const floorplans = normalizeSavedFloorplans(savedFloorplans, scenes)
-  const rooms = Array.isArray(savedRooms) ? savedRooms.map(room => ({ ...room })) : []
+  const rooms = Array.isArray(savedRooms)
+    ? savedRooms.map((room, index) => normalizeRoomPolygon(room, index)).filter(Boolean)
+    : []
   const knownIds = new Set(rooms.map(room => room.id))
   for (const scene of scenes) {
     const layout = floorplans[scene.id] || { rooms: [] }

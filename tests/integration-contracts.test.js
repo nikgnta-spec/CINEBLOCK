@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
+import { snapRoomPoint } from '../src/utils/roomSnapping.js'
 
 const readSource = path => readFile(new URL(path, import.meta.url), 'utf8')
 
@@ -93,14 +94,140 @@ test('Locked objects remain selectable but cannot move or resize', async () => {
   assert.match(source, /!entry\.original\.locked/)
 })
 
-test('Room dimensions can be entered manually in meters and respect Room lock', async () => {
+test('Rooms use editable polygon vertices and a manually entered ceiling height', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
 
+  assert.match(source, /const getRoomPoints = room =>/)
+  assert.match(source, /const pointInPolygon =/)
+  assert.match(source, /const beginRoomVertexDrag =/)
+  assert.match(source, /mode: 'room-vertex'/)
+  assert.match(source, /id="room-ceiling-height"/)
+  assert.match(source, /placeholder="Belum diisi"/)
+  assert.match(source, /Room hasil migrasi tidak diberi tinggi otomatis/)
+  // Polygon Rooms expose editable overall bounds (not a legacy rectangle width),
+  // while individual edge lengths are rendered separately and manual drawing
+  // accepts a length in meters. All inspector dimension controls respect Room lock.
+  assert.match(source, /id="room-length"/)
   assert.match(source, /id="room-width"/)
-  assert.match(source, /id="room-height"/)
-  assert.match(source, /type="number"/)
-  assert.match(source, /Math\.round\(meters \* 100\)/)
-  assert.match(source, /disabled=\{Boolean\(selectedEntity\.locked\)\}/)
+  assert.match(source, /disabled=\{Boolean\(selectedEntity\.locked\)\} onChange=\{event =>/)
+  assert.match(source, /const resizeRoomBounds = \(room, dimension, targetUnits\) =>/)
+  assert.match(source, /const confirmManualRoomLength =/)
+  assert.match(source, /aria-label="Panjang garis dalam meter"/)
+  assert.match(source, /getRoomPoints\(selectedEntity\)\.length/)
+  assert.match(source, /step="0\.01"/)
+})
+
+test('Room dimensions are shown outside every polygon edge and can be toggled', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const getRoomDimensionGeometry =/)
+  assert.match(source, /showRoomDimensions && \(active \|\| hoveredRoomEdge\?\.roomId === room\.id\)/)
+  assert.match(source, /aria-pressed=\{showRoomDimensions\}/)
+  assert.match(source, /\(edge\.length \/ 100\)\.toFixed\(2\) \+ ' m'/)
+})
+
+test('Room drawing snaps positionally to existing vertices with alignment guides and Alt bypass', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  const snapping = await readSource('../src/utils/roomSnapping.js')
+  assert.match(source, /import \{ snapRoomPoint \} from '\.\.\/utils\/roomSnapping'/)
+  assert.match(source, /\.\.\.layout\.rooms\.flatMap\(room => getRoomPoints\(room\)\)/)
+  assert.match(snapping, /const xAnchor = nearestOnAxis\(point\.x, 'x'\)/)
+  assert.match(snapping, /const yAnchor = nearestOnAxis\(point\.y, 'y'\)/)
+  assert.match(snapping, /if \(xAnchor\) guides\.push\(\{ axis: 'vertical'/)
+  assert.match(snapping, /if \(yAnchor\) guides\.push\(\{ axis: 'horizontal'/)
+  assert.match(snapping, /return \{ point: \{ x: snappedX, y: snappedY \}, guides \}/)
+  assert.match(source, /svgRef\.current\?\.getBoundingClientRect\(\)\?\.width \|\| canvasSize\.width/)
+  assert.match(source, /event\.altKey/)
+  assert.match(source, /roomSnapGuides\.map/)
+  assert.match(source, /strokeDasharray="5 4"/)
+  assert.match(source, /9 \* viewBox\.width/)
+})
+
+test('Room snapping combines X and Y from different vertices and keeps single-axis snapping', () => {
+  const origin = { x: 100, y: 100 }
+  const vertexX = { x: 300, y: 200 }
+  const vertexY = { x: 500, y: 400 }
+
+  const both = snapRoomPoint({ x: 304, y: 396 }, origin, [vertexX, vertexY], 8)
+  assert.deepEqual(both.point, { x: 300, y: 400 })
+  assert.deepEqual(both.guides.map(guide => guide.axis).sort(), ['horizontal', 'vertical'])
+
+  const onlyX = snapRoomPoint({ x: 304, y: 270 }, origin, [vertexX, vertexY], 8)
+  assert.deepEqual(onlyX.point, { x: 300, y: 270 })
+  assert.deepEqual(onlyX.guides.map(guide => guide.axis), ['vertical'])
+
+  const onlyY = snapRoomPoint({ x: 650, y: 396 }, origin, [vertexX, vertexY], 8)
+  assert.deepEqual(onlyY.point, { x: 650, y: 400 })
+  assert.deepEqual(onlyY.guides.map(guide => guide.axis), ['horizontal'])
+})
+
+test('Room dimensions distinguish individual wall lengths from overall bounds and keep openings draggable', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /m total/)
+  assert.match(source, /y1 = y2 = guideY/)
+  assert.match(source, /x1 = x2 = guideX/)
+  assert.match(source, /angle: 0/)
+  const roomRenderStart = source.indexOf('layout.rooms.map(room => {')
+  const roomRenderEnd = source.indexOf('layout.walls.map', roomRenderStart)
+  assert.notEqual(roomRenderStart, -1, 'Room polygon render block must exist')
+  assert.notEqual(roomRenderEnd, -1, 'Room render block must end before wall render block')
+  const roomRender = source.slice(roomRenderStart, roomRenderEnd)
+  assert.match(roomRender, /key=\{'edge-hit-' \+ edge\.edgeIndex\}/)
+  assert.match(roomRender, /stroke="transparent" strokeWidth="14"/)
+  assert.match(roomRender, /beginRoomEdgeDrag\(room, edge\.edgeIndex, event\)/)
+  assert.match(roomRender, /beginOpeningDrag\('room', room, opening, event\)/)
+  assert.match(roomRender, /openings\.map\(opening =>/)
+})
+
+test('Door opening controls expose swing direction and single or double leaves', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const DoorSwingSymbol =/)
+  assert.match(source, /opening\.swingDirection === 'out'/)
+  assert.match(source, /opening\.doorType === 'double'/)
+  assert.match(source, /opening\.id \+ '-swing'/)
+  assert.match(source, /opening\.id \+ '-door-type'/)
+  assert.match(source, /const offset = 72/)
+})
+test('Dragging a Room edge translates both endpoint vertices in parallel', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const beginRoomEdgeDrag =/)
+  assert.match(source, /mode: 'room-edge'/)
+  assert.match(source, /const distance = dx \* nx \+ dy \* ny/)
+  assert.match(source, /index === drag\.edgeIndex \|\| index === \(drag\.edgeIndex \+ 1\) % drag\.originalPoints\.length/)
+  assert.match(source, /beginRoomEdgeDrag\(room, edge\.edgeIndex, event\)/)
+})
+
+test('Room drawing is point-by-point with close, Escape, live dimensions and manual lengths', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+
+  assert.match(source, /const addRoomDrawingPoint = point =>/)
+  assert.match(source, /const finishRoomDrawing = points =>/)
+  assert.match(source, /setRoomDrawPoints\(points => \[\.\.\.points, snappedPoint\]\)/)
+  assert.match(source, /const confirmManualRoomLength =/)
+  assert.match(source, /Panjang garis dalam meter/)
+  assert.match(source, /roomDrawPoints.length && key === 'enter'/)
+  assert.match(source, /roomDrawPoints.length && key === 'tab'/)
+  assert.match(source, /roomDrawPoints.length\) \{/)
+})
+
+test('Room migration converts legacy rectangles and remaps openings without assigning ceiling height', async () => {
+  const source = await readSource('../src/App.jsx')
+
+  assert.match(source, /function normalizeRoomPolygon\(room, index = 0\)/)
+  assert.match(source, /\{ x, y \}, \{ x: x \+ width, y \}, \{ x: x \+ width, y: y \+ height \}, \{ x, y: y \+ height \}/)
+  assert.match(source, /const oldSideToEdge = \{ top: 0, right: 1, bottom: 2, left: 3 \}/)
+  assert.match(source, /delete next\.side/)
+  assert.match(source, /legacyRectangle && \['bottom', 'left'\]\.includes\(next\.side\)\) next\.offset = 1 - next\.offset/)
+  assert.match(source, /migrated\.rooms/)
+  assert.match(source, /Number\.isFinite\(Number\(room\.ceilingHeight\)\)/)
+})
+
+test('Room PDF export uses polygon outlines and polygon-edge opening positions', async () => {
+  const source = await readSource('../src/components/PrintReport.jsx')
+
+  assert.match(source, /function roomPoints\(room\)/)
+  assert.match(source, /function roomEdges\(room\)/)
+  assert.match(source, /<polygon key=\{'room-fill-' \+ room\.id\}/)
+  assert.match(source, /Number\.isInteger\(opening\.edgeIndex\)/)
 })
 
 test('Props have editable names and manual dimensions in meters', async () => {
@@ -132,16 +259,20 @@ test('Props Custom type accepts free text and displays the entered type/name', a
   assert.match(source, /if \(type === 'prop'\) return item\.label \|\| item\.customPropType \|\| item\.propType \|\| 'Prop'/)
 })
 
-test('Doors and windows support precise width, position, and Room wall-side controls', async () => {
+test('Doors and windows support precise width, position, and polygon edge controls', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
 
   assert.match(source, /const updateOpening = \(openingId, patch\) =>/)
   assert.match(source, /id=\{opening\.id \+ '-width'\}/)
   assert.match(source, /id=\{opening\.id \+ '-offset'\}/)
-  assert.match(source, /id=\{opening\.id \+ '-side'\}/)
+  assert.match(source, /id=\{opening\.id \+ '-edge'\}/)
   assert.match(source, /updateOpening\(opening\.id, \{ width: Math\.round\(meters \* 100\) \}\)/)
   assert.match(source, /updateOpening\(opening\.id, \{ offset: percent \/ 100 \}\)/)
-  assert.match(source, /updateOpening\(opening\.id, \{ side: event\.target\.value \}\)/)
+  // Openings are attached to a polygon edge by edgeIndex, not legacy cardinal sides.
+  assert.match(source, /id=\{opening\.id \+ '-edge'\}/)
+  assert.match(source, /value=\{Number\.isInteger\(opening\.edgeIndex\) \? opening\.edgeIndex : 0\}/)
+  assert.match(source, /getRoomEdges\(selectedEntity\)\.map\(edge => <option key=\{edge\.edgeIndex\} value=\{edge\.edgeIndex\}>/)
+  assert.match(source, /updateOpening\(opening\.id, \{ edgeIndex: Number\(event\.target\.value\) \}\)/)
   assert.match(source, /disabled=\{Boolean\(selectedEntity\.locked\)\}/)
 })
 
@@ -170,6 +301,7 @@ test('Floorplan navigation supports shared cursor-anchored zoom, pinch, and expl
   assert.match(source, /const resetZoom = \(\) => setViewBox/)
   assert.match(source, /Reset zoom ke 100% \(1:1\)/)
   assert.match(source, /Muat seluruh denah ke kanvas/)
+  assert.match(source, /<aside className="floorplan-inspector" onWheel=\{event => event\.stopPropagation\(\)\} style=\{\{ overscrollBehavior: 'contain' \}\}>/)
 })
 
 test('Floorplan pan capture takes priority over object interactions and select-box is blank-canvas only', async () => {

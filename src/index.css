@@ -471,6 +471,8 @@ button:focus-visible,
   overflow: hidden;
 }
 .floorplan-canvas-column {
+  position: relative;
+  z-index: 0;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -503,11 +505,15 @@ button:focus-visible,
 .floorplan-canvas.can-select { cursor: default; }
 .floorplan-canvas.can-draw { cursor: crosshair; }
 .floorplan-inspector {
+  /* Keep the properties panel above any canvas overflow in hit-testing too. */
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   border-left: 1px solid var(--border);
   background: var(--bg);
 }
