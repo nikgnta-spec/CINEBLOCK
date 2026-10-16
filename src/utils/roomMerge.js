@@ -71,5 +71,33 @@ export function mergeAdjacentRoomPolygons(movingRoom, targetRoom, candidate) {
   if (edges.length || !samePoint(end, polygon[0], 1.5) || polygon.length < 3) return null
   const area = Math.abs(polygon.reduce((sum, p, i) => { const n = polygon[(i + 1) % polygon.length]; return sum + p.x * n.y - n.x * p.y }, 0)) / 2
   if (area < 16) return null
-  return { ...targetRoom, points: polygon.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) })), openings: [...(targetRoom.openings || []), ...(movingRoom.openings || [])] }
+  const mergedPoints = polygon.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }))
+  const hasSharedEdgeOpening = (room, edgeIndex) => (room.openings || []).some(opening => Number(opening.edgeIndex) === edgeIndex)
+  if (hasSharedEdgeOpening(movingRoom, mi) || hasSharedEdgeOpening(targetRoom, ti)) return null
+
+  const remapOpenings = (room, originalPoints) => (room.openings || []).map(opening => {
+    const oldIndex = Number(opening.edgeIndex)
+    if (!Number.isInteger(oldIndex) || oldIndex < 0 || oldIndex >= originalPoints.length) return { ...opening }
+    const a = originalPoints[oldIndex]
+    const b = originalPoints[(oldIndex + 1) % originalPoints.length]
+    const edgeLength = distance(a, b)
+    if (!edgeLength) return { ...opening }
+    const offset = Math.max(0, Math.min(1, Number(opening.offset ?? 0.5)))
+    const center = { x: a.x + (b.x - a.x) * offset, y: a.y + (b.y - a.y) * offset }
+    let nearest = null
+    edgesOf({ points: mergedPoints }).forEach((edge, edgeIndex) => {
+      const dx = edge.b.x - edge.a.x, dy = edge.b.y - edge.a.y
+      const squared = dx * dx + dy * dy || 1
+      const t = Math.max(0, Math.min(1, ((center.x - edge.a.x) * dx + (center.y - edge.a.y) * dy) / squared))
+      const projected = { x: edge.a.x + t * dx, y: edge.a.y + t * dy }
+      const d = distance(center, projected)
+      if (!nearest || d < nearest.distance) nearest = { edgeIndex, offset: t, distance: d }
+    })
+    if (!nearest || nearest.distance > 3) return { ...opening, edgeIndex: -1, needsReposition: true }
+    return { ...opening, edgeIndex: nearest.edgeIndex, offset: nearest.offset }
+  })
+  const targetOpenings = remapOpenings(targetRoom, targetPoints)
+  const movingOpenings = remapOpenings(movingRoom, movingPoints)
+  if ([...targetOpenings, ...movingOpenings].some(opening => opening.needsReposition)) return null
+  return { ...targetRoom, points: mergedPoints, openings: [...targetOpenings, ...movingOpenings] }
 }
