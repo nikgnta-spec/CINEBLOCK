@@ -1070,9 +1070,18 @@ export default function Floorplan({
       return
     }
 
-    // "Merge" connects adjacent room areas conceptually, but must not union
-    // their polygons: both Room records, labels, wall boundaries and openings
-    // remain independently editable and visible.
+    // Persist the connection on both Room records. Selection is temporary UI
+    // state and must not be used to represent a lasting Room connection.
+    // Keep the polygons, names, walls and all openings completely separate.
+    updateLayout(previous => ({
+      ...previous,
+      rooms: previous.rooms.map(room => {
+        if (room.id !== moving.id && room.id !== target.id) return room
+        const connectedRoomIds = new Set(Array.isArray(room.connectedRoomIds) ? room.connectedRoomIds : [])
+        connectedRoomIds.add(room.id === moving.id ? target.id : moving.id)
+        return { ...room, connectedRoomIds: [...connectedRoomIds] }
+      }),
+    }))
     applyEntitySelection([{ type: 'room', id: target.id }, { type: 'room', id: moving.id }], { type: 'room', id: target.id })
     setRoomMergePrompt(null)
   }
