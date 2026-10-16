@@ -208,7 +208,18 @@ function PrintFloorplan({ scene, layout }) {
               <text x={bounds.x + 9} y={bounds.y + 18} fontSize="13" fontWeight="700" fill="#111827">{room.label || 'Room'}</text>
               <text x={bounds.x + 9} y={bounds.y + 36} fontSize="12" fill="#374151">{meters(bounds.maxX - bounds.x) + ' × ' + meters(bounds.maxY - bounds.y)}</text>
               {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && <text x={bounds.x + 9} y={bounds.y + 52} fontSize="12" fill="#374151">{Number(room.ceilingHeight).toFixed(1) + ' m ceiling'}</text>}
-              {edges.map(edge => {
+              {edges.filter(edge => {
+                // A shared wall between connected Rooms is internal to the group;
+                // dimension it once as geometry, not once for each Room.
+                return !connectedRoomGroup.some(other => other.id !== room.id
+                  && roomEdges(other).some(otherEdge => {
+                    const samePoint = (a, b) => Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) < 1
+                    return (samePoint({ x: edge.x1, y: edge.y1 }, { x: otherEdge.x1, y: otherEdge.y1 })
+                      && samePoint({ x: edge.x2, y: edge.y2 }, { x: otherEdge.x2, y: otherEdge.y2 }))
+                      || (samePoint({ x: edge.x1, y: edge.y1 }, { x: otherEdge.x2, y: otherEdge.y2 })
+                      && samePoint({ x: edge.x2, y: edge.y2 }, { x: otherEdge.x1, y: otherEdge.y1 }))
+                  }))
+              }).map(edge => {
                 const horizontal = Math.abs(edge.x2 - edge.x1) >= Math.abs(edge.y2 - edge.y1)
                 const mx = (edge.x1 + edge.x2) / 2
                 const my = (edge.y1 + edge.y2) / 2
@@ -243,8 +254,9 @@ function PrintFloorplan({ scene, layout }) {
 
                 </g>
               })}
-              {(() => {
-                // Match Floorplan's overall dimensions: polygon bounding-box extents, not the sum of edges.
+              {connectedRoomGroup.length === 1 && (() => {
+                // A standalone Room gets its own bounding-box dimensions.
+                // Connected groups show their bounding-box dimensions once below.
                 const totalLength = bounds.maxX - bounds.x
                 const totalWidth = bounds.maxY - bounds.y
                 const horizontalY = bounds.y - 112
