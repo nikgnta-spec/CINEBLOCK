@@ -1065,16 +1065,15 @@ export default function Floorplan({
     if (!roomMergePrompt) return
     const moving = layout.rooms.find(room => room.id === roomMergePrompt.movingRoomId)
     const target = layout.rooms.find(room => room.id === roomMergePrompt.targetRoomId)
-    const merged = mergeAdjacentRoomPolygons(moving, target, roomMergePrompt)
-    if (!merged) {
-      setRoomMergePrompt({ ...roomMergePrompt, error: 'Gabungan ini berisiko merusak bentuk atau bukaan. Sejajarkan sisi yang sama panjang dan pindahkan pintu/jendela dari sisi sambungan terlebih dahulu.' })
+    if (!moving || !target) {
+      setRoomMergePrompt(null)
       return
     }
-    updateLayout(previous => ({
-      ...previous,
-      rooms: previous.rooms.filter(room => room.id !== moving.id).map(room => room.id === target.id ? merged : room),
-    }))
-    applyEntitySelection([{ type: 'room', id: target.id }], { type: 'room', id: target.id })
+
+    // "Merge" connects adjacent room areas conceptually, but must not union
+    // their polygons: both Room records, labels, wall boundaries and openings
+    // remain independently editable and visible.
+    applyEntitySelection([{ type: 'room', id: target.id }, { type: 'room', id: moving.id }], { type: 'room', id: target.id })
     setRoomMergePrompt(null)
   }
 
@@ -3401,11 +3400,11 @@ export default function Floorplan({
         <div className="floorplan-dialog-backdrop" role="presentation" onPointerDown={event => { if (event.target === event.currentTarget) setRoomMergePrompt(null) }}>
           <section className="floorplan-dialog" role="dialog" aria-modal="true" aria-labelledby="room-merge-title" onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
             <h3 id="room-merge-title">Gabungkan kedua Room?</h3>
-            <p>Dua Room sudah berdekatan. Jika digabung, keduanya menjadi satu polygon dan ukuran total dihitung ulang.</p>
+            <p>Dua Room akan ditandai sebagai area yang tersambung. Bentuk dan nama masing-masing Room, semua dinding, pintu, dan jendela tetap dipertahankan.</p>
             {roomMergePrompt.error && <p role="alert">{roomMergePrompt.error}</p>}
             <div className="floorplan-dialog-actions">
               <button type="button" onClick={() => setRoomMergePrompt(null)}>Batal</button>
-              <button type="button" onClick={confirmRoomMerge}>Gabungkan Room</button>
+              <button type="button" onClick={confirmRoomMerge}>Sambungkan Room</button>
             </div>
           </section>
         </div>
