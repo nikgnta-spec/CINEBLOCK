@@ -201,3 +201,38 @@ export function mergeAdjacentRoomPolygons(movingRoom, targetRoom, candidate) {
   if ([...targetOpenings, ...movingOpenings].some(opening => opening.needsReposition)) return null
   return { ...targetRoom, points: mergedPoints, openings: [...targetOpenings, ...movingOpenings] }
 }
+
+
+/**
+ * Rigidly snap a Room edge onto a target Room edge. The moving Room is rotated
+ * around the midpoint of the selected edge, then translated only along the
+ * target edge's normal. All edge lengths and opening offsets remain unchanged.
+ * Returns the transformed polygon points, or null for invalid geometry.
+ */
+export function snapRoomToEdge(room, movingEdge, targetEdge) {
+  const points = pointsOf(room).map(point => ({ x: Number(point.x), y: Number(point.y) }))
+  if (points.length < 3 || !movingEdge?.a || !movingEdge?.b || !targetEdge?.a || !targetEdge?.b) return null
+  if (points.some(point => !Number.isFinite(point.x) || !Number.isFinite(point.y))) return null
+  const movingLength = distance(movingEdge.a, movingEdge.b)
+  const targetLength = distance(targetEdge.a, targetEdge.b)
+  if (movingLength < 1 || targetLength < 1) return null
+
+  const movingAngle = Math.atan2(movingEdge.b.y - movingEdge.a.y, movingEdge.b.x - movingEdge.a.x)
+  const targetAngle = Math.atan2(targetEdge.b.y - targetEdge.a.y, targetEdge.b.x - targetEdge.a.x)
+  const rotation = Math.atan2(Math.sin(targetAngle - movingAngle), Math.cos(targetAngle - movingAngle))
+  // Merge candidates are deliberately limited to nearly parallel edges. Reject
+  // unexpected input rather than silently rotating a Room by a large amount.
+  if (Math.abs(rotation) > 0.08) return null
+
+  const pivot = { x: (movingEdge.a.x + movingEdge.b.x) / 2, y: (movingEdge.a.y + movingEdge.b.y) / 2 }
+  const cos = Math.cos(rotation), sin = Math.sin(rotation)
+  const rotated = points.map(point => {
+    const x = point.x - pivot.x, y = point.y - pivot.y
+    return { x: pivot.x + x * cos - y * sin, y: pivot.y + x * sin + y * cos }
+  })
+  const targetUnit = unit(targetEdge)
+  const normal = { x: -targetUnit.y, y: targetUnit.x }
+  const signedDistance = (pivot.x - targetEdge.a.x) * normal.x + (pivot.y - targetEdge.a.y) * normal.y
+  const shift = { x: -normal.x * signedDistance, y: -normal.y * signedDistance }
+  return rotated.map(point => ({ x: point.x + shift.x, y: point.y + shift.y }))
+}
