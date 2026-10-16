@@ -480,3 +480,14 @@ test('connecting adjacent Rooms preserves both Room records, labels, walls, and 
   assert.doesNotMatch(handler, /rooms: previous\.rooms\.filter/)
   assert.match(source, /mọi dinding|semua dinding|dinding, pintu, dan jendela/i)
 })
+
+test('Room connections persist independently of selection and Rooms remain draggable', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  const start = source.indexOf('const confirmRoomMerge = () => {')
+  const end = source.indexOf('const addRoomVertexAtEdgeMidpoint', start)
+  const handler = source.slice(start, end)
+  assert.match(handler, /connectedRoomIds/)
+  assert.match(handler, /connectedRoomIds\.add\(room\.id === moving\.id \? target\.id : moving\.id\)/)
+  assert.match(source, /onPointerDown=\{event => beginObjectDrag\('room', room, event\)\}/)
+  assert.match(source, /if \(drag\.type === 'room'\)[\s\S]*?points: getRoomPoints\(drag\.original\)\.map/)
+})
