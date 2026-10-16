@@ -458,3 +458,11 @@ test('Room edge selection persists when moving from canvas to inspector vertex c
   assert.match(source, /Tambah titik pada sisi terpilih/)
   assert.match(source, /selectedEntity\.id\} onClick=\{\(\) => addRoomVertexAtEdgeMidpoint\(selectedEntity\)\}/)
 })
+
+test('Room vertex insertion uses a persistent selected edge, not transient hover state', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const \[selectedRoomEdge, setSelectedRoomEdge\] = useState\(null\)/)
+  assert.match(source, /setSelectedRoomEdge\(\{ roomId: room\.id, edgeIndex \}\)/)
+  assert.match(source, /if \(!room \|\| room\.locked \|\| selectedRoomEdge\?\.roomId !== room\.id\) return/)
+  assert.match(source, /disabled=\{Boolean\(selectedEntity\.locked\) \|\| selectedRoomEdge\?\.roomId !== selectedEntity\.id\}/)
+})
