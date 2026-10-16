@@ -2205,7 +2205,7 @@ export default function Floorplan({
                         <g key={opening.id} transform={'translate(' + placement.x + ' ' + placement.y + ') rotate(' + placement.angle + ')'} data-floorplan-object="true" style={{ cursor: 'grab' }} onPointerDownCapture={event => beginOpeningDrag('room', room, opening, event)} onClick={event => event.stopPropagation()}>
                           <rect x={-(Math.min(Number(opening.width ?? 48), placement.length) / 2) - 8} y="-16" width={Math.min(Number(opening.width ?? 48), placement.length) + 16} height="32" fill="transparent" pointerEvents="all" />
                           <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type === 'door' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">{opening.type === 'door' ? 'Pintu' : 'Jendela'}</text>
-                          {opening.type === 'door' && <text x="0" y="25" textAnchor="middle" fontSize="9" fontWeight="600" fill="#fbbf24" stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">{'Daun pintu ' + (Number(opening.width ?? 48) / 100).toFixed(2) + ' m'}</text>}
+                          
                           {opening.type === 'door' ? (
                             <DoorSwingSymbol opening={opening} width={openingWidth} />
                           ) : (
