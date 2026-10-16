@@ -2197,7 +2197,8 @@ export default function Floorplan({
                       const placement = getRoomOpeningPlacement(room, opening)
                       const openingWidth = Math.min(Number(opening.width) || 48, placement.length)
                       return (
-                        <g key={opening.id} transform={'translate(' + placement.x + ' ' + placement.y + ') rotate(' + placement.angle + ')'} data-floorplan-object="true" style={{ cursor: 'grab' }} onPointerDown={event => beginOpeningDrag('room', room, opening, event)} onClick={event => event.stopPropagation()}>
+                        <g key={opening.id} transform={'translate(' + placement.x + ' ' + placement.y + ') rotate(' + placement.angle + ')'} data-floorplan-object="true" style={{ cursor: 'grab' }} onPointerDownCapture={event => beginOpeningDrag('room', room, opening, event)} onClick={event => event.stopPropagation()}>
+                          <rect x={-(Math.min(Number(opening.width) || 48, placement.length) / 2) - 8} y="-16" width={Math.min(Number(opening.width) || 48, placement.length) + 16} height="32" fill="transparent" pointerEvents="all" />
                           <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type === 'door' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">{opening.type === 'door' ? 'Pintu' : 'Jendela'}</text>
                           {opening.type === 'door' ? (
                             <DoorSwingSymbol opening={opening} width={openingWidth} />
@@ -2247,9 +2248,10 @@ export default function Floorplan({
                           transform={'translate(' + (wall.x1 + metrics.ux * center) + ' ' + (wall.y1 + metrics.uy * center) + ') rotate(' + wallAngle + ')'}
                           data-floorplan-object="true"
                           style={{ cursor: 'grab' }}
-                          onPointerDown={event => beginOpeningDrag('wall', wall, opening, event)}
+                          onPointerDownCapture={event => beginOpeningDrag('wall', wall, opening, event)}
                           onClick={event => event.stopPropagation()}
                         >
+                          <rect x={-(openingWidth / 2) - 8} y="-16" width={openingWidth + 16} height="32" fill="transparent" pointerEvents="all" />
                           <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type === 'door' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">
                             {opening.type === 'door' ? 'Pintu' : 'Jendela'}
                            </text>
