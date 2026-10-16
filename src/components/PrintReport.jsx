@@ -131,12 +131,7 @@ function PrintFloorplan({ scene, layout }) {
       </div>
       <svg className="print-plan-svg" viewBox="0 0 1000 650" role="img" aria-label={'Floorplan for ' + (scene.name || 'scene')}>
         <rect width="1000" height="650" fill="#fff" />
-        {Array.from({ length: 41 }, (_, i) => (
-          <line key={'gx' + i} x1={i * 25} y1="0" x2={i * 25} y2="650" stroke={i % 4 === 0 ? '#d1d5db' : '#edf0f2'} strokeWidth={i % 4 === 0 ? 1.1 : 0.6} />
-        ))}
-        {Array.from({ length: 27 }, (_, i) => (
-          <line key={'gy' + i} x1="0" y1={i * 25} x2="1000" y2={i * 25} stroke={i % 4 === 0 ? '#d1d5db' : '#edf0f2'} strokeWidth={i % 4 === 0 ? 1.1 : 0.6} />
-        ))}
+        {/* Export only the plan and its measurements, not the editor workspace grid. */}
 
         <g transform={'translate(' + planTranslate.x + ' ' + planTranslate.y + ')'}>
         {rooms.map(room => (
