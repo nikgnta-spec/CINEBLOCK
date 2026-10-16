@@ -21,8 +21,8 @@ function overlapOnLine(a, b, tolerance) {
   const low = Math.max(0, Math.min(bStart, bEnd))
   const high = Math.min(aLength, Math.max(bStart, bEnd))
   if (high - low <= 1) return null
-  const gap = Math.max(0, -Math.min(bStart, bEnd), Math.max(bStart, bEnd) - aLength)
-  return { low, high, overlap: high - low, gap, lineDistance, av, bv }
+  // Different edge lengths are valid: only require a real shared segment.
+  return { low, high, overlap: high - low, gap: 0, lineDistance, av, bv }
 }
 
 export function findRoomMergeCandidate(movingRoom, rooms, tolerance = 18) {
