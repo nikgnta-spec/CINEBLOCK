@@ -111,12 +111,16 @@ const getRoomEdges = room => getRoomPoints(room).map((point, index, points) => {
 })
 const getRoomDimensionGeometry = (room, edge) => {
   const points = getRoomPoints(room)
-  const center = points.reduce((sum, point) => ({ x: sum.x + point.x / points.length, y: sum.y + point.y / points.length }), { x: 0, y: 0 })
   const dx = edge.x2 - edge.x1, dy = edge.y2 - edge.y1
   const length = Math.hypot(dx, dy) || 1
   let nx = dy / length, ny = -dx / length
   const midpoint = { x: (edge.x1 + edge.x2) / 2, y: (edge.y1 + edge.y2) / 2 }
-  if ((center.x - midpoint.x) * nx + (center.y - midpoint.y) * ny > 0) { nx *= -1; ny *= -1 }
+  // For concave polygons, centroid-based normals can point into the room.
+  // Probe both sides of the edge and choose the side outside the polygon.
+  const probeDistance = Math.max(2, Math.min(8, length * 0.04))
+  const positiveProbe = { x: midpoint.x + nx * probeDistance, y: midpoint.y + ny * probeDistance }
+  const negativeProbe = { x: midpoint.x - nx * probeDistance, y: midpoint.y - ny * probeDistance }
+  if (pointInPolygon(positiveProbe, points) && !pointInPolygon(negativeProbe, points)) { nx *= -1; ny *= -1 }
   const offset = 72
   const x1 = edge.x1 + nx * offset, y1 = edge.y1 + ny * offset
   const x2 = edge.x2 + nx * offset, y2 = edge.y2 + ny * offset
@@ -1256,7 +1260,7 @@ export default function Floorplan({
       return
     }
     const previous = roomDrawPoints[roomDrawPoints.length - 1]
-    const snapTolerance = 14 * viewBox.width / Math.max(1, canvasSize.width)
+    const snapTolerance = 24 * viewBox.width / Math.max(1, canvasSize.width)
     const snappedPoint = snapRoomPoint(point, previous, roomDrawPoints.slice(0, -1), snapTolerance)
     if (Math.hypot(snappedPoint.x - previous.x, snappedPoint.y - previous.y) < 4) {
       setRoomDrawMessage('Garis terlalu pendek.')
