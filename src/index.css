@@ -480,9 +480,13 @@ button:focus-visible,
   background: var(--bg-subtle);
 }
 .floorplan-canvas-frame {
-  flex: 1 1 auto;
+  /* Keep the drawing surface independent from the inspector/list height. */
+  flex: 0 0 auto;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1000 / 650;
   min-height: 0;
-  height: 100%;
+  align-self: flex-start;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1677,3 +1681,225 @@ button:focus-visible,
 .floorplan-scale-bar { display: block; height: 7px; min-width: 36px; max-width: 120px; border: 1px solid var(--text); border-top: 0; }
 .floorplan-scale-caption { color: var(--text-muted); font-size: 9px; line-height: 1.2; white-space: nowrap; }
 .floorplan-object-row-name { overflow-wrap: anywhere; }
+
+/* Cloud auth and project picker */
+.cloud-workspace { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 0; max-width: 430px; }
+.cloud-workspace-unconfigured { flex-direction: row; align-items: center; color: var(--text-muted); font-size: 11px; white-space: nowrap; }
+.cloud-login-form, .cloud-session, .cloud-create-form { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cloud-login-form input, .cloud-create-form input, .cloud-project-select { min-width: 0; width: 132px; height: 34px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-subtle); color: var(--text); }
+.cloud-project-select { width: 150px; }
+.cloud-user { display: inline-flex; align-items: center; gap: 5px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); font-size: 11px; }
+.cloud-icon-button { min-width: 32px; padding-inline: 8px; }
+.cloud-muted, .cloud-feedback { font-size: 11px; color: var(--text-muted); }
+.cloud-feedback { max-width: 430px; text-align: right; }
+.cloud-feedback.is-error { color: var(--danger); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 1180px) {
+  .cloud-workspace { align-items: stretch; }
+  .cloud-user { display: none; }
+  .cloud-login-form input { width: 112px; }
+}
+@media (max-width: 760px) {
+  .cloud-workspace { display: none; }
+}
+
+
+/* Dedicated authentication gate; cloud workspace is not the default entry point. */
+.auth-gate {
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+  padding: 28px 16px;
+  background:
+    radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 55%),
+    var(--bg);
+}
+.auth-gate-card {
+  width: min(100%, 420px);
+  padding: 32px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-subtle);
+  box-shadow: var(--shadow);
+}
+.auth-gate-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 34px;
+  font-size: 14px;
+  font-weight: 750;
+  letter-spacing: .09em;
+}
+.auth-gate-brand svg { color: var(--accent); }
+.auth-gate-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 18px;
+  border: 1px solid var(--accent-border);
+  border-radius: 12px;
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+.auth-gate-card h1 { margin-bottom: 8px; font-size: 23px; line-height: 1.25; letter-spacing: -.035em; }
+.auth-gate-subtitle { margin-bottom: 24px; color: var(--text-muted); font-size: 13px; line-height: 1.6; }
+.auth-mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 0 0 16px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.auth-mode-switch button {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.auth-mode-switch button.active {
+  border-color: var(--border);
+  background: var(--bg-subtle);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 12%);
+}
+.auth-mode-switch button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.auth-gate-form { display: flex; flex-direction: column; gap: 8px; }
+.auth-gate-form label { margin-top: 5px; color: var(--text-muted); font-size: 12px; font-weight: 600; }
+.auth-gate-form input {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+}
+.auth-gate-form input:read-only { color: var(--text-muted); }
+.auth-gate-form button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 700;
+}
+.auth-gate-form button:disabled { opacity: .55; cursor: wait; }
+.auth-gate-error, .auth-gate-notice { margin-top: 14px; font-size: 12px; line-height: 1.5; }
+.auth-gate-error { color: var(--danger); }
+.auth-gate-notice { color: var(--success); }
+.auth-gate-footer {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.auth-gate-footer svg { flex: 0 0 auto; margin-top: 1px; }
+.auth-gate-local {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 20px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.auth-gate-local:hover { color: var(--text); }
+.auth-gate-secondary-action { align-self: flex-start; margin-top: 10px; color: var(--text-muted); font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+.auth-gate-secondary-action:hover { color: var(--text); }
+.auth-gate-form .auth-gate-secondary-action { min-height: 30px; margin-top: 2px; padding: 4px 0; border: 0; background: transparent; color: var(--text-muted); font-weight: 500; }
+.auth-gate-local-note { margin-top: 8px; color: var(--text-muted); font-size: 11px; line-height: 1.5; }
+@media (max-width: 480px) {
+  .auth-gate-card { padding: 24px 20px; }
+  .auth-gate-card h1 { font-size: 21px; }
+}
+
+.auth-gate-form select {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+}
+.auth-gate-empty {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.local-mode-shell { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.local-mode-shell > .app { flex: 1; min-height: 0; height: auto; }
+.local-mode-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--text);
+  font-size: 11px;
+  text-align: center;
+}
+.local-mode-banner button { color: var(--text); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+
+
+/* Project access management */
+.cloud-access-manager {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 520px);
+  padding: 14px;
+  border: 1px solid var(--border, #3b3b3b);
+  border-radius: 10px;
+  background: var(--panel, #171717);
+  color: var(--text, #f5f5f5);
+}
+.cloud-access-heading,
+.cloud-access-member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cloud-access-heading strong { font-size: 13px; }
+.cloud-invite-form { display: grid; gap: 7px; }
+.cloud-invite-form label { font-size: 12px; color: var(--muted, #aaa); }
+.cloud-invite-form input,
+.cloud-invite-form select {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border, #444);
+  border-radius: 6px;
+  background: var(--bg, #111);
+  color: inherit;
+}
+.cloud-access-members { display: grid; gap: 7px; }
+.cloud-access-member { padding: 8px 0; border-top: 1px solid var(--border, #333); }
+.cloud-access-member > div { display: grid; gap: 3px; min-width: 0; }
+.cloud-access-member strong { font-size: 12px; overflow-wrap: anywhere; }
+.cloud-access-member span { font-size: 11px; color: var(--muted, #aaa); }
+.cloud-access-manager .cloud-muted { margin: 0; font-size: 12px; line-height: 1.45; }

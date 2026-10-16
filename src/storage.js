@@ -5,20 +5,22 @@ const PRIMARY_KEY = 'primary'
 const LEGACY_STORAGE_KEY = 'cineblock.app-state.v1'
 const CHANGE_EVENT_KEY = 'cineblock.app-state.changed'
 const CHANNEL_NAME = 'cineblock-app-state'
-const TAB_ID = crypto.randomUUID()
+const TAB_ID = typeof globalThis.crypto?.randomUUID === 'function'
+  ? globalThis.crypto.randomUUID()
+  : `tab-${Math.random().toString(36).slice(2)}`
 
 let databasePromise
 let saveQueue = Promise.resolve()
 let lastSavedAt = 0
 
 function openDatabase() {
-  if (typeof indexedDB === 'undefined') {
+  if (typeof globalThis.indexedDB === 'undefined') {
     return Promise.reject(new Error('IndexedDB is not available in this browser'))
   }
 
   if (!databasePromise) {
     databasePromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION)
+      const request = globalThis.indexedDB.open(DATABASE_NAME, DATABASE_VERSION)
 
       request.onupgradeneeded = () => {
         const database = request.result
@@ -60,8 +62,8 @@ function writeToDatabase(database, value) {
 
 function notifyOtherTabs() {
   try {
-    const channel = typeof BroadcastChannel !== 'undefined'
-      ? new BroadcastChannel(CHANNEL_NAME)
+    const channel = typeof globalThis.BroadcastChannel !== 'undefined'
+      ? new globalThis.BroadcastChannel(CHANNEL_NAME)
       : null
     channel?.postMessage({ type: 'saved', source: TAB_ID })
     channel?.close()
@@ -70,7 +72,7 @@ function notifyOtherTabs() {
   }
 
   try {
-    window.localStorage.setItem(CHANGE_EVENT_KEY, `${TAB_ID}:${Date.now()}:${Math.random()}`)
+    globalThis.window.localStorage.setItem(CHANGE_EVENT_KEY, `${TAB_ID}:${Date.now()}:${Math.random()}`)
   } catch {
     // BroadcastChannel still works when localStorage is unavailable.
   }
@@ -90,18 +92,18 @@ export function subscribeToExternalSave(callback) {
   }
 
   channel?.addEventListener('message', handleMessage)
-  window.addEventListener('storage', handleStorage)
+  globalThis.window.addEventListener('storage', handleStorage)
 
   return () => {
     channel?.removeEventListener('message', handleMessage)
     channel?.close()
-    window.removeEventListener('storage', handleStorage)
+    globalThis.window.removeEventListener('storage', handleStorage)
   }
 }
 
 function readLegacyLocalStorage() {
   try {
-    const raw = window.localStorage.getItem(LEGACY_STORAGE_KEY)
+    const raw = globalThis.window.localStorage.getItem(LEGACY_STORAGE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object') return null
@@ -193,7 +195,7 @@ async function persistAppState(value) {
     // localStorage can be unavailable or over quota, so mirror failure must not
     // turn a successful IndexedDB save into a reported save failure.
     try {
-      window.localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(record))
+      globalThis.window.localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(record))
     } catch {
       // IndexedDB remains the source of truth when the compatibility copy cannot be written.
     }

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#081126">
+  <title>CineBlock — Akses Penguji</title>
+  <style>
+    :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:#081126;color:#edf2ff}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at top,#14264a 0%,#081126 58%)}
+    main{width:min(100%,440px);border:1px solid #263655;background:#0c1730;border-radius:20px;padding:30px;box-shadow:0 24px 80px #0005}
+    .brand{font-size:12px;font-weight:800;letter-spacing:.18em;color:#9db8ff}h1{font-size:27px;line-height:1.15;margin:12px 0}p{color:#aebbd3;line-height:1.6;font-size:14px}
+    label{display:block;margin:22px 0 8px;font-size:13px;color:#dce5f7}input{width:100%;padding:13px 14px;border:1px solid #354665;border-radius:10px;background:#071022;color:#fff;font:inherit;outline:none}input:focus{border-color:#89a9ff}
+    button{width:100%;border:0;border-radius:10px;padding:13px 16px;margin-top:12px;background:#dce7ff;color:#111e39;font-weight:750;font-size:14px;cursor:pointer}button:disabled{opacity:.55;cursor:wait}
+    .status{padding:12px;border-radius:10px;background:#142441;color:#c8d7f2;font-size:13px;overflow-wrap:anywhere}.status.error{background:#3a1d2b;color:#ffd9e0}.small{font-size:12px;color:#8293b1;margin-top:18px}
+    [hidden]{display:none!important}
+  </style>
+</head>
+<body>
+<main>
+  <div class="brand">CINEBLOCK / TESTER ACCESS</div>
+  <h1>Masuk sebagai penguji</h1>
+  <p>Masukkan email yang sudah diundang atau dibuat oleh admin CineBlock. Kami akan mengirim kode masuk ke email tersebut. Pendaftaran akun baru tidak dibuka dari halaman ini.</p>
+  <form id="request-form">
+    <label for="email">Email penguji</label>
+    <input id="email" name="email" type="email" autocomplete="email" placeholder="nama@email.com" required maxlength="254">
+    <button id="send" type="submit">Kirim kode masuk</button>
+  </form>
+  <form id="verify-form" hidden>
+    <label for="code">Kode dari email</label>
+    <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" placeholder="Masukkan kode 6 digit" required minlength="6" maxlength="8">
+    <button id="verify" type="submit">Verifikasi dan masuk</button>
+    <button id="back" type="button" style="background:transparent;color:#c9d7f5;border:1px solid #354665">Gunakan email lain</button>
+  </form>
+  <p id="status" class="status" role="status" aria-live="polite" hidden></p>
+  <div class="small">Akses hanya untuk akun yang telah diundang. Jika kode tidak masuk, periksa folder spam atau hubungi admin.</div>
+</main>
+<script type="module">
+const SUPABASE_URL = 'https://pycxqqghkpkoqqgatprv.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_GRixB_y1fBvVfa777zhjXw_O7LCmSS_';
+const SESSION_KEY = 'cineblock.supabase.session.v1';
+const requestForm = document.querySelector('#request-form');
+const verifyForm = document.querySelector('#verify-form');
+const emailInput = document.querySelector('#email');
+const codeInput = document.querySelector('#code');
+const statusBox = document.querySelector('#status');
+const sendButton = document.querySelector('#send');
+const verifyButton = document.querySelector('#verify');
+let currentEmail = '';
+function status(message, isError = false) {
+  statusBox.textContent = message;
+  statusBox.hidden = false;
+  statusBox.classList.toggle('error', isError);
+}
+async function api(path, body) {
+  const response = await fetch(SUPABASE_URL + '/auth/v1/' + path, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = data.msg || data.message || data.error_description || data.error || 'Permintaan autentikasi gagal.';
+    throw new Error(message);
+  }
+  return data;
+}
+requestForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  currentEmail = emailInput.value.trim().toLowerCase();
+  sendButton.disabled = true;
+  statusBox.hidden = true;
+  try {
+    await api('otp', { email: currentEmail, create_user: false });
+    requestForm.hidden = true;
+    verifyForm.hidden = false;
+    status('Jika email tersebut terdaftar dan diizinkan, kode masuk akan dikirim. Periksa inbox dan spam.');
+    codeInput.focus();
+  } catch (error) {
+    status('Tidak dapat mengirim kode. Pastikan email sudah diundang/terdaftar dan coba lagi. Detail: ' + error.message, true);
+  } finally {
+    sendButton.disabled = false;
+  }
+});
+verifyForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  verifyButton.disabled = true;
+  statusBox.hidden = true;
+  try {
+    const data = await api('verify', { email: currentEmail, token: codeInput.value.trim(), type: 'email' });
+    if (!data.access_token || !data.user) throw new Error('Respons login tidak lengkap.');
+    const session = {
+      ...data,
+      expires_at: data.expires_at || Math.floor(Date.now() / 1000) + Number(data.expires_in || 3600)
+    };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    status('Login berhasil. Membuka CineBlock…');
+    window.location.replace('/');
+  } catch (error) {
+    status('Verifikasi gagal. Periksa kode atau minta kode baru. Detail: ' + error.message, true);
+  } finally {
+    verifyButton.disabled = false;
+  }
+});
+document.querySelector('#back').addEventListener('click', () => {
+  verifyForm.hidden = true;
+  requestForm.hidden = false;
+  codeInput.value = '';
+  statusBox.hidden = true;
+  emailInput.focus();
+});
+</script>
+</body>
+</html>
