@@ -42,7 +42,8 @@ test('invitation quota is atomic and unavailable to ordinary users', () => {
 test('only the CineBlock owner sees project access management controls', () => {
   assert.match(workspace, /isCineBlockOwner && projects\.length > 0 && selectedProjectId/)
   assert.match(workspace, /accessOpen && isCineBlockOwner && selectedProjectId/)
-  assert.match(workspace, /Undang melalui email/)
+  assert.doesNotMatch(workspace, /Undang melalui email/)
+  assert.match(workspace, /Bagikan dengan link/)
   assert.match(workspace, /value="editor"/)
   assert.match(workspace, /value="viewer"/)
   assert.match(workspace, /manageAccess\('remove'/)
