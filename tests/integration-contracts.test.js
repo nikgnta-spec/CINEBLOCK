@@ -125,6 +125,19 @@ test('Room dimensions are shown outside every polygon edge and can be toggled', 
   assert.match(source, /\(edge\.length \/ 100\)\.toFixed\(2\) \+ ' m'/)
 })
 
+test('Wall drawing captures pointer events on existing Rooms and snaps endpoints to Room and wall geometry', async () => {
+  const source = await readFile(new URL('../src/components/Floorplan.jsx', import.meta.url), 'utf8')
+  const captureStart = source.indexOf('const handleCanvasPointerDownCapture = event =>')
+  const captureEnd = source.indexOf('const handleCanvasPointerDown = event =>', captureStart)
+  const capture = source.slice(captureStart, captureEnd)
+  assert.match(capture, /tool === 'wall'.*event\.button === 0/s)
+  assert.match(capture, /event\.stopPropagation\(\)/)
+  assert.match(capture, /setDrawStart\(snapped\.point\)/)
+  assert.match(source, /const snapPointToRoomAndWallGeometry = \(point, origin = null\) =>/)
+  assert.match(source, /snapRoomPoint\(point, origin, anchors, snapTolerance\)/)
+  assert.match(source, /if \(tool === 'wall'\) \{\s*if \(event\.altKey\)/)
+})
+
 test('Room drawing snaps positionally to existing vertices with alignment guides and Alt bypass', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   const snapping = await readSource('../src/utils/roomSnapping.js')
