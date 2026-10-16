@@ -1202,7 +1202,37 @@ export default function Floorplan({
       dragRef.current = { mode: 'multi-move', start: point, items }
     } else {
       beginDragHistory()
-      dragRef.current = { mode: 'move', type, id: item.id, start: point, original: item }
+      if (type === 'room') {
+        // Connected Rooms move as one persistent group. Clearing canvas
+        // selection does not break the connection or leave a Room behind.
+        const connectedIds = new Set([item.id, ...(item.connectedRoomIds || [])])
+        let changed = true
+        while (changed) {
+          changed = false
+          for (const room of layout.rooms) {
+            if (connectedIds.has(room.id)) {
+              for (const id of room.connectedRoomIds || []) {
+                if (!connectedIds.has(id)) { connectedIds.add(id); changed = true }
+              }
+            }
+          }
+        }
+        const connectedRooms = layout.rooms.filter(room => connectedIds.has(room.id) && !room.locked)
+        const movableRooms = connectedRooms.length > 1
+          ? connectedRooms
+          : [item]
+        if (movableRooms.length > 1) {
+          dragRef.current = {
+            mode: 'multi-move',
+            start: point,
+            items: movableRooms.map(room => ({ type: 'room', id: room.id, original: room })),
+          }
+        } else {
+          dragRef.current = { mode: 'move', type, id: item.id, start: point, original: item }
+        }
+      } else {
+        dragRef.current = { mode: 'move', type, id: item.id, start: point, original: item }
+      }
     }
     svgRef.current?.setPointerCapture?.(event.pointerId)
   }
