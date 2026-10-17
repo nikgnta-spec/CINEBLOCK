@@ -93,50 +93,54 @@ function splitAndCancelEdges(roomPoints, otherPoints, tolerance = 1.5) {
   return pieces.filter((_, i) => !removed.has(i))
 }
 
+function polygonArea(points) {
+  return points.reduce((sum, point, index) => {
+    const next = points[(index + 1) % points.length]
+    return sum + point.x * next.y - next.x * point.y
+  }, 0) / 2
+}
+
+function sameWinding(first, second) {
+  const firstArea = polygonArea(first)
+  const secondArea = polygonArea(second)
+  return Math.sign(firstArea) === Math.sign(secondArea) ? second : [...second].reverse()
+}
+
 function tracePolygon(edges) {
   if (edges.length < 3) return null
-  // Trace only edge-to-edge connections. Do not silently bridge a missing
-  // segment with a diagonal: that creates self-crossing/notched Rooms when
-  // the shared wall is only partially overlapping.
+  // The input polygons are normalized to the same winding before shared
+  // segments are cancelled. Their remaining exterior edges are therefore
+  // already directed around the union. Never reverse an edge to force a join:
+  // doing so can follow an interior branch at a partial-overlap T-junction.
   const remaining = [...edges]
   const first = remaining.shift()
   const polygon = [{ ...first.a }]
   let current = first.b
-  let previousDirection = subtract(first.b, first.a)
   let guard = 0
 
   while (guard++ < edges.length + 2) {
     if (samePoint(current, polygon[0], 1.5)) break
     const candidates = []
     for (let i = 0; i < remaining.length; i++) {
-      const edge = remaining[i]
-      if (samePoint(edge.a, current, 1.5)) candidates.push({ i, edge, reverse: false })
-      if (samePoint(edge.b, current, 1.5)) candidates.push({ i, edge, reverse: true })
+      if (samePoint(remaining[i].a, current, 1.5)) candidates.push({ i, edge: remaining[i] })
     }
     if (!candidates.length) return null
-    // At a T-junction, choose the continuation that follows the exterior
-    // boundary with the smallest turn rather than whichever edge appears first.
+    // When several directed segments meet, follow the tightest clockwise turn
+    // while retaining each edge's original direction.
     candidates.sort((left, right) => {
-      const direction = item => {
-        const a = item.reverse ? item.edge.b : item.edge.a
-        const b = item.reverse ? item.edge.a : item.edge.b
-        return subtract(b, a)
-      }
-      const turn = v => Math.atan2(cross(previousDirection, v), dot(previousDirection, v))
-      return turn(direction(left)) - turn(direction(right))
+      const turn = edge => Math.atan2(cross(subtract(current, polygon[polygon.length - 1]), subtract(edge.b, edge.a)), dot(subtract(current, polygon[polygon.length - 1]), subtract(edge.b, edge.a)))
+      return turn(left.edge) - turn(right.edge)
     })
     const chosen = candidates[0]
     remaining.splice(chosen.i, 1)
-    const next = chosen.reverse ? chosen.edge.a : chosen.edge.b
     if (!samePoint(current, polygon[polygon.length - 1], 1.5)) polygon.push({ ...current })
-    previousDirection = subtract(next, current)
-    current = next
+    current = chosen.edge.b
   }
 
   if (remaining.length || !samePoint(current, polygon[0], 1.5) || polygon.length < 3) return null
   const cleaned = polygon.filter((p, i) => i === 0 || !samePoint(p, polygon[i - 1], 1))
   if (cleaned.length < 3) return null
-  const area = cleaned.reduce((sum, p, i) => { const n = cleaned[(i + 1) % cleaned.length]; return sum + p.x * n.y - n.x * p.y }, 0) / 2
+  const area = polygonArea(cleaned)
   if (Math.abs(area) < 16) return null
   return cleaned.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }))
 }
@@ -176,7 +180,8 @@ export function mergeAdjacentRoomPolygons(movingRoom, targetRoom, candidate, onF
     return coordinate >= sharedRange.low - 1 && coordinate <= sharedRange.high + 1
   }
 
-  const rawEdges = splitAndCancelEdges(movingPoints, alignedTarget)
+  const normalizedTarget = sameWinding(movingPoints, alignedTarget)
+  const rawEdges = splitAndCancelEdges(movingPoints, normalizedTarget)
   const mergedPoints = tracePolygon(rawEdges)
   if (!mergedPoints) return fail('Batas luar gabungan tidak membentuk poligon tertutup. Coba sejajarkan sisi dinding yang bertemu.')
 
