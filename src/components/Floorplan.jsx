@@ -3696,10 +3696,37 @@ export default function Floorplan({
                 <>
                   <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Dimensi</div>
-                    <div className="floorplan-dimension-summary">
-                      <div><span>Panjang</span><strong>{formatMeters(getWallMetrics(selectedEntity).length)}</strong></div>
-                      <div><span>Lebar</span><strong>{formatMeters(Number(selectedEntity.thickness) || 6)}</strong></div>
+                    <div className="floorplan-dimension-grid">
+                      <div className="floorplan-dimension-input">
+                        <label htmlFor="wall-length">Panjang (m)</label>
+                        <input id="wall-length" className="floorplan-field" type="number" min="0.01" max="20" step="0.01" value={(getWallMetrics(selectedEntity).length / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onFocus={event => event.currentTarget.select()} onChange={event => {
+                          const meters = Number(event.target.value)
+                          if (!Number.isFinite(meters) || meters < 0.01 || meters > 20) return
+                          const current = getWallMetrics(selectedEntity)
+                          const length = meters * 100
+                          updateLayout(previous => ({
+                            ...previous,
+                            walls: previous.walls.map(wall => wall.id === selectedEntity.id
+                              ? { ...wall, x2: wall.x1 + current.ux * length, y2: wall.y1 + current.uy * length }
+                              : wall),
+                          }))
+                        }} />
+                      </div>
+                      <div className="floorplan-dimension-input">
+                        <label htmlFor="wall-thickness">Lebar / tebal (m)</label>
+                        <input id="wall-thickness" className="floorplan-field" type="number" min="0.01" max="1" step="0.01" value={((Number(selectedEntity.thickness) || 6) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onFocus={event => event.currentTarget.select()} onChange={event => {
+                          const meters = Number(event.target.value)
+                          if (!Number.isFinite(meters) || meters < 0.01 || meters > 1) return
+                          updateLayout(previous => ({
+                            ...previous,
+                            walls: previous.walls.map(wall => wall.id === selectedEntity.id
+                              ? { ...wall, thickness: Math.round(meters * 100) }
+                              : wall),
+                          }))
+                        }} />
+                      </div>
                     </div>
+                    <p className="floorplan-field-note">Panjang total dinding: {formatMeters(getWallMetrics(selectedEntity).length)}.</p>
                   </section>
                   <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Bukaan</div>
