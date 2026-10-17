@@ -1,15 +1,95 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { snapRoomPoint } from '../src/utils/roomSnapping.js'
+import { projectPointToSegment, snapRoomPoint } from '../src/utils/roomSnapping.js'
+import { mergeAdjacentRoomPolygons } from '../src/utils/roomMerge.js'
+import { connectWallGeometry, createRoomPolygon, normalizeWallJunctions, updateRoomPolygonGeometry, updateWallEndpointGeometry } from '../src/utils/floorplanGeometry.js'
 
 const readSource = path => readFile(new URL(path, import.meta.url), 'utf8')
+
+test('Room drag snaps the whole polygon to nearby Room corners and aligned walls', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+
+  assert.match(source, /Snap the entire Room as a rigid body/)
+  assert.match(source, /const snapTolerance = 12 \* viewBox\.width/)
+  assert.match(source, /const otherEdges = otherRooms\.flatMap\(room => getRoomEdges\(room\)\)/)
+  assert.match(source, /const bestEdgeSnap = null|let bestEdgeSnap = null/)
+  assert.match(source, /let bestCorner = null/)
+  assert.match(source, /setRoomSnapGuides\(\[\s*\{ axis: 'vertical'/)
+  assert.match(source, /completedDrag\.type === 'room'\)\) setRoomSnapGuides\(\[\]\)/)
+})
+
+test('Room merge supports partial shared walls without requiring equal wall lengths', () => {
+  const rectangularRoom = {
+    id: 'rect',
+    points: [{ x: 0, y: 0 }, { x: 983, y: 0 }, { x: 983, y: 800 }, { x: 0, y: 800 }],
+    openings: [{ id: 'shared-doorway', type: 'doorway', edgeIndex: 1, offset: 0.5, width: 48 }],
+  }
+  const lShapedRoom = {
+    id: 'l-shape',
+    points: [{ x: 983, y: 0 }, { x: 1558, y: 0 }, { x: 1558, y: 281 }, { x: 1237, y: 281 }, { x: 1237, y: 666 }, { x: 983, y: 666 }],
+    openings: [],
+  }
+  const merged = mergeAdjacentRoomPolygons(rectangularRoom, lShapedRoom, {
+    movingEdge: { index: 1 },
+    targetEdge: { index: 5 },
+  })
+
+  assert.ok(merged, 'partial shared boundary should merge even when the complete wall lengths differ')
+  assert.equal(merged.points.length, 9)
+  assert.ok(merged.points.some(point => point.x === 983 && point.y === 666))
+  assert.ok(merged.points.some(point => point.x === 983 && point.y === 800))
+  assert.ok(merged.points.some(point => point.x === 983 && point.y === 0))
+  assert.ok(merged.internalWalls?.some(wall => wall.x1 === 983 && wall.x2 === 983 && Math.abs(Math.abs(wall.y2 - wall.y1) - 666) <= 1), 'the shared boundary is preserved as an internal wall')
+  assert.ok(merged.openings.some(opening => opening.id === 'shared-doorway' && opening.wallType === 'internal' && opening.internalWallIndex === 0), 'an opening on the shared wall stays attached to the new internal wall')
+})
 
 test('App wires shared scene and floorplan state into both planning tabs', async () => {
   const source = await readSource('../src/App.jsx')
 
   assert.match(source, /<ShotList[\s\S]*?scenes=\{scenes\}[\s\S]*?onChange=\{setScenes\}[\s\S]*?floorplans=\{floorplans\}[\s\S]*?onFloorplansChange=\{setFloorplans\}/)
   assert.match(source, /<Floorplan[\s\S]*?scenes=\{scenes\}[\s\S]*?onChange=\{setScenes\}[\s\S]*?floorplans=\{floorplans\}[\s\S]*?onFloorplansChange=\{setFloorplans\}/)
+})
+
+test('Merged internal walls remain visible in Floorplan and PDF and support openings', async () => {
+  assert.match(await readSource('../src/components/Floorplan.jsx'), /const getRoomInternalWalls = room =>/)
+
+  const floorplan = await readSource('../src/components/Floorplan.jsx')
+  const report = await readSource('../src/components/PrintReport.jsx')
+
+  assert.match(floorplan, /const wallOpenings = openings\.filter\(opening => opening\.wallType === 'internal' && opening\.internalWallIndex === index\)/)
+  assert.match(floorplan, /setSelectedRoomEdge\(\{ roomId: room\.id, internalWallIndex: index, edgeIndex: null \}\)/)
+  assert.match(floorplan, /wallType: 'internal', internalWallIndex: selectedRoomEdge\.internalWallIndex/)
+  assert.match(floorplan, /const internalWall = isInternalOpening\s*\? getRoomInternalWalls\(host\)\[opening\.internalWallIndex\]/)
+  assert.match(floorplan, /if \(isInternalOpening && !internalWall\)[\s\S]*?return/)
+  assert.match(floorplan, /Dinding sambungan/)
+  assert.match(report, /roomInternalWalls\(room\)\.map\(\(wall, wallIndex\)/)
+  assert.match(report, /opening\.wallType === 'internal' && opening\.internalWallIndex === wallIndex/)
+  assert.match(report, /opening\.wallType === 'internal' && Number\.isInteger\(opening\.internalWallIndex\)/)
+})
+
+test('PDF export does not add wall dimension labels absent from the Floorplan canvas', async () => {
+  const report = await readSource('../src/components/PrintReport.jsx')
+  assert.doesNotMatch(report, /WALL · \{meters\(metric\.length\)\}/)
+  assert.match(report, /strokeWidth=\{wall\.thickness \|\| 6\}/)
+})
+
+test('PDF export does not caption a merged Room\'s internal-wall doorway with dimensions', async () => {
+  // The Floorplan canvas labels every Room opening with just its short name (Pintu/Jendela),
+  // never a width × height caption. The PDF previously added that caption for every opening,
+  // including the door left on a merged Room's former shared wall — making that internal
+  // doorway read as the entrance to its own separate, titled Room in the exported plan.
+  const report = await readSource('../src/components/PrintReport.jsx')
+  assert.match(report, /\{openings\.filter\(opening => !\(opening\.wallType === 'internal' && Number\.isInteger\(opening\.internalWallIndex\)\)\)\.map\(opening => \{\s*\n(?:.*\n)*?\s*return <g key=\{'room-opening-dimension-' \+ opening\.id\}>/)
+})
+
+test('PDF dimensions avoid duplicate bounding dimensions and shared-wall measurements for connected Rooms', async () => {
+  const source = await readSource('../src/components/PrintReport.jsx')
+  assert.match(source, /connectedRoomGroup\.length === 1 && \(\(\) =>/)
+  assert.match(source, /edges\.filter\(edge =>/)
+  assert.match(source, /roomEdges\(other\)\.some\(otherEdge =>/)
+  assert.match(source, /isConnectedGroupOwner && \(\(\) =>/)
+  assert.match(source, /total gabungan/)
 })
 
 test('Floorplan resolves and edits linked shots by stable IDs, not row numbers', async () => {
@@ -53,7 +133,7 @@ test('backup import has a pre-read size limit and validates before replacing act
   assert.match(source, /catch \(error\) \{[\s\S]*?could not import backup/i)
 })
 
-test('local Room Reusable migration extracts per-Scene rooms without geometry deduplication', async () => {
+test('legacy Room references can be detached per Scene and Room reuse UI is removed', async () => {
   const source = await readSource('../src/App.jsx')
   const floorplan = await readSource('../src/components/Floorplan.jsx')
 
@@ -62,7 +142,10 @@ test('local Room Reusable migration extracts per-Scene rooms without geometry de
   assert.match(source, /projectRooms/)
   assert.match(source, /rooms: Array\.isArray\(rooms\) \? rooms : \[\]/)
   assert.match(floorplan, /projectRooms\.filter\(room => \(scene\.roomIds \|\| \[\]\)\.includes\(room\.id\)\)/)
-  assert.match(floorplan, /Room digunakan bersama/)
+  assert.doesNotMatch(floorplan, /Room digunakan bersama/) 
+  assert.match(floorplan, /roomIsolationVersion === 1/) 
+  assert.match(floorplan, /roomIsolationVersion: 1/) 
+  assert.doesNotMatch(floorplan, /Pakai Room yang sudah ada/)
   assert.match(source, /const resolvedFloorplans = projectRooms === null/)
 })
 
@@ -74,13 +157,24 @@ test('local backup project records include reusable rooms and Scene references',
   assert.match(source, /migrateReusableRooms\(targetScenes, target\.floorplans, target\.rooms\)/)
 })
 
-test('Room picker keeps every project Room visible across Scenes and marks current Scene usage', async () => {
+test('Room picker is removed so Rooms cannot be reused across Scenes', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
 
-  assert.match(source, /projectRooms\.map\(room =>/)
-  assert.match(source, /disabled=\{alreadyUsed\}/)
-  assert.match(source, /sudah dipakai di scene ini/)
-  assert.match(source, /digunakan scene lain/)
+  assert.doesNotMatch(source, /Pakai Room yang sudah ada/)
+  assert.doesNotMatch(source, /projectRooms\.map\(room =>/)
+  assert.match(source, /roomIsolationVersion: 1/)
+})
+
+test('Wall dimensions can be edited numerically and total length is displayed on canvas', async () => {
+  const floorplan = await readSource('../src/components/Floorplan.jsx')
+
+  assert.match(floorplan, /id="wall-length"/)
+  assert.match(floorplan, /id="wall-thickness"/)
+  assert.match(floorplan, /thickness: Math\.round\(meters \* 100\)/)
+  assert.match(floorplan, /x2: wall\.x1 \+ current\.ux \* length/)
+  assert.doesNotMatch(floorplan, /formatMeters\(length\) \+ ' total'/)
+  assert.doesNotMatch(floorplan, /Panjang total dinding:/)
+  assert.match(floorplan, /showWallDimension/)
 })
 
 test('Locked objects remain selectable but cannot move or resize', async () => {
@@ -88,9 +182,9 @@ test('Locked objects remain selectable but cannot move or resize', async () => {
   const dragHandler = source.slice(source.indexOf('const beginObjectDrag'), source.indexOf('const beginWaypointDrag'))
 
   assert.match(source, /locked: !selectedEntity\.locked/)
-  assert.match(dragHandler, /applyEntitySelection\(\[\{ type, id: item\.id \}\], \{ type, id: item\.id \}\)/)
-  assert.match(dragHandler, /if \(item\.locked \|\| tool === 'room' \|\| tool === 'wall'\) return/)
-  assert.match(source, /const beginResize = \(type, item, sx, sy, event\) => \{\n    if \(tool === 'pan'\) return[\s\S]*?setSelected\(\{ type, id: item\.id \}\)\n    if \(item\.locked\) return/)
+  assert.match(dragHandler, /if \(item\.locked \|\| \(tool === 'room' && type !== 'room'\) \|\| \(tool === 'wall' && type !== 'wall'\)\) return/)
+  assert.match(dragHandler, /if \(item\.locked \|\| \(tool === 'room' && type !== 'room'\) \|\| \(tool === 'wall' && type !== 'wall'\)\) return/)
+  assert.match(source, /const beginResize = \(type, item, sx, sy, event\) => \{[\s\S]*?if \(item\.locked\) return/)
   assert.match(source, /!entry\.original\.locked/)
 })
 
@@ -120,15 +214,28 @@ test('Rooms use editable polygon vertices and a manually entered ceiling height'
 test('Room dimensions are shown outside every polygon edge and can be toggled', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /const getRoomDimensionGeometry =/)
-  assert.match(source, /showRoomDimensions && \(active \|\| hoveredRoomEdge\?\.roomId === room\.id\)/)
+  assert.match(source, /showRoomDimensions && \(\(\) => \{/ )
   assert.match(source, /aria-pressed=\{showRoomDimensions\}/)
   assert.match(source, /\(edge\.length \/ 100\)\.toFixed\(2\) \+ ' m'/)
+})
+
+test('Wall drawing captures pointer events on existing Rooms and snaps endpoints to Room and wall geometry', async () => {
+  const source = await readFile(new URL('../src/components/Floorplan.jsx', import.meta.url), 'utf8')
+  const captureStart = source.indexOf('const handleCanvasPointerDownCapture = event =>')
+  const captureEnd = source.indexOf('const handleCanvasPointerDown = event =>', captureStart)
+  const capture = source.slice(captureStart, captureEnd)
+  assert.match(capture, /tool === 'wall'.*event\.button === 0/s)
+  assert.match(capture, /event\.stopPropagation\(\)/)
+  assert.match(capture, /setDrawStart\(snapped\.point\)/)
+  assert.match(source, /const snapPointToRoomAndWallGeometry = \(point, origin = null\) =>/)
+  assert.match(source, /snapRoomPoint\(point, origin, anchors, snapTolerance\)/)
+  assert.match(source, /if \(tool === 'wall'\) \{\s*if \(event\.altKey\)/)
 })
 
 test('Room drawing snaps positionally to existing vertices with alignment guides and Alt bypass', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   const snapping = await readSource('../src/utils/roomSnapping.js')
-  assert.match(source, /import \{ snapRoomPoint \} from '\.\.\/utils\/roomSnapping'/)
+  assert.ok(source.includes("import { projectPointToSegment, snapRoomPoint } from '../utils/roomSnapping'"))
   assert.match(source, /\.\.\.layout\.rooms\.flatMap\(room => getRoomPoints\(room\)\)/)
   assert.match(snapping, /const xAnchor = nearestOnAxis\(point\.x, 'x'\)/)
   assert.match(snapping, /const yAnchor = nearestOnAxis\(point\.y, 'y'\)/)
@@ -140,6 +247,16 @@ test('Room drawing snaps positionally to existing vertices with alignment guides
   assert.match(source, /roomSnapGuides\.map/)
   assert.match(source, /strokeDasharray="5 4"/)
   assert.match(source, /9 \* viewBox\.width/)
+})
+
+test('Wall endpoints can snap to the middle of existing Room edges and Walls', () => {
+  const projection = projectPointToSegment(
+    { x: 50, y: 4 },
+    { x1: 0, y1: 0, x2: 100, y2: 0 },
+  )
+  assert.deepEqual(projection.point, { x: 50, y: 0 })
+  assert.equal(projection.t, 0.5)
+  assert.equal(projection.distance, 4)
 })
 
 test('Room snapping combines X and Y from different vertices and keeps single-axis snapping', () => {
@@ -160,6 +277,27 @@ test('Room snapping combines X and Y from different vertices and keeps single-ax
   assert.deepEqual(onlyY.guides.map(guide => guide.axis), ['horizontal'])
 })
 
+test('Room dimension layout keeps segment lanes close and overall totals outside without connected-room duplicates', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const getRoomDimensionLayouts = \(room, edges\) =>/)
+  assert.match(source, /edges\.filter\(edge => edge\.length >= 5\)/)
+  assert.match(source, /const offset = 72 \+ level \* 30/)
+  assert.match(source, /const showIndividualTotals = !hasConnectedRooms/)
+  assert.match(source, /const showHorizontalTotal = showIndividualTotals/)
+  assert.match(source, /const showVerticalTotal = showIndividualTotals/)
+  assert.match(source, /showHorizontalTotal && <>/) 
+  assert.match(source, /showVerticalTotal && <>/)
+  assert.match(source, /const groupDimensionLayouts = connectedRoomGroup\.flatMap/)
+  assert.match(source, /const groupMaxHorizontalLevel = Math\.max/)
+  assert.match(source, /const groupMaxVerticalLevel = Math\.max/)
+  assert.match(source, /const groupFullHeightEdge = groupTotalBounds && groupDimensionLayouts/) 
+  assert.match(source, /Math\.abs\(item\.edge\.x2 - item\.edge\.x1\) < 1 && Math\.abs\(item\.edge\.length - groupTotalBounds\.height\) <= 5/) 
+  assert.match(source, /groupVerticalMeasuredHeight/ )
+  assert.match(source, /showVerticalTotal && <>/)
+  assert.match(source, /opacity=\{active \? 1 : 0\.58\}/)
+  assert.match(source, /strokeWidth="5" paintOrder="stroke"/)
+})
+
 test('Room dimensions distinguish individual wall lengths from overall bounds and keep openings draggable', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /m total/)
@@ -176,6 +314,15 @@ test('Room dimensions distinguish individual wall lengths from overall bounds an
   assert.match(roomRender, /beginRoomEdgeDrag\(room, edge\.edgeIndex, event\)/)
   assert.match(roomRender, /beginOpeningDrag\('room', room, opening, event\)/)
   assert.match(roomRender, /openings\.map\(opening =>/)
+})
+
+test('Door leaf mode can be toggled in-place without replacing or resetting opening data', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.equal((source.match(/id=\{opening\.id \+ '-leaf-mode'\}/g) || []).length, 2, 'Room and Wall inspectors both expose the door mode selector')
+  assert.match(source, /value=\{opening\.type === 'door' \? 'leaf' : 'no-leaf'\}/)
+  assert.match(source, /updateOpening\(opening\.id, \{ type: event\.target\.value === 'leaf' \? 'door' : 'doorway' \}\)/)
+  assert.match(source, /const next = \{ \.\.\.opening, \.\.\.patch \}/, 'Updating type retains the existing opening record fields')
+  assert.match(source, /opening\.type === 'doorway' \? null/, 'A door without a leaf does not render a leaf or swing arc')
 })
 
 test('Door opening controls expose swing direction and single or double leaves', async () => {
@@ -268,20 +415,20 @@ test('Doors and windows support precise width, position, and polygon edge contro
   assert.match(source, /id=\{opening\.id \+ '-edge'\}/)
   assert.match(source, /updateOpening\(opening\.id, \{ width: Math\.round\(clamp\(meters, 0, 5\) \* 100\) \}\)/)
   assert.match(source, /updateOpening\(opening\.id, \{ offset: percent \/ 100 \}\)/)
-  // Openings are attached to a polygon edge by edgeIndex, not legacy cardinal sides.
+  // Openings can attach to either a perimeter edge or a preserved internal wall.
   assert.match(source, /id=\{opening\.id \+ '-edge'\}/)
-  assert.match(source, /value=\{Number\.isInteger\(opening\.edgeIndex\) \? opening\.edgeIndex : 0\}/)
-  assert.match(source, /getRoomEdges\(selectedEntity\)\.map\(edge => <option key=\{edge\.edgeIndex\} value=\{edge\.edgeIndex\}>/)
-  assert.match(source, /updateOpening\(opening\.id, \{ edgeIndex: Number\(event\.target\.value\) \}\)/)
+  assert.match(source, /opening\.wallType === 'internal' && Number\.isInteger\(opening\.internalWallIndex\)/)
+  assert.match(source, /value=\{'edge:' \+ edge\.edgeIndex\}/)
+  assert.match(source, /value=\{'internal:' \+ index\}/)
+  assert.match(source, /wallType: 'internal', internalWallIndex: index, edgeIndex: null/)
+  assert.match(source, /wallType: 'perimeter', internalWallIndex: null, edgeIndex: index/)
   assert.match(source, /disabled=\{Boolean\(selectedEntity\.locked\)\}/)
 })
 
 test('restoring active project preserves canonical reusable Rooms when legacy top-level floorplans exist', async () => {
   const source = await readSource('../src/App.jsx')
 
-  assert.ok(source.includes(`const sourceRooms = Array.isArray(savedState?.rooms)
-          ? savedState.rooms
-          : (savedProjectRecord?.rooms || [])`))
+  assert.match(source, /const sourceRooms = Array\.isArray\(savedState\?\.rooms\)\s*\? savedState\.rooms\s*:\s*\(savedProjectRecord\?\.rooms \|\| \[\]\)/)
 })
 
 test('Room opening normalization preserves the full supported 5-meter width', async () => {
@@ -320,7 +467,7 @@ test('Floorplan Escape deselects and shortcuts ignore editable fields; Path drag
   assert.match(source, /target\.isContentEditable \|\| \['INPUT', 'TEXTAREA', 'SELECT'\]\.includes\(target\.tagName\)/)
   const objectDrag = source.slice(source.indexOf('const beginObjectDrag'), source.indexOf('const beginWaypointDrag'))
   const waypointDrag = source.slice(source.indexOf('const beginWaypointDrag'), source.indexOf('const beginRotate'))
-  assert.match(objectDrag, /if \(item\.locked \|\| tool === 'room' \|\| tool === 'wall'\) return/)
+  assert.match(objectDrag, /if \(item\.locked \|\| \(tool === 'room' && type !== 'room'\) \|\| \(tool === 'wall' && type !== 'wall'\)\) return/)
   assert.match(waypointDrag, /mode: 'waypoint'/)
   assert.match(source, /const appendWaypoint =/)
 })
@@ -385,4 +532,268 @@ test('Door hinge side supports left and right in Floorplan, persistence, and PDF
   assert.match(floorplan, /const hingeSide = opening\.hingeSide === 'right' \? 'right' : 'left'/)
   assert.match(app, /hingeSide: opening\.hingeSide === 'right' \? 'right' : 'left'/)
   assert.match(report, /const hingeX = opening\.hingeSide === 'right' \? width \/ 2 : -width \/ 2/)
+})
+
+
+test('Room merge prompts after a room is moved near an aligned shared edge', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  const merge = await readSource('../src/utils/roomMerge.js')
+  assert.match(source, /const currentLayout = layoutRef\.current \|\| layout[\s\S]*?findRoomMergeCandidate\(movedRoom, currentLayout\.rooms, 18\)/)
+  assert.match(source, /Gabungkan kedua Room\?/)
+  assert.match(source, /const confirmRoomMerge = \(\) => \{/)
+  assert.match(source.slice(source.indexOf('const confirmRoomMerge = () => {'), source.indexOf('const addRoomVertexAtEdgeMidpoint')), /mergeAdjacentRoomPolygons\(snappedMoving, target/)
+  assert.match(source.slice(source.indexOf('const confirmRoomMerge = () => {'), source.indexOf('const addRoomVertexAtEdgeMidpoint')), /rooms: previous\.rooms[\s\S]*?\.filter\(room => room\.id !== moving\.id && room\.id !== target\.id\)/)
+  assert.match(merge, /export function findRoomMergeCandidate/)
+  assert.match(merge, /export function mergeAdjacentRoomPolygons/)
+})
+
+test('Double-clicking a Room vertex offers to start a new Room from that point', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /onDoubleClick=\{event => \{ event\.preventDefault\(\); event\.stopPropagation\(\); setRoomVertexPrompt/)
+  assert.match(source, /setRoomDrawPoints\(\[point\]\)/)
+  assert.match(source, /Buat Room baru/)
+})
+
+test('Double-clicking a Room edge inserts a new editable vertex on that edge', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const addRoomVertexOnEdge = \(room, edgeIndex, event\) =>/)
+  assert.match(source, /nextPoints\.splice\(edgeIndex \+ 1, 0, point\)/)
+  assert.match(source, /onDoubleClick=\{event => addRoomVertexOnEdge\(room, edge\.edgeIndex, event\)\}/)
+  assert.match(source, /Avoid creating a duplicate vertex close to either endpoint/)
+})
+
+test('Delete and Backspace remove a selected Room vertex without allowing invalid polygons', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const deleteSelectedRoomVertex = \(\) =>/)
+  assert.match(source, /if \(points\.length <= 3\)/)
+  assert.match(source, /const nextPoints = points\.filter\(\(_, index\) => index !== vertexIndex\)/)
+  assert.match(source, /if \(area < 16\)/)
+  assert.match(source, /if \(selectedRoomVertex\) \{[\s\S]*?deleteSelectedRoomVertex\(\)/)
+  assert.match(source, /setSelectedRoomVertex\(\{ roomId: room\.id, vertexIndex \}\)/)
+})
+
+test('Room inspector exposes explicit add/remove vertex controls', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /addRoomVertexAtEdgeMidpoint/)
+  assert.match(source, /Tambah titik pada sisi terpilih/)
+  assert.match(source, /Hapus titik terpilih/)
+  assert.match(source, /selectedRoomVertex\?\.roomId !== selectedEntity\.id/)
+})
+
+test('Room edge selection persists when moving from canvas to inspector vertex controls', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /onClick=\{event => \{ event\.preventDefault\(\); event\.stopPropagation\(\); setHoveredRoomEdge\(\{ roomId: room\.id, edgeIndex: edge\.edgeIndex \}\)/)
+  assert.match(source, /Tambah titik pada sisi terpilih/)
+  assert.match(source, /selectedEntity\.id\} onClick=\{\(\) => addRoomVertexAtEdgeMidpoint\(selectedEntity\)\}/)
+})
+
+test('Room vertex insertion uses a persistent selected edge, not transient hover state', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const \[selectedRoomEdge, setSelectedRoomEdge\] = useState\(null\)/)
+  assert.match(source, /setSelectedRoomEdge\(\{ roomId: room\.id, edgeIndex \}\)/)
+  assert.match(source, /if \(!room \|\| room\.locked \|\| selectedRoomEdge\?\.roomId !== room\.id\) return/)
+  assert.match(source, /disabled=\{Boolean\(selectedEntity\.locked\) \|\| selectedRoomEdge\?\.roomId !== selectedEntity\.id\}/)
+})
+
+test('confirming Room merge creates one draggable polygon and preserves the shared wall', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  const merge = await readSource('../src/utils/roomMerge.js')
+  const start = source.indexOf('const confirmRoomMerge = () => {')
+  const end = source.indexOf('\n  const addRoomVertexAtEdgeMidpoint', start)
+  assert.ok(start >= 0 && end > start, 'Room merge handler should exist')
+  const handler = source.slice(start, end)
+  assert.match(handler, /mergeAdjacentRoomPolygons\(snappedMoving, target/)
+  assert.match(handler, /\.filter\(room => room\.id !== moving\.id && room\.id !== target\.id\)/)
+  assert.match(handler, /\.concat\(\{[\s\S]*?\.\.\.target,[\s\S]*?points: merged\.points,[\s\S]*?openings: merged\.openings,[\s\S]*?internalWalls: merged\.internalWalls/)
+  assert.match(handler, /connectedRoomIds: \[\]/)
+  assert.match(merge, /internalWalls = \[/)
+  assert.match(source, /getRoomInternalWalls\(room\)\.map/)
+  assert.match(source, /internalWalls: \(drag\.original\.internalWalls \|\| \[\]\)\.map/)
+  assert.match(source, /onPointerDown=\{event => beginObjectDrag\('room', room, event\)\}/)
+})
+
+test('Merged Room inspector can restore its source Rooms', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /mergeParts: \{[\s\S]*?target: \{ \.\.\.target \}[\s\S]*?moving: \{ \.\.\.snappedMoving \}/)
+  assert.match(source, /const unmergeRoom = room => \{/)
+  assert.match(source, /rooms: previous\.rooms[\s\S]*?\.filter\(item => item\.id !== room\.id\)[\s\S]*?\.concat\([\s\S]*?parts\.target[\s\S]*?parts\.moving/)
+  assert.match(source, /Lepas ruangan/)
+})
+
+test('Room connections persist independently of selection and Rooms remain draggable', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  const start = source.indexOf('const confirmRoomMerge = () => {')
+  const end = source.indexOf('const addRoomVertexAtEdgeMidpoint', start)
+  const handler = source.slice(start, end)
+  assert.match(handler, /mergeAdjacentRoomPolygons\(snappedMoving, target/)
+  assert.match(handler, /connectedRoomIds: \[\]/)
+  assert.match(source, /onPointerDown=\{event => beginObjectDrag\('room', room, event\)\}/)
+  assert.match(source, /if \(drag\.type === 'room'\)[\s\S]*?points: getRoomPoints\(drag\.original\)\.map/)
+  assert.match(source, /A connected Room behaves like an opening hosted on a wall/)
+  assert.match(source, /attachmentVector = \{ x: \(edge\.b\.x - edge\.a\.x\) \/ length, y: \(edge\.b\.y - edge\.a\.y\) \/ length \}/)
+  assert.match(source, /if \(drag\.type === 'room' && drag\.attachmentVector\)/)
+  assert.match(source, /const alongWall = dx \* drag\.attachmentVector\.x \+ dy \* drag\.attachmentVector\.y/)
+  assert.match(source, /if \(type !== 'room' && alreadySelected && currentSelection\.length > 1\)/)
+  assert.match(source, /if \(candidate && !alreadyConnected\) setRoomMergePrompt\(candidate\)/)
+})
+
+test('existing Rooms remain draggable while Room drawing tool is active', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /if \(item\.locked \|\| \(tool === 'room' && type !== 'room'\) \|\| \(tool === 'wall' && type !== 'wall'\)\) return/)
+})
+
+test('Wall drawing delegates junction topology to the shared Room/Wall geometry kernel', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  const geometry = await readSource('../src/utils/floorplanGeometry.js')
+  assert.match(source, /import \{ createRoomPolygon, connectWallGeometry, updateRoomPolygonGeometry, updateWallEndpointGeometry \} from '..\/utils\/floorplanGeometry'/)
+  assert.match(source, /projectPointToSegment\(point, segment\)/)
+  assert.match(source, /sourceType: 'room'/)
+  assert.match(source, /sourceType: 'wall'/)
+  assert.match(source, /connectWallGeometry\(previous\.rooms \|\| \[\], previous\.walls \|\| \[\], wall, makeId\)/)
+  assert.match(geometry, /export function createRoomPolygon/)
+  assert.match(geometry, /export function connectWallGeometry/)
+  assert.match(geometry, /points\.splice\(edgeIndex \+ 1/)
+  assert.match(geometry, /const second = \{ \.\.\.segment, id: makeId\(\), x1: junction\.x, y1: junction\.y, openings: \[\] \}/)
+  assert.match(geometry, /openingProjection\.t <= splitAt/)
+})
+
+test('Room tool switches to move mode when dragging an existing Room and inspector can disconnect it', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /if \(tool === 'path' \|\| \(tool === 'room' && type === 'room'\)\) setTool\('select'\)/)
+  assert.match(source, /Lepaskan sambungan Room/)
+  assert.match(source, /connectedRoomIds: \(room\.connectedRoomIds \|\| \[\]\)\.filter\(id => id !== selectedEntity\.id\)/)
+})
+
+test('dragging a connected Room keeps it hosted to its shared wall', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /A connected Room behaves like an opening hosted on a wall/)
+  assert.match(source, /attachmentVector = \{ x: \(edge\.b\.x - edge\.a\.x\) \/ length, y: \(edge\.b\.y - edge\.a\.y\) \/ length \}/)
+  assert.match(source, /if \(drag\.type === 'room' && drag\.attachmentVector\)/)
+  assert.match(source, /const alongWall = dx \* drag\.attachmentVector\.x \+ dy \* drag\.attachmentVector\.y/)
+  assert.match(source, /if \(type !== 'room' && alreadySelected && currentSelection\.length > 1\)/)
+  assert.match(source, /if \(candidate && !alreadyConnected\) setRoomMergePrompt\(candidate\)/)
+})
+
+test('Connected Rooms use one combined bounding box and place overall dimensions beyond all segment lanes', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /const connectedRoomGroup = \(\(\) => \{/)
+  assert.match(source, /const connectedGroupPoints = connectedRoomGroup\.flatMap\(getRoomPoints\)/)
+  assert.match(source, /const totalBounds = bounds/)
+  assert.match(source, /const visibleDimensionLayouts = dimensionLayouts/)
+  assert.match(source, /const groupTotalBounds = hasConnectedRooms \? connectedBounds : null/)
+  assert.match(source, /const groupDimensionLayouts = connectedRoomGroup\.flatMap/)
+  assert.match(source, /const showIndividualTotals = !hasConnectedRooms/)
+  assert.match(source, /groupHorizontalTotalY = groupTotalBounds \? groupTotalBounds\.y - 160 - groupMaxHorizontalLevel \* 30/)
+  assert.match(source, /groupVerticalTotalX = groupTotalBounds \? groupTotalBounds\.x \+ groupTotalBounds\.width \+ 160 \+ groupMaxVerticalLevel \* 30/)
+  assert.match(source, /m total gabungan/)
+  assert.match(source, /\{edges\.map\(edge => \{/)
+  assert.match(source, /const isDimensionGroupActive = active && hasConnectedRooms/)
+  assert.match(source, /\(totalBounds\.width \/ 100\)\.toFixed\(2\) \+ ' m total'/)
+  assert.match(source, /\(totalBounds\.height \/ 100\)\.toFixed\(2\) \+ ' m total'/)
+})
+
+test('Confirming a Room connection snaps walls flush while retaining shared walls', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  const handlerStart = source.indexOf('const confirmRoomMerge = () => {')
+  const handlerEnd = source.indexOf('const addRoomVertexAtEdgeMidpoint', handlerStart)
+  const handler = source.slice(handlerStart, handlerEnd)
+  assert.match(handler, /snapRoomToEdge\(moving, movingEdge, targetEdge\)/)
+  const mergeUtils = await readSource('../src/utils/roomMerge.js')
+  assert.match(mergeUtils, /export function snapRoomToEdge\(/)
+  assert.match(source, /\{edges\.map\(edge => \{/)
+  assert.match(source, /const isSharedRoomEdge = edge => connectedRooms\.some/)
+})
+
+test('Room total length and width stay visible without hover while edge dimensions remain contextual', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /showRoomDimensions && \(\(\) => \{/)
+  assert.match(source, /const showIndividualTotals = !hasConnectedRooms/)
+  assert.match(source, /\(active \|\| hoveredRoomEdge\?\.roomId === room\.id\) && visibleDimensionLayouts\.map/)
+})
+
+
+test('Room and Wall modes share the same polygon and junction geometry kernel', () => {
+  const room = createRoomPolygon({ x: 0, y: 0 }, { x: 400, y: 300 }, 'room-1', 'Room 1')
+  assert.deepEqual(room.points, [
+    { x: 0, y: 0 }, { x: 400, y: 0 }, { x: 400, y: 300 }, { x: 0, y: 300 },
+  ])
+
+  const existingWall = { id: 'wall-1', x1: 200, y1: 0, x2: 200, y2: 300, thickness: 6, openings: [] }
+  const newWall = { id: 'wall-2', x1: 200, y1: 150, x2: 400, y2: 150, thickness: 6, openings: [] }
+  const connected = connectWallGeometry([room], [existingWall], newWall, () => 'wall-split')
+
+  assert.ok(connected.rooms[0].points.some(point => point.x === 400 && point.y === 150),
+    'Room perimeter geometry records the wall endpoint as a vertex')
+  assert.equal(connected.walls.length, 3, 'existing wall is split at the junction and the new wall is added')
+  assert.ok(connected.walls.some(wall => wall.x2 === 200 && wall.y2 === 150))
+  assert.ok(connected.walls.some(wall => wall.x1 === 200 && wall.y1 === 150))
+})
+
+test('shared Room geometry rejects degenerate rectangles', () => {
+  assert.equal(createRoomPolygon({ x: 0, y: 0 }, { x: 10, y: 300 }, 'bad', 'Bad'), null)
+  assert.equal(createRoomPolygon({ x: 0, y: 0 }, { x: 300, y: 10 }, 'bad', 'Bad'), null)
+})
+
+
+test('moving a Room vertex keeps attached Wall endpoints connected and preserves openings', () => {
+  const room = { id: 'room', points: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }] }
+  const wall = { id: 'wall', x1: 100, y1: 0, x2: 160, y2: 0, openings: [{ id: 'window', offset: 0.25 }] }
+  const nextPoints = room.points.map((point, index) => index === 1 ? { x: 120, y: 10 } : point)
+  const result = updateRoomPolygonGeometry([room], [wall], 'room', nextPoints)
+  assert.deepEqual(result.rooms[0].points[1], { x: 120, y: 10 })
+  assert.deepEqual({ x: result.walls[0].x1, y: result.walls[0].y1 }, { x: 120, y: 10 })
+  assert.deepEqual(result.walls[0].openings, wall.openings)
+})
+
+test('moving a Wall endpoint moves attached Room vertices and connected Wall endpoints', () => {
+  const room = { id: 'room', points: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }] }
+  const first = { id: 'first', x1: 100, y1: 0, x2: 160, y2: 0, openings: [{ id: 'door', offset: 0.4 }] }
+  const second = { id: 'second', x1: 100, y1: 0, x2: 100, y2: -50, openings: [] }
+  const result = updateWallEndpointGeometry([room], [first, second], 'first', 'start', { x: 115, y: 8 })
+  assert.deepEqual(result.rooms[0].points[1], { x: 115, y: 8 })
+  assert.deepEqual({ x: result.walls[0].x1, y: result.walls[0].y1 }, { x: 115, y: 8 })
+  assert.deepEqual({ x: result.walls[1].x1, y: result.walls[1].y1 }, { x: 115, y: 8 })
+  assert.deepEqual(result.walls[0].openings, first.openings)
+  assert.deepEqual(result.walls.map(wall => wall.id), ['first', 'second'])
+})
+
+test('Floorplan Room edge and vertex edits use the shared junction geometry helpers', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /updateRoomPolygonGeometry\(previous\.rooms \|\| \[\], previous\.walls \|\| \[\], drag\.id, points\)/)
+  assert.match(source, /updateRoomPolygonGeometry\(previous\.rooms \|\| \[\], previous\.walls \|\| \[\], drag\.id, nextPoints\)/)
+  assert.match(source, /updateWallEndpointGeometry\(/)
+})
+
+
+test('moving a Room rigidly keeps attached Walls welded to its perimeter', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /if \(drag\.type === 'room'\) \{\s*const movedPoints = getRoomPoints\(drag\.original\)/)
+  assert.match(source, /updateRoomPolygonGeometry\(previous\.rooms \|\| \[\], previous\.walls \|\| \[\], drag\.id, movedPoints\)/)
+  assert.match(source, /internalWalls: \(drag\.original\.internalWalls \|\| \[\]\)\.map/)
+})
+
+
+test('overlapping collinear Walls become one continuous non-duplicated line with openings remapped', () => {
+  let sequence = 0
+  const walls = normalizeWallJunctions([
+    { id: 'left', x1: 0, y1: 0, x2: 100, y2: 0, openings: [] },
+    { id: 'overlap', x1: 50, y1: 0, x2: 150, y2: 0, openings: [{ id: 'window', offset: 0.25, width: 10 }] },
+  ], () => 'split-' + (++sequence))
+  assert.equal(walls.length, 3)
+  assert.deepEqual(walls.map(wall => [wall.x1, wall.x2]).sort((a, b) => a[0] - b[0]), [[0, 50], [50, 100], [100, 150]])
+  const shared = walls.find(wall => wall.x1 === 50 && wall.x2 === 100)
+  assert.equal(shared.openings.length, 1)
+  assert.equal(shared.openings[0].id, 'window')
+  assert.equal(shared.openings[0].offset, 0.5)
+})
+
+test('wall normalization retains a T-junction as a shared endpoint without stacked segments', () => {
+  let sequence = 0
+  const walls = normalizeWallJunctions([
+    { id: 'horizontal', x1: 0, y1: 0, x2: 100, y2: 0, openings: [] },
+    { id: 'vertical', x1: 50, y1: 0, x2: 50, y2: 40, openings: [] },
+  ], () => 'split-' + (++sequence))
+  assert.ok(walls.some(wall => wall.x1 === 0 && wall.x2 === 50 && wall.y1 === 0 && wall.y2 === 0))
+  assert.ok(walls.some(wall => wall.x1 === 50 && wall.x2 === 100 && wall.y1 === 0 && wall.y2 === 0))
+  assert.ok(walls.some(wall => wall.x1 === 50 && wall.y1 === 0 && wall.x2 === 50 && wall.y2 === 40))
 })

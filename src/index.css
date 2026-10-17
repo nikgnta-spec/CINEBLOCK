@@ -1927,3 +1927,43 @@ button:focus-visible,
 .cloud-access-member strong { font-size: 12px; overflow-wrap: anywhere; }
 .cloud-access-member span { font-size: 11px; color: var(--muted, #aaa); }
 .cloud-access-manager .cloud-muted { margin: 0; font-size: 12px; line-height: 1.45; }
+
+
+.floorplan-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgb(0 0 0 / 58%);
+}
+.floorplan-dialog {
+  width: min(420px, 100%);
+  padding: 22px;
+  border: 1px solid var(--border, #343a40);
+  border-radius: 12px;
+  background: var(--panel, #171a1f);
+  color: var(--text, #f3f4f6);
+  box-shadow: 0 18px 60px rgb(0 0 0 / 35%);
+}
+.floorplan-dialog h3 { margin: 0 0 10px; font-size: 17px; }
+.floorplan-dialog p { margin: 0 0 18px; line-height: 1.5; color: var(--text-muted, #a7adb7); }
+.floorplan-dialog p[role="alert"] { color: #fca5a5; }
+.floorplan-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.floorplan-dialog-actions button {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid var(--border, #343a40);
+  border-radius: 7px;
+  background: var(--surface, #22262d);
+  color: var(--text, #f3f4f6);
+  cursor: pointer;
+}
+.floorplan-dialog-actions button:last-child {
+  background: var(--accent, #f59e0b);
+  border-color: var(--accent, #f59e0b);
+  color: #111827;
+  font-weight: 650;
+}

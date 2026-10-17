@@ -36,6 +36,45 @@ function roomPoints(room) {
   return [{ x: room.x, y: room.y }, { x: room.x + room.width, y: room.y }, { x: room.x + room.width, y: room.y + room.height }, { x: room.x, y: room.y + room.height }]
 }
 
+function roomInternalWalls(room) {
+  const stored = Array.isArray(room?.internalWalls) ? room.internalWalls.filter(wall =>
+    [wall.x1, wall.y1, wall.x2, wall.y2].every(value => Number.isFinite(Number(value)))
+      && Math.hypot(Number(wall.x2) - Number(wall.x1), Number(wall.y2) - Number(wall.y1)) > 1
+  ) : []
+  if (stored.length) return stored
+  const points = roomPoints(room)
+  if (points.length < 4) return []
+  const area = points.reduce((sum, point, index) => {
+    const next = points[(index + 1) % points.length]
+    return sum + point.x * next.y - next.x * point.y
+  }, 0)
+  const winding = area >= 0 ? 1 : -1
+  const reflex = []
+  points.forEach((point, index) => {
+    const previous = points[(index - 1 + points.length) % points.length]
+    const next = points[(index + 1) % points.length]
+    const cross = (point.x - previous.x) * (next.y - point.y) - (point.y - previous.y) * (next.x - point.x)
+    if (cross * winding < -1) reflex.push(index)
+  })
+  const walls = []
+  const used = new Set()
+  for (const reflexIndex of reflex) {
+    const corner = points[reflexIndex]
+    const candidates = points.map((point, index) => {
+      if (index === reflexIndex || (index + 1) % points.length === reflexIndex || (index - 1 + points.length) % points.length === reflexIndex || used.has(index)) return null
+      const dx = Math.abs(point.x - corner.x), dy = Math.abs(point.y - corner.y)
+      if (Math.min(dx, dy) > 1 || Math.max(dx, dy) < 2) return null
+      if (!pointInPolygon({ x: (point.x + corner.x) / 2, y: (point.y + corner.y) / 2 }, points)) return null
+      return { index, point, length: Math.hypot(dx, dy) }
+    }).filter(Boolean).sort((a, b) => a.length - b.length)
+    const candidate = candidates[0]
+    if (!candidate) continue
+    walls.push({ x1: corner.x, y1: corner.y, x2: candidate.point.x, y2: candidate.point.y, legacyInferred: true })
+    used.add(candidate.index)
+  }
+  return walls
+}
+
 function roomEdges(room) {
   return roomPoints(room).map((point, index, points) => {
     const next = points[(index + 1) % points.length]
@@ -56,9 +95,16 @@ function pointInPolygon(point, points) {
 }
 
 function roomOpeningPlacement(room, opening) {
+  const offset = Math.max(0.02, Math.min(0.98, Number(opening.offset) || 0.5))
+  if (opening.wallType === 'internal' && Number.isInteger(opening.internalWallIndex)) {
+    const wall = roomInternalWalls(room)[opening.internalWallIndex]
+    if (wall) {
+      const metrics = wallMetrics(wall)
+      return { x: wall.x1 + metrics.ux * metrics.length * offset, y: wall.y1 + metrics.uy * metrics.length * offset, angle: metrics.angle + 180, length: metrics.length }
+    }
+  }
   const edges = roomEdges(room)
   const edge = edges[Math.max(0, Math.min(edges.length - 1, Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)))] || edges[0]
-  const offset = Math.max(0.02, Math.min(0.98, Number(opening.offset) || 0.5))
   return { x: edge.x1 + (edge.x2 - edge.x1) * offset, y: edge.y1 + (edge.y2 - edge.y1) * offset, angle: edge.angle + 180, length: edge.length }
 }
 
@@ -175,15 +221,61 @@ function PrintFloorplan({ scene, layout }) {
             maxX: Math.max(...points.map(point => point.x)),
             maxY: Math.max(...points.map(point => point.y)),
           }
+          // Mirror the editor's connected-room group measurements in the PDF.
+          const roomById = new Map(rooms.map(item => [item.id, item]))
+          const visitedRoomIds = new Set([room.id])
+          const roomQueue = [room.id]
+          while (roomQueue.length) {
+            const current = roomById.get(roomQueue.shift())
+            ;(current?.connectedRoomIds || []).forEach(id => {
+              if (roomById.has(id) && !visitedRoomIds.has(id)) {
+                visitedRoomIds.add(id)
+                roomQueue.push(id)
+              }
+            })
+          }
+          const connectedRoomGroup = [...visitedRoomIds].map(id => roomById.get(id)).filter(Boolean)
+          const connectedPoints = connectedRoomGroup.flatMap(roomPoints)
+          const connectedBounds = connectedPoints.length ? {
+            x: Math.min(...connectedPoints.map(point => point.x)),
+            y: Math.min(...connectedPoints.map(point => point.y)),
+            maxX: Math.max(...connectedPoints.map(point => point.x)),
+            maxY: Math.max(...connectedPoints.map(point => point.y)),
+          } : bounds
+          const isConnectedGroupOwner = connectedRoomGroup.length > 1
+            && room.id === connectedRoomGroup.map(item => item.id).sort()[0]
           return (
             <g key={'room-outline-' + room.id}>
-              {edges.flatMap(edge => openingSegments(edge.length, openings.filter(opening => (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)) === edge.edgeIndex)).map((segment, index) => {
+              {edges.flatMap(edge => openingSegments(edge.length, openings.filter(opening => opening.wallType !== 'internal' && !Number.isInteger(opening.internalWallIndex) && (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)) === edge.edgeIndex)).map((segment, index) => {
                 const ux = (edge.x2 - edge.x1) / (edge.length || 1)
                 const uy = (edge.y2 - edge.y1) / (edge.length || 1)
                 return <line key={edge.edgeIndex + '-' + index} x1={edge.x1 + ux * segment.start} y1={edge.y1 + uy * segment.start} x2={edge.x1 + ux * segment.end} y2={edge.y1 + uy * segment.end} stroke="#111827" strokeWidth="3" />
               }))}
-              {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && <text x={bounds.x + 9} y={bounds.y + 36} fontSize="12" fill="#374151">{Number(room.ceilingHeight).toFixed(1) + ' m ceiling'}</text>}
-              {edges.map(edge => {
+              {roomInternalWalls(room).map((wall, wallIndex) => {
+                const metric = wallMetrics(wall)
+                const wallOpenings = openings.filter(opening => opening.wallType === 'internal' && opening.internalWallIndex === wallIndex)
+                return openingSegments(metric.length, wallOpenings).map((segment, segmentIndex) => (
+                  <line key={'internal-wall-' + wallIndex + '-' + segmentIndex}
+                    x1={wall.x1 + metric.ux * segment.start} y1={wall.y1 + metric.uy * segment.start}
+                    x2={wall.x1 + metric.ux * segment.end} y2={wall.y1 + metric.uy * segment.end}
+                    stroke="#111827" strokeWidth="3" />
+                ))
+              })}
+              <text x={bounds.x + 9} y={bounds.y + 18} fontSize="13" fontWeight="700" fill="#111827">{room.label || 'Room'}</text>
+              <text x={bounds.x + 9} y={bounds.y + 36} fontSize="12" fill="#374151">{meters(bounds.maxX - bounds.x) + ' × ' + meters(bounds.maxY - bounds.y)}</text>
+              {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && <text x={bounds.x + 9} y={bounds.y + 52} fontSize="12" fill="#374151">{Number(room.ceilingHeight).toFixed(1) + ' m ceiling'}</text>}
+              {edges.filter(edge => {
+                // A shared wall between connected Rooms is internal to the group;
+                // dimension it once as geometry, not once for each Room.
+                return !connectedRoomGroup.some(other => other.id !== room.id
+                  && roomEdges(other).some(otherEdge => {
+                    const samePoint = (a, b) => Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) < 1
+                    return (samePoint({ x: edge.x1, y: edge.y1 }, { x: otherEdge.x1, y: otherEdge.y1 })
+                      && samePoint({ x: edge.x2, y: edge.y2 }, { x: otherEdge.x2, y: otherEdge.y2 }))
+                      || (samePoint({ x: edge.x1, y: edge.y1 }, { x: otherEdge.x2, y: otherEdge.y2 })
+                      && samePoint({ x: edge.x2, y: edge.y2 }, { x: otherEdge.x1, y: otherEdge.y1 }))
+                  }))
+              }).map(edge => {
                 const horizontal = Math.abs(edge.x2 - edge.x1) >= Math.abs(edge.y2 - edge.y1)
                 const mx = (edge.x1 + edge.x2) / 2
                 const my = (edge.y1 + edge.y2) / 2
@@ -218,8 +310,9 @@ function PrintFloorplan({ scene, layout }) {
 
                 </g>
               })}
-              {(() => {
-                // Match Floorplan's overall dimensions: polygon bounding-box extents, not the sum of edges.
+              {connectedRoomGroup.length === 1 && (() => {
+                // A standalone Room gets its own bounding-box dimensions.
+                // Connected groups show their bounding-box dimensions once below.
                 const totalLength = bounds.maxX - bounds.x
                 const totalWidth = bounds.maxY - bounds.y
                 const horizontalY = bounds.y - 112
@@ -228,11 +321,27 @@ function PrintFloorplan({ scene, layout }) {
                   <line x1={bounds.x} y1={horizontalY} x2={bounds.maxX} y2={horizontalY} />
                   <line x1={bounds.x} y1={horizontalY - 5} x2={bounds.x} y2={horizontalY + 5} />
                   <line x1={bounds.maxX} y1={horizontalY - 5} x2={bounds.maxX} y2={horizontalY + 5} />
-                  <text x={(bounds.x + bounds.maxX) / 2} y={horizontalY - 8} fill="#374151" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="12" textAnchor="middle">{meters(totalLength)} m total</text>
+                  <text x={(bounds.x + bounds.maxX) / 2} y={horizontalY - 8} fill="#374151" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="12" textAnchor="middle">{meters(totalLength)} total</text>
                   <line x1={verticalX} y1={bounds.y} x2={verticalX} y2={bounds.maxY} />
                   <line x1={verticalX - 5} y1={bounds.y} x2={verticalX + 5} y2={bounds.y} />
                   <line x1={verticalX - 5} y1={bounds.maxY} x2={verticalX + 5} y2={bounds.maxY} />
-                  <text x={verticalX + 14} y={(bounds.y + bounds.maxY) / 2} fill="#374151" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="12" textAnchor="middle" transform={'rotate(90 ' + (verticalX + 14) + ' ' + ((bounds.y + bounds.maxY) / 2) + ')'}>{meters(totalWidth)} m total</text>
+                  <text x={verticalX + 14} y={(bounds.y + bounds.maxY) / 2} fill="#374151" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="12" textAnchor="middle" transform={'rotate(90 ' + (verticalX + 14) + ' ' + ((bounds.y + bounds.maxY) / 2) + ')'}>{meters(totalWidth)} total</text>
+                </g>
+              })()}
+              {isConnectedGroupOwner && (() => {
+                const totalLength = connectedBounds.maxX - connectedBounds.x
+                const totalWidth = connectedBounds.maxY - connectedBounds.y
+                const horizontalY = connectedBounds.y - 160
+                const verticalX = connectedBounds.maxX + 160
+                return <g fill="none" stroke="#475569" strokeWidth="1.4">
+                  <line x1={connectedBounds.x} y1={horizontalY} x2={connectedBounds.maxX} y2={horizontalY} />
+                  <line x1={connectedBounds.x} y1={horizontalY - 5} x2={connectedBounds.x} y2={horizontalY + 5} />
+                  <line x1={connectedBounds.maxX} y1={horizontalY - 5} x2={connectedBounds.maxX} y2={horizontalY + 5} />
+                  <text x={(connectedBounds.x + connectedBounds.maxX) / 2} y={horizontalY - 8} fill="#1d4ed8" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="13" fontWeight="700" textAnchor="middle">{meters(totalLength)} total gabungan</text>
+                  <line x1={verticalX} y1={connectedBounds.y} x2={verticalX} y2={connectedBounds.maxY} />
+                  <line x1={verticalX - 5} y1={connectedBounds.y} x2={verticalX + 5} y2={connectedBounds.y} />
+                  <line x1={verticalX - 5} y1={connectedBounds.maxY} x2={verticalX + 5} y2={connectedBounds.maxY} />
+                  <text x={verticalX + 14} y={(connectedBounds.y + connectedBounds.maxY) / 2} fill="#1d4ed8" stroke="#fff" strokeWidth="4" paintOrder="stroke" fontSize="13" fontWeight="700" textAnchor="middle" transform={'rotate(90 ' + (verticalX + 14) + ' ' + ((connectedBounds.y + connectedBounds.maxY) / 2) + ')'}>{meters(totalWidth)} total gabungan</text>
                 </g>
               })()}
               {openings.map(opening => {
@@ -268,7 +377,10 @@ function PrintFloorplan({ scene, layout }) {
                   </g>
                 )
               })}
-              {openings.map(opening => {
+              {openings.filter(opening => !(opening.wallType === 'internal' && Number.isInteger(opening.internalWallIndex))).map(opening => {
+                // A door on a merged Room's former shared wall stays visible (see internal-wall
+                // rendering above), but the Floorplan canvas never captions it with dimensions —
+                // doing so here made that internal doorway read as its own separate, titled Room.
                 const p = roomOpeningPlacement(room, opening)
                 const width = Math.min(Number(opening.width) || 48, p.length)
                 return <g key={'room-opening-dimension-' + opening.id}>
@@ -297,7 +409,6 @@ function PrintFloorplan({ scene, layout }) {
                   strokeLinecap="square"
                 />
               ))}
-              <text x={(wall.x1 + wall.x2) / 2} y={(wall.y1 + wall.y2) / 2 - 9} fontSize="12" fill="#374151" textAnchor="middle">WALL · {meters(metric.length)} × {meters(wall.thickness || 6)}</text>
               {openings.map(opening => {
                 const width = Math.min(Number(opening.width) || 48, metric.length)
                 const center = Math.max(0, Math.min(1, Number(opening.offset) || 0.5)) * metric.length
