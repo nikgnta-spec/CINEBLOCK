@@ -22,7 +22,7 @@ test('Room merge supports partial shared walls without requiring equal wall leng
   const rectangularRoom = {
     id: 'rect',
     points: [{ x: 0, y: 0 }, { x: 983, y: 0 }, { x: 983, y: 800 }, { x: 0, y: 800 }],
-    openings: [],
+    openings: [{ id: 'shared-doorway', type: 'doorway', edgeIndex: 1, offset: 0.5, width: 48 }],
   }
   const lShapedRoom = {
     id: 'l-shape',
@@ -40,6 +40,7 @@ test('Room merge supports partial shared walls without requiring equal wall leng
   assert.ok(merged.points.some(point => point.x === 983 && point.y === 800))
   assert.ok(merged.points.some(point => point.x === 983 && point.y === 0))
   assert.ok(merged.internalWalls?.some(wall => wall.x1 === 983 && wall.x2 === 983 && Math.abs(Math.abs(wall.y2 - wall.y1) - 666) <= 1), 'the shared boundary is preserved as an internal wall')
+  assert.ok(merged.openings.some(opening => opening.id === 'shared-doorway' && opening.wallType === 'internal' && opening.internalWallIndex === 0), 'an opening on the shared wall stays attached to the new internal wall')
 })
 
 test('App wires shared scene and floorplan state into both planning tabs', async () => {
