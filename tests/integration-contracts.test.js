@@ -68,6 +68,12 @@ test('Merged internal walls remain visible in Floorplan and PDF and support open
   assert.match(report, /opening\.wallType === 'internal' && Number\.isInteger\(opening\.internalWallIndex\)/)
 })
 
+test('PDF export does not add wall dimension labels absent from the Floorplan canvas', async () => {
+  const report = await readSource('../src/components/PrintReport.jsx')
+  assert.doesNotMatch(report, /WALL · \{meters\(metric\.length\)\}/)
+  assert.match(report, /strokeWidth=\{wall\.thickness \|\| 6\}/)
+})
+
 test('PDF dimensions avoid duplicate bounding dimensions and shared-wall measurements for connected Rooms', async () => {
   const source = await readSource('../src/components/PrintReport.jsx')
   assert.match(source, /connectedRoomGroup\.length === 1 && \(\(\) =>/)
