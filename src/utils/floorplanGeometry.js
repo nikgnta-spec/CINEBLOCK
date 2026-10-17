@@ -169,9 +169,6 @@ export function updateWallEndpointGeometry(rooms = [], walls = [], wallId, endpo
   if (!wall || !['start', 'end'].includes(endpoint)) return { rooms, walls }
   const from = endpoint === 'start' ? { x: wall.x1, y: wall.y1 } : { x: wall.x2, y: wall.y2 }
   const to = { x: Math.round(point.x), y: Math.round(point.y) }
-  const synchronized = synchronizeJunctionMoves(rooms, walls.filter(item => item.id !== wallId), [{ from, to }])
-  const nextWalls = synchronized.walls.concat(walls.filter(item => item.id === wallId).map(item => endpoint === 'start'
-    ? { ...item, x1: to.x, y1: to.y }
-    : { ...item, x2: to.x, y2: to.y }))
-  return { rooms: synchronized.rooms, walls: nextWalls }
+  const synchronized = synchronizeJunctionMoves(rooms, walls, [{ from, to }])
+  return { rooms: synchronized.rooms, walls: synchronized.walls }
 }
