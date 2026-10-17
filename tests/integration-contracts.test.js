@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { projectPointToSegment, snapRoomPoint } from '../src/utils/roomSnapping.js'
 import { mergeAdjacentRoomPolygons } from '../src/utils/roomMerge.js'
-import { connectWallGeometry, createRoomPolygon, updateRoomPolygonGeometry, updateWallEndpointGeometry } from '../src/utils/floorplanGeometry.js'
+import { connectWallGeometry, createRoomPolygon, normalizeWallJunctions, updateRoomPolygonGeometry, updateWallEndpointGeometry } from '../src/utils/floorplanGeometry.js'
 
 const readSource = path => readFile(new URL(path, import.meta.url), 'utf8')
 
@@ -741,4 +741,30 @@ test('moving a Room rigidly keeps attached Walls welded to its perimeter', async
   assert.match(source, /if \(drag\.type === 'room'\) \{\s*const movedPoints = getRoomPoints\(drag\.original\)/)
   assert.match(source, /updateRoomPolygonGeometry\(previous\.rooms \|\| \[\], previous\.walls \|\| \[\], drag\.id, movedPoints\)/)
   assert.match(source, /internalWalls: \(drag\.original\.internalWalls \|\| \[\]\)\.map/)
+})
+
+
+test('overlapping collinear Walls become one continuous non-duplicated line with openings remapped', () => {
+  let sequence = 0
+  const walls = normalizeWallJunctions([
+    { id: 'left', x1: 0, y1: 0, x2: 100, y2: 0, openings: [] },
+    { id: 'overlap', x1: 50, y1: 0, x2: 150, y2: 0, openings: [{ id: 'window', offset: 0.25, width: 10 }] },
+  ], () => 'split-' + (++sequence))
+  assert.equal(walls.length, 3)
+  assert.deepEqual(walls.map(wall => [wall.x1, wall.x2]).sort((a, b) => a[0] - b[0]), [[0, 50], [50, 100], [100, 150]])
+  const shared = walls.find(wall => wall.x1 === 50 && wall.x2 === 100)
+  assert.equal(shared.openings.length, 1)
+  assert.equal(shared.openings[0].id, 'window')
+  assert.equal(shared.openings[0].offset, 0.5)
+})
+
+test('wall normalization retains a T-junction as a shared endpoint without stacked segments', () => {
+  let sequence = 0
+  const walls = normalizeWallJunctions([
+    { id: 'horizontal', x1: 0, y1: 0, x2: 100, y2: 0, openings: [] },
+    { id: 'vertical', x1: 50, y1: 0, x2: 50, y2: 40, openings: [] },
+  ], () => 'split-' + (++sequence))
+  assert.ok(walls.some(wall => wall.x1 === 0 && wall.x2 === 50 && wall.y1 === 0 && wall.y2 === 0))
+  assert.ok(walls.some(wall => wall.x1 === 50 && wall.x2 === 100 && wall.y1 === 0 && wall.y2 === 0))
+  assert.ok(walls.some(wall => wall.x1 === 50 && wall.y1 === 0 && wall.x2 === 50 && wall.y2 === 40))
 })
