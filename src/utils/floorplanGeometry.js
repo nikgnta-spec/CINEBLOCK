@@ -93,7 +93,7 @@ export function connectWallGeometry(rooms = [], walls = [], wall, makeId) {
     return segments
   })
 
-  return { rooms: nextRooms, walls: [...nextWalls, wall] }
+  return { rooms: nextRooms, walls: normalizeWallJunctions([...nextWalls, wall], makeId) }
 }
 
 
@@ -171,4 +171,62 @@ export function updateWallEndpointGeometry(rooms = [], walls = [], wallId, endpo
   const to = { x: Math.round(point.x), y: Math.round(point.y) }
   const synchronized = synchronizeJunctionMoves(rooms, walls, [{ from, to }])
   return { rooms: synchronized.rooms, walls: synchronized.walls }
+}
+
+
+/**
+ * Split collinear overlaps at every shared endpoint and collapse duplicate
+ * atomic segments. This keeps the drawn line continuous without rendering
+ * stacked duplicate Walls, while preserving IDs and remapping opening offsets.
+ */
+export function normalizeWallJunctions(walls = [], makeId = () => `wall-${Math.random().toString(36).slice(2)}`) {
+  const tolerance = ROOM_JUNCTION_TOLERANCE
+  const split = walls.flatMap(wall => {
+    const source = { x1: wall.x1, y1: wall.y1, x2: wall.x2, y2: wall.y2 }
+    const length = Math.hypot(source.x2 - source.x1, source.y2 - source.y1)
+    if (length < 0.01) return []
+    const cuts = [0, 1]
+    for (const other of walls) {
+      if (other.id === wall.id) continue
+      for (const endpoint of [{ x: other.x1, y: other.y1 }, { x: other.x2, y: other.y2 }]) {
+        const projection = projectPointToSegment(endpoint, source)
+        if (projection.distance < tolerance && projection.t > 0.001 && projection.t < 0.999) cuts.push(projection.t)
+      }
+    }
+    cuts.sort((a, b) => a - b)
+    const unique = cuts.filter((value, index) => index === 0 || Math.abs(value - cuts[index - 1]) > 0.001)
+    return unique.slice(0, -1).map((startT, index) => {
+      const endT = unique[index + 1]
+      const xAt = t => Math.round(source.x1 + (source.x2 - source.x1) * t)
+      const yAt = t => Math.round(source.y1 + (source.y2 - source.y1) * t)
+      const segment = {
+        ...wall,
+        ...(index === 0 ? {} : { id: makeId() }),
+        x1: xAt(startT), y1: yAt(startT), x2: xAt(endT), y2: yAt(endT),
+        openings: [],
+      }
+      for (const opening of wall.openings || []) {
+        const offset = Math.max(0, Math.min(1, Number(opening.offset ?? 0.5)))
+        if (offset < startT - 0.001 || offset > endT + 0.001) continue
+        segment.openings.push({ ...opening, offset: endT > startT ? Math.max(0, Math.min(1, (offset - startT) / (endT - startT))) : 0.5 })
+      }
+      return segment
+    })
+  })
+  const unique = []
+  for (const segment of split) {
+    const duplicate = unique.find(existing =>
+      (sameJunction(existing, { x: segment.x1, y: segment.y1 }, tolerance) &&
+       sameJunction({ x: existing.x2, y: existing.y2 }, { x: segment.x2, y: segment.y2 }, tolerance)) ||
+      (sameJunction(existing, { x: segment.x2, y: segment.y2 }, tolerance) &&
+       sameJunction({ x: existing.x2, y: existing.y2 }, { x: segment.x1, y: segment.y1 }, tolerance))
+    )
+    if (!duplicate) {
+      unique.push(segment)
+      continue
+    }
+    const seen = new Set((duplicate.openings || []).map(opening => opening.id).filter(Boolean))
+    duplicate.openings = [...(duplicate.openings || []), ...(segment.openings || []).filter(opening => !opening.id || !seen.has(opening.id))]
+  }
+  return unique
 }
