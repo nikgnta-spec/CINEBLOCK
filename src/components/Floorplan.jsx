@@ -1157,9 +1157,9 @@ export default function Floorplan({
         b: snappedPoints[(movingEdge.index + 1) % snappedPoints.length],
       },
       targetEdge,
-    })
+    }, reason => setRoomMergePrompt({ ...roomMergePrompt, error: reason }))
     if (!merged) {
-      setRoomMergePrompt({ ...roomMergePrompt, error: 'Room belum bisa digabung dengan aman. Periksa bentuk dinding dan posisi pintu/jendela, lalu coba lagi.' })
+      if (!roomMergePrompt.error) setRoomMergePrompt({ ...roomMergePrompt, error: 'Room belum bisa digabung dengan aman. Periksa bentuk dinding dan posisi pintu/jendela, lalu coba lagi.' })
       return
     }
 
