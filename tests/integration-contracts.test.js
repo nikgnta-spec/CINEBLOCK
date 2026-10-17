@@ -74,6 +74,15 @@ test('PDF export does not add wall dimension labels absent from the Floorplan ca
   assert.match(report, /strokeWidth=\{wall\.thickness \|\| 6\}/)
 })
 
+test('PDF export does not caption a merged Room\'s internal-wall doorway with dimensions', async () => {
+  // The Floorplan canvas labels every Room opening with just its short name (Pintu/Jendela),
+  // never a width × height caption. The PDF previously added that caption for every opening,
+  // including the door left on a merged Room's former shared wall — making that internal
+  // doorway read as the entrance to its own separate, titled Room in the exported plan.
+  const report = await readSource('../src/components/PrintReport.jsx')
+  assert.match(report, /\{openings\.filter\(opening => !\(opening\.wallType === 'internal' && Number\.isInteger\(opening\.internalWallIndex\)\)\)\.map\(opening => \{\s*\n(?:.*\n)*?\s*return <g key=\{'room-opening-dimension-' \+ opening\.id\}>/)
+})
+
 test('PDF dimensions avoid duplicate bounding dimensions and shared-wall measurements for connected Rooms', async () => {
   const source = await readSource('../src/components/PrintReport.jsx')
   assert.match(source, /connectedRoomGroup\.length === 1 && \(\(\) =>/)

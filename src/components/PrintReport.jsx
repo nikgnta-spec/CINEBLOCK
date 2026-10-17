@@ -377,7 +377,10 @@ function PrintFloorplan({ scene, layout }) {
                   </g>
                 )
               })}
-              {openings.map(opening => {
+              {openings.filter(opening => !(opening.wallType === 'internal' && Number.isInteger(opening.internalWallIndex))).map(opening => {
+                // A door on a merged Room's former shared wall stays visible (see internal-wall
+                // rendering above), but the Floorplan canvas never captions it with dimensions —
+                // doing so here made that internal doorway read as its own separate, titled Room.
                 const p = roomOpeningPlacement(room, opening)
                 const width = Math.min(Number(opening.width) || 48, p.length)
                 return <g key={'room-opening-dimension-' + opening.id}>
