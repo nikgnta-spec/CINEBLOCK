@@ -185,6 +185,7 @@ test('Room snapping combines X and Y from different vertices and keeps single-ax
 test('Room dimension layout keeps segment lanes close and overall totals outside without connected-room duplicates', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /const getRoomDimensionLayouts = \(room, edges\) =>/)
+  assert.match(source, /edges\.filter\(edge => edge\.length >= 5\)/)
   assert.match(source, /const offset = 72 \+ level \* 30/)
   assert.match(source, /const showIndividualTotals = !hasConnectedRooms/)
   assert.match(source, /const showHorizontalTotal = showIndividualTotals && !edges\.some/) 
