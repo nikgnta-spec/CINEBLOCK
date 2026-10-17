@@ -182,15 +182,16 @@ test('Room snapping combines X and Y from different vertices and keeps single-ax
   assert.deepEqual(onlyY.guides.map(guide => guide.axis), ['horizontal'])
 })
 
-test('Room dimension layout uses consistent exterior lanes and suppresses duplicate total dimensions', async () => {
+test('Room dimension layout keeps segment lanes close and overall totals outside without connected-room duplicates', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
-  assert.match(source, /const getRoomDimensionLayouts = \(room, edges\) =>/)
-  assert.match(source, /const offset = 72 \+ level \* 30/)
-  assert.match(source, /const horizontalIsSingleEdge = outerGroupEdges\.some/)
-  assert.match(source, /const verticalIsSingleEdge = outerGroupEdges\.some/)
-  assert.match(source, /!horizontalIsSingleEdge/)
-  assert.match(source, /!verticalIsSingleEdge/)
-  assert.match(source, /opacity=\{active \? 1 : 0\.58\}/)
+  assert.match(source, /const getRoomDimensionLayouts = \\(room, edges\\) =>/)
+  assert.match(source, /const offset = 72 \\+ level \\* 30/)
+  assert.match(source, /const showIndividualTotals = !hasConnectedRooms/)
+  assert.match(source, /const groupDimensionLayouts = connectedRoomGroup\\.flatMap/)
+  assert.match(source, /const groupMaxHorizontalLevel = Math\\.max/)
+  assert.match(source, /const groupMaxVerticalLevel = Math\\.max/)
+  assert.match(source, /showIndividualTotals && <>/)
+  assert.match(source, /opacity=\\{active \\? 1 : 0\\.58\\}/)
   assert.match(source, /strokeWidth="5" paintOrder="stroke"/)
 })
 
@@ -577,7 +578,6 @@ test('Confirming a Room connection snaps walls flush while retaining shared wall
 test('Room total length and width stay visible without hover while edge dimensions remain contextual', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /showRoomDimensions && \(\(\) => \{/)
-  assert.match(source, /!horizontalIsSingleEdge/)
-  assert.match(source, /!verticalIsSingleEdge/)
+  assert.match(source, /const showIndividualTotals = !hasConnectedRooms/)
   assert.match(source, /\(active \|\| hoveredRoomEdge\?\.roomId === room\.id\) && visibleDimensionLayouts\.map/)
 })
