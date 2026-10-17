@@ -2120,7 +2120,26 @@ export default function Floorplan({
     } else if (drag.type === 'room' && event.altKey) {
       setRoomSnapGuides([])
     }
-    updateLayout(previous => ({
+    updateLayout(previous => {
+      if (drag.type === 'room') {
+        const movedPoints = getRoomPoints(drag.original).map(vertex => ({
+          x: Math.round(vertex.x + dx),
+          y: Math.round(vertex.y + dy),
+        }))
+        const connected = updateRoomPolygonGeometry(previous.rooms || [], previous.walls || [], drag.id, movedPoints)
+        return {
+          ...previous,
+          rooms: connected.rooms.map(item => item.id !== drag.id ? item : ({
+            ...item,
+            internalWalls: (drag.original.internalWalls || []).map(wall => ({
+              x1: Math.round(wall.x1 + dx), y1: Math.round(wall.y1 + dy),
+              x2: Math.round(wall.x2 + dx), y2: Math.round(wall.y2 + dy),
+            })),
+          })),
+          walls: connected.walls,
+        }
+      }
+      return {
       ...previous,
       [drag.type + 's']: previous[drag.type + 's'].map(item => {
         if (item.id !== drag.id) return item
@@ -2156,7 +2175,8 @@ export default function Floorplan({
         }
         return item
       }),
-    }))
+      }
+    })
   }
 
   const handleCanvasPointerUp = event => {
