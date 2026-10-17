@@ -371,11 +371,13 @@ test('Doors and windows support precise width, position, and polygon edge contro
   assert.match(source, /id=\{opening\.id \+ '-edge'\}/)
   assert.match(source, /updateOpening\(opening\.id, \{ width: Math\.round\(clamp\(meters, 0, 5\) \* 100\) \}\)/)
   assert.match(source, /updateOpening\(opening\.id, \{ offset: percent \/ 100 \}\)/)
-  // Openings are attached to a polygon edge by edgeIndex, not legacy cardinal sides.
+  // Openings can attach to either a perimeter edge or a preserved internal wall.
   assert.match(source, /id=\{opening\.id \+ '-edge'\}/)
-  assert.match(source, /value=\{Number\.isInteger\(opening\.edgeIndex\) \? opening\.edgeIndex : 0\}/)
-  assert.match(source, /getRoomEdges\(selectedEntity\)\.map\(edge => <option key=\{edge\.edgeIndex\} value=\{edge\.edgeIndex\}>/)
-  assert.match(source, /updateOpening\(opening\.id, \{ edgeIndex: Number\(event\.target\.value\) \}\)/)
+  assert.match(source, /opening\.wallType === 'internal' && Number\.isInteger\(opening\.internalWallIndex\)/)
+  assert.match(source, /value=\{'edge:' \+ edge\.edgeIndex\}/)
+  assert.match(source, /value=\{'internal:' \+ index\}/)
+  assert.match(source, /wallType: 'internal', internalWallIndex: index, edgeIndex: null/)
+  assert.match(source, /wallType: 'perimeter', internalWallIndex: null, edgeIndex: index/)
   assert.match(source, /disabled=\{Boolean\(selectedEntity\.locked\)\}/)
 })
 
