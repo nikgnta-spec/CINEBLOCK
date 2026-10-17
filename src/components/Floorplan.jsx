@@ -1907,6 +1907,72 @@ export default function Floorplan({
       const alongWall = dx * drag.attachmentVector.x + dy * drag.attachmentVector.y
       dx = alongWall * drag.attachmentVector.x
       dy = alongWall * drag.attachmentVector.y
+    } else if (drag.type === 'room' && !event.altKey) {
+      // Snap the entire Room as a rigid body, like Room drawing and opening
+      // placement: first align nearby parallel wall segments, then weld a
+      // nearby corner to the exact X/Y coordinates of another Room corner.
+      const rect = svgRef.current?.getBoundingClientRect()
+      const snapTolerance = 12 * viewBox.width / Math.max(1, rect?.width || canvasSize.width)
+      const movedPoints = getRoomPoints(drag.original).map(vertex => ({ x: vertex.x + dx, y: vertex.y + dy }))
+      const otherRooms = layout.rooms.filter(room => room.id !== drag.id)
+      const otherEdges = otherRooms.flatMap(room => getRoomEdges(room))
+      const edgeLength = edge => Math.hypot(edge.x2 - edge.x1, edge.y2 - edge.y1) || 1
+      let bestEdgeSnap = null
+      for (const movingEdge of getRoomEdges({ points: movedPoints })) {
+        const length = edgeLength(movingEdge)
+        const ux = (movingEdge.x2 - movingEdge.x1) / length
+        const uy = (movingEdge.y2 - movingEdge.y1) / length
+        for (const targetEdge of otherEdges) {
+          const targetLength = edgeLength(targetEdge)
+          const tx = (targetEdge.x2 - targetEdge.x1) / targetLength
+          const ty = (targetEdge.y2 - targetEdge.y1) / targetLength
+          if (Math.abs(ux * ty - uy * tx) > 0.035) continue
+          const nx = -uy
+          const ny = ux
+          const signedDistance = (targetEdge.x1 - movingEdge.x1) * nx + (targetEdge.y1 - movingEdge.y1) * ny
+          if (Math.abs(signedDistance) > snapTolerance) continue
+          const projectionStart = (targetEdge.x1 - movingEdge.x1) * ux + (targetEdge.y1 - movingEdge.y1) * uy
+          const projectionEnd = (targetEdge.x2 - movingEdge.x1) * ux + (targetEdge.y2 - movingEdge.y1) * uy
+          const overlap = Math.min(length, Math.max(projectionStart, projectionEnd)) - Math.max(0, Math.min(projectionStart, projectionEnd))
+          if (overlap < -snapTolerance) continue
+          if (!bestEdgeSnap || Math.abs(signedDistance) < Math.abs(bestEdgeSnap.distance)) bestEdgeSnap = { distance: signedDistance, nx, ny }
+        }
+      }
+      if (bestEdgeSnap) {
+        dx += bestEdgeSnap.nx * bestEdgeSnap.distance
+        dy += bestEdgeSnap.ny * bestEdgeSnap.distance
+      }
+
+      const snappedPoints = getRoomPoints(drag.original).map(vertex => ({ x: vertex.x + dx, y: vertex.y + dy }))
+      const anchors = [
+        ...otherRooms.flatMap(room => getRoomPoints(room)),
+        ...(layout.walls || []).flatMap(wall => [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]),
+      ]
+      let bestVertexSnap = null
+      for (const vertex of snappedPoints) {
+        for (const anchor of anchors) {
+          const sx = anchor.x - vertex.x
+          const sy = anchor.y - vertex.y
+          if (Math.abs(sx) <= snapTolerance && (!bestVertexSnap || Math.abs(sx) < Math.abs(bestVertexSnap.dx))) bestVertexSnap = { dx: sx, dy: 0, axis: 'vertical', anchor }
+          if (Math.abs(sy) <= snapTolerance && (!bestVertexSnap || Math.abs(sy) < Math.abs(bestVertexSnap.dy))) bestVertexSnap = { dx: 0, dy: sy, axis: 'horizontal', anchor }
+          if (Math.abs(sx) <= snapTolerance && Math.abs(sy) <= snapTolerance) {
+            const score = Math.hypot(sx, sy)
+            if (!bestVertexSnap || score < bestVertexSnap.score) bestVertexSnap = { dx: sx, dy: sy, score, anchor }
+          }
+        }
+      }
+      if (bestVertexSnap) {
+        dx += bestVertexSnap.dx
+        dy += bestVertexSnap.dy
+        setRoomSnapGuides([
+          ...(bestVertexSnap.axis !== 'horizontal' ? [{ axis: 'vertical', x: bestVertexSnap.anchor.x, y: bestVertexSnap.anchor.y }] : []),
+          ...(bestVertexSnap.axis !== 'vertical' ? [{ axis: 'horizontal', x: bestVertexSnap.anchor.x, y: bestVertexSnap.anchor.y }] : []),
+        ])
+      } else {
+        setRoomSnapGuides(bestEdgeSnap ? [{ axis: Math.abs(bestEdgeSnap.nx) > Math.abs(bestEdgeSnap.ny) ? 'vertical' : 'horizontal', x: movedPoints[0]?.x + dx, y: movedPoints[0]?.y + dy }] : [])
+      }
+    } else if (drag.type === 'room' && event.altKey) {
+      setRoomSnapGuides([])
     }
     updateLayout(previous => ({
       ...previous,
