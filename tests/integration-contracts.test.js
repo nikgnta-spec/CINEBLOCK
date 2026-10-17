@@ -157,8 +157,9 @@ test('Wall dimensions can be edited numerically and total length is displayed on
   assert.match(floorplan, /id="wall-thickness"/)
   assert.match(floorplan, /thickness: Math\.round\(meters \* 100\)/)
   assert.match(floorplan, /x2: wall\.x1 \+ current\.ux \* length/)
-  assert.match(floorplan, /formatMeters\(length\) \+ ' total'/)
-  assert.match(floorplan, /Panjang total dinding:/)
+  assert.doesNotMatch(floorplan, /formatMeters\(length\) \+ ' total'/)
+  assert.doesNotMatch(floorplan, /Panjang total dinding:/)
+  assert.match(floorplan, /showWallDimension/)
 })
 
 test('Locked objects remain selectable but cannot move or resize', async () => {
