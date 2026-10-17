@@ -2548,13 +2548,10 @@ export default function Floorplan({
                       const groupMaxHorizontalLevel = Math.max(0, ...groupDimensionLayouts.filter(item => item.sideKey.startsWith('h-')).map(item => item.dimension.level))
                       const groupMaxVerticalLevel = Math.max(0, ...groupDimensionLayouts.filter(item => item.sideKey.startsWith('v-')).map(item => item.dimension.level))
                       const showIndividualTotals = !hasConnectedRooms
-                      // Suppress an overall total when one wall already represents that exact full span.
-                      // Keep totals for concave rooms when the bounding dimension spans multiple edges.
-                      // Treat tiny alignment residue (up to 5 units = 5 cm) as the same full span.
-                      const showHorizontalTotal = showIndividualTotals && !edges.some(edge =>
-                        Math.abs(edge.y2 - edge.y1) < 1 && Math.abs(Math.abs(edge.x2 - edge.x1) - totalBounds.width) <= 5)
-                      const showVerticalTotal = showIndividualTotals && !edges.some(edge =>
-                        Math.abs(edge.x2 - edge.x1) < 1 && Math.abs(Math.abs(edge.y2 - edge.y1) - totalBounds.height) <= 5)
+                      // Always show overall length and width for standalone rooms,
+                      // even when the total equals one full wall. Totals are useful metadata.
+                      const showHorizontalTotal = showIndividualTotals
+                      const showVerticalTotal = showIndividualTotals
                       const horizontalTotalY = totalBounds.y - 112 - maxHorizontalLevel * 30
                       const verticalTotalX = totalBounds.x + totalBounds.width + 112 + maxVerticalLevel * 30
                       const groupHorizontalTotalY = groupTotalBounds ? groupTotalBounds.y - 160 - groupMaxHorizontalLevel * 30 : 0
