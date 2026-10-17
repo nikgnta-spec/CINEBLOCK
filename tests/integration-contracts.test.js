@@ -572,6 +572,14 @@ test('confirming Room merge creates one draggable polygon and preserves the shar
   assert.match(source, /onPointerDown=\{event => beginObjectDrag\('room', room, event\)\}/)
 })
 
+test('Merged Room inspector can restore its source Rooms', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /mergeParts: \{[\s\S]*?target: \{ \.\.\.target \}[\s\S]*?moving: \{ \.\.\.snappedMoving \}/)
+  assert.match(source, /const unmergeRoom = room => \{/)
+  assert.match(source, /rooms: previous\.rooms[\s\S]*?\.filter\(item => item\.id !== room\.id\)[\s\S]*?\.concat\([\s\S]*?parts\.target[\s\S]*?parts\.moving/)
+  assert.match(source, /Lepas ruangan/)
+})
+
 test('Room connections persist independently of selection and Rooms remain draggable', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   const start = source.indexOf('const confirmRoomMerge = () => {')
