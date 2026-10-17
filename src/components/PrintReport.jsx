@@ -56,9 +56,16 @@ function pointInPolygon(point, points) {
 }
 
 function roomOpeningPlacement(room, opening) {
+  const offset = Math.max(0.02, Math.min(0.98, Number(opening.offset) || 0.5))
+  if (opening.wallType === 'internal' && Number.isInteger(opening.internalWallIndex)) {
+    const wall = (room.internalWalls || [])[opening.internalWallIndex]
+    if (wall) {
+      const metrics = wallMetrics(wall)
+      return { x: wall.x1 + metrics.ux * metrics.length * offset, y: wall.y1 + metrics.uy * metrics.length * offset, angle: metrics.angle + 180, length: metrics.length }
+    }
+  }
   const edges = roomEdges(room)
   const edge = edges[Math.max(0, Math.min(edges.length - 1, Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)))] || edges[0]
-  const offset = Math.max(0.02, Math.min(0.98, Number(opening.offset) || 0.5))
   return { x: edge.x1 + (edge.x2 - edge.x1) * offset, y: edge.y1 + (edge.y2 - edge.y1) * offset, angle: edge.angle + 180, length: edge.length }
 }
 
@@ -200,11 +207,21 @@ function PrintFloorplan({ scene, layout }) {
             && room.id === connectedRoomGroup.map(item => item.id).sort()[0]
           return (
             <g key={'room-outline-' + room.id}>
-              {edges.flatMap(edge => openingSegments(edge.length, openings.filter(opening => (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)) === edge.edgeIndex)).map((segment, index) => {
+              {edges.flatMap(edge => openingSegments(edge.length, openings.filter(opening => opening.wallType !== 'internal' && !Number.isInteger(opening.internalWallIndex) && (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)) === edge.edgeIndex)).map((segment, index) => {
                 const ux = (edge.x2 - edge.x1) / (edge.length || 1)
                 const uy = (edge.y2 - edge.y1) / (edge.length || 1)
                 return <line key={edge.edgeIndex + '-' + index} x1={edge.x1 + ux * segment.start} y1={edge.y1 + uy * segment.start} x2={edge.x1 + ux * segment.end} y2={edge.y1 + uy * segment.end} stroke="#111827" strokeWidth="3" />
               }))}
+              {(room.internalWalls || []).map((wall, wallIndex) => {
+                const metric = wallMetrics(wall)
+                const wallOpenings = openings.filter(opening => opening.wallType === 'internal' && opening.internalWallIndex === wallIndex)
+                return openingSegments(metric.length, wallOpenings).map((segment, segmentIndex) => (
+                  <line key={'internal-wall-' + wallIndex + '-' + segmentIndex}
+                    x1={wall.x1 + metric.ux * segment.start} y1={wall.y1 + metric.uy * segment.start}
+                    x2={wall.x1 + metric.ux * segment.end} y2={wall.y1 + metric.uy * segment.end}
+                    stroke="#111827" strokeWidth="3" />
+                ))
+              })}
               <text x={bounds.x + 9} y={bounds.y + 18} fontSize="13" fontWeight="700" fill="#111827">{room.label || 'Room'}</text>
               <text x={bounds.x + 9} y={bounds.y + 36} fontSize="12" fill="#374151">{meters(bounds.maxX - bounds.x) + ' × ' + meters(bounds.maxY - bounds.y)}</text>
               {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && <text x={bounds.x + 9} y={bounds.y + 52} fontSize="12" fill="#374151">{Number(room.ceilingHeight).toFixed(1) + ' m ceiling'}</text>}
