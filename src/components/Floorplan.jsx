@@ -4,7 +4,7 @@ import {
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
 import { projectPointToSegment, snapRoomPoint } from '../utils/roomSnapping'
-import { createRoomPolygon, connectWallGeometry } from '../utils/floorplanGeometry'
+import { createRoomPolygon, connectWallGeometry, updateRoomPolygonGeometry, updateWallEndpointGeometry } from '../utils/floorplanGeometry'
 import { findRoomMergeCandidate, mergeAdjacentRoomPolygons, snapRoomToEdge } from '../utils/roomMerge'
 import {
   SIZES as SHOT_SIZES,
@@ -1861,10 +1861,18 @@ export default function Floorplan({
       const endpointPatch = drag.endpoint === 'start'
         ? { x1: Math.round(point.x), y1: Math.round(point.y) }
         : { x2: Math.round(point.x), y2: Math.round(point.y) }
-      updateLayout(previous => ({
-        ...previous,
-        walls: previous.walls.map(wall => wall.id === drag.id ? { ...wall, ...endpointPatch } : wall),
-      }))
+      updateLayout(previous => {
+        const connected = updateWallEndpointGeometry(
+          previous.rooms || [],
+          previous.walls || [],
+          drag.id,
+          drag.endpoint,
+          drag.endpoint === 'start'
+            ? { x: endpointPatch.x1, y: endpointPatch.y1 }
+            : { x: endpointPatch.x2, y: endpointPatch.y2 },
+        )
+        return { ...previous, rooms: connected.rooms, walls: connected.walls }
+      })
       return
     }
 
@@ -1917,7 +1925,10 @@ export default function Floorplan({
         }
         return vertex
       })
-      updateLayout(previous => ({ ...previous, rooms: previous.rooms.map(room => room.id === drag.id ? { ...room, points } : room) }))
+      updateLayout(previous => {
+        const connected = updateRoomPolygonGeometry(previous.rooms || [], previous.walls || [], drag.id, points)
+        return { ...previous, rooms: connected.rooms, walls: connected.walls }
+      })
       return
     }
 
@@ -1939,7 +1950,10 @@ export default function Floorplan({
       const nextPoints = drag.originalPoints.map((vertex, index) => index === drag.vertexIndex
         ? { x: Math.round(point.x), y: Math.round(point.y) }
         : vertex)
-      updateLayout(previous => ({ ...previous, rooms: previous.rooms.map(room => room.id === drag.id ? { ...room, points: nextPoints } : room) }))
+      updateLayout(previous => {
+        const connected = updateRoomPolygonGeometry(previous.rooms || [], previous.walls || [], drag.id, nextPoints)
+        return { ...previous, rooms: connected.rooms, walls: connected.walls }
+      })
       return
     }
 
