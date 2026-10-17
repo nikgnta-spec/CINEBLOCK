@@ -60,7 +60,7 @@ test('Merged internal walls remain visible in Floorplan and PDF and support open
   assert.match(floorplan, /setSelectedRoomEdge\(\{ roomId: room\.id, internalWallIndex: index, edgeIndex: null \}\)/)
   assert.match(floorplan, /wallType: 'internal', internalWallIndex: selectedRoomEdge\.internalWallIndex/)
   assert.match(floorplan, /Dinding sambungan/)
-  assert.match(report, /\(room\.internalWalls \|\| \[\]\)\.map\(\(wall, wallIndex\)/)
+  assert.match(report, /roomInternalWalls\(room\)\.map\(\(wall, wallIndex\)/)
   assert.match(report, /opening\.wallType === 'internal' && opening\.internalWallIndex === wallIndex/)
   assert.match(report, /opening\.wallType === 'internal' && Number\.isInteger\(opening\.internalWallIndex\)/)
 })
