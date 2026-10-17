@@ -118,7 +118,7 @@ test('backup import has a pre-read size limit and validates before replacing act
   assert.match(source, /catch \(error\) \{[\s\S]*?could not import backup/i)
 })
 
-test('local Room Reusable migration extracts per-Scene rooms without geometry deduplication', async () => {
+test('legacy Room references can be detached per Scene and Room reuse UI is removed', async () => {
   const source = await readSource('../src/App.jsx')
   const floorplan = await readSource('../src/components/Floorplan.jsx')
 
@@ -127,7 +127,10 @@ test('local Room Reusable migration extracts per-Scene rooms without geometry de
   assert.match(source, /projectRooms/)
   assert.match(source, /rooms: Array\.isArray\(rooms\) \? rooms : \[\]/)
   assert.match(floorplan, /projectRooms\.filter\(room => \(scene\.roomIds \|\| \[\]\)\.includes\(room\.id\)\)/)
-  assert.match(floorplan, /Room digunakan bersama/)
+  assert.doesNotMatch(floorplan, /Room digunakan bersama/) 
+  assert.match(floorplan, /roomIsolationVersion === 1/) 
+  assert.match(floorplan, /roomIsolationVersion: 1/) 
+  assert.doesNotMatch(floorplan, /Pakai Room yang sudah ada/)
   assert.match(source, /const resolvedFloorplans = projectRooms === null/)
 })
 
