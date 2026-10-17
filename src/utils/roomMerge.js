@@ -141,19 +141,20 @@ function tracePolygon(edges) {
   return cleaned.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) }))
 }
 
-export function mergeAdjacentRoomPolygons(movingRoom, targetRoom, candidate) {
-  if (!movingRoom || !targetRoom || !candidate) return null
+export function mergeAdjacentRoomPolygons(movingRoom, targetRoom, candidate, onFailure) {
+  const fail = message => { onFailure?.(message); return null }
+  if (!movingRoom || !targetRoom || !candidate) return fail('Data Room atau sisi sambungan tidak lengkap.')
   const movingPoints = pointsOf(movingRoom).map(p => ({ ...p }))
   const targetPoints = pointsOf(targetRoom).map(p => ({ ...p }))
   const mi = candidate.movingEdge?.index
   const ti = candidate.targetEdge?.index
-  if (!Number.isInteger(mi) || !Number.isInteger(ti)) return null
+  if (!Number.isInteger(mi) || !Number.isInteger(ti)) return fail('Sisi sambungan tidak valid. Pilih sisi dinding yang lain.')
   const movingEdge = edgesOf({ points: movingPoints })[mi]
   const targetEdge = edgesOf({ points: targetPoints })[ti]
-  if (!movingEdge || !targetEdge) return null
+  if (!movingEdge || !targetEdge) return fail('Sisi dinding yang dipilih tidak ditemukan lagi.')
 
   const overlap = overlapOnLine(movingEdge, targetEdge, 18)
-  if (!overlap) return null
+  if (!overlap) return fail('Kedua sisi dinding tidak lagi sejajar atau tidak memiliki bagian yang bertumpuk.')
   // Move the target polygon only perpendicular to the shared edge, closing a small gap
   // without forcing the two rooms' edge lengths to match.
   const normal = { x: -overlap.av.y, y: overlap.av.x }
@@ -164,7 +165,7 @@ export function mergeAdjacentRoomPolygons(movingRoom, targetRoom, candidate) {
   // Openings on the shared segment become internal and are intentionally
   // removed during the merge. Openings outside that segment are preserved.
   const sharedRange = overlapOnLine(movingEdge, { a: { x: targetEdge.a.x + shift.x, y: targetEdge.a.y + shift.y }, b: { x: targetEdge.b.x + shift.x, y: targetEdge.b.y + shift.y } }, 1.5)
-  if (!sharedRange) return null
+  if (!sharedRange) return fail('Bagian dinding bersama tidak cocok setelah penyelarasan. Geser Room sedikit lalu coba lagi.')
   const isOpeningOnSharedSegment = (opening, roomPoints, edgeIndex) => {
     if (Number(opening.edgeIndex) !== edgeIndex) return false
     const edge = edgesOf({ points: roomPoints })[edgeIndex]
@@ -177,7 +178,7 @@ export function mergeAdjacentRoomPolygons(movingRoom, targetRoom, candidate) {
 
   const rawEdges = splitAndCancelEdges(movingPoints, alignedTarget)
   const mergedPoints = tracePolygon(rawEdges)
-  if (!mergedPoints) return null
+  if (!mergedPoints) return fail('Batas luar gabungan tidak membentuk poligon tertutup. Coba sejajarkan sisi dinding yang bertemu.')
 
   const remapOpenings = (room, originalPoints, sharedEdgeIndex, shiftBy = { x: 0, y: 0 }) => (room.openings || []).filter(opening => !isOpeningOnSharedSegment(opening, originalPoints, sharedEdgeIndex)).map(opening => {
     const oldIndex = Number(opening.edgeIndex)
@@ -198,7 +199,7 @@ export function mergeAdjacentRoomPolygons(movingRoom, targetRoom, candidate) {
   })
   const targetOpenings = remapOpenings(targetRoom, targetPoints, ti, shift)
   const movingOpenings = remapOpenings(movingRoom, movingPoints, mi)
-  if ([...targetOpenings, ...movingOpenings].some(opening => opening.needsReposition)) return null
+  if ([...targetOpenings, ...movingOpenings].some(opening => opening.needsReposition)) return fail('Posisi pintu atau jendela tidak dapat dipetakan ke dinding gabungan. Pindahkan bukaan dari sisi sambungan lalu coba lagi.')
   const sharedStart = addScaled(movingEdge.a, overlap.av, sharedRange.low)
   const sharedEnd = addScaled(movingEdge.a, overlap.av, sharedRange.high)
   const internalWalls = [
