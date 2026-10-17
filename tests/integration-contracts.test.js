@@ -51,6 +51,9 @@ test('App wires shared scene and floorplan state into both planning tabs', async
 })
 
 test('Merged internal walls remain visible in Floorplan and PDF and support openings', async () => {
+  const legacyRoomWallFallback = /const getRoomInternalWalls = room =>[\\s\\S]*?if \\(stored\\.length\\) return stored[\\s\\S]*?const reflex = \\[\\]/
+  assert.match(await readSource('../src/components/Floorplan.jsx'), legacyRoomWallFallback)
+
   const floorplan = await readSource('../src/components/Floorplan.jsx')
   const report = await readSource('../src/components/PrintReport.jsx')
 
