@@ -1765,9 +1765,15 @@ export default function Floorplan({
         length = metrics.length || 1
         offset = ((point.x - host.x1) * metrics.ux + (point.y - host.y1) * metrics.uy) / length
       } else {
-        const internalWall = opening.wallType === 'internal' && Number.isInteger(opening.internalWallIndex)
-          ? (host.internalWalls || [])[opening.internalWallIndex]
+        const isInternalOpening = opening.wallType === 'internal' && Number.isInteger(opening.internalWallIndex)
+        const internalWall = isInternalOpening
+          ? getRoomInternalWalls(host)[opening.internalWallIndex]
           : null
+        if (isInternalOpening && !internalWall) {
+          // Never silently reattach an internal-wall opening to the room perimeter.
+          // A stale/missing wall should not make dragging teleport the opening outside.
+          return
+        }
         if (internalWall) {
           const metrics = getWallMetrics(internalWall)
           length = metrics.length || 1
