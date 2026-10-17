@@ -207,7 +207,7 @@ export function normalizeWallJunctions(walls = [], makeId = () => `wall-${Math.r
       }
       for (const opening of wall.openings || []) {
         const offset = Math.max(0, Math.min(1, Number(opening.offset ?? 0.5)))
-        if (offset < startT - 0.001 || offset > endT + 0.001) continue
+        if ((offset <= startT + 0.001 && startT > 0.001) || offset > endT + 0.001) continue
         segment.openings.push({ ...opening, offset: endT > startT ? Math.max(0, Math.min(1, (offset - startT) / (endT - startT))) : 0.5 })
       }
       return segment
@@ -216,9 +216,9 @@ export function normalizeWallJunctions(walls = [], makeId = () => `wall-${Math.r
   const unique = []
   for (const segment of split) {
     const duplicate = unique.find(existing =>
-      (sameJunction(existing, { x: segment.x1, y: segment.y1 }, tolerance) &&
+      (sameJunction({ x: existing.x1, y: existing.y1 }, { x: segment.x1, y: segment.y1 }, tolerance) &&
        sameJunction({ x: existing.x2, y: existing.y2 }, { x: segment.x2, y: segment.y2 }, tolerance)) ||
-      (sameJunction(existing, { x: segment.x2, y: segment.y2 }, tolerance) &&
+      (sameJunction({ x: existing.x1, y: existing.y1 }, { x: segment.x2, y: segment.y2 }, tolerance) &&
        sameJunction({ x: existing.x2, y: existing.y2 }, { x: segment.x1, y: segment.y1 }, tolerance))
     )
     if (!duplicate) {
