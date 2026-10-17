@@ -196,6 +196,7 @@ test('Room dimension layout keeps segment lanes close and overall totals outside
   assert.match(source, /const groupMaxHorizontalLevel = Math\.max/)
   assert.match(source, /const groupMaxVerticalLevel = Math\.max/)
   assert.match(source, /const groupFullHeightEdge = groupTotalBounds && groupDimensionLayouts/) 
+  assert.match(source, /Math\.abs\(item\.edge\.x2 - item\.edge\.x1\) < 1 && Math\.abs\(item\.edge\.length - groupTotalBounds\.height\) <= 5/) 
   assert.match(source, /groupVerticalMeasuredHeight/ )
   assert.match(source, /showVerticalTotal && <>/)
   assert.match(source, /opacity=\{active \? 1 : 0\.58\}/)
