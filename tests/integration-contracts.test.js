@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { snapRoomPoint } from '../src/utils/roomSnapping.js'
+import { projectPointToSegment, snapRoomPoint } from '../src/utils/roomSnapping.js'
 import { mergeAdjacentRoomPolygons } from '../src/utils/roomMerge.js'
 
 const readSource = path => readFile(new URL(path, import.meta.url), 'utf8')
@@ -217,6 +217,16 @@ test('Room drawing snaps positionally to existing vertices with alignment guides
   assert.match(source, /roomSnapGuides\.map/)
   assert.match(source, /strokeDasharray="5 4"/)
   assert.match(source, /9 \* viewBox\.width/)
+})
+
+test('Wall endpoints can snap to the middle of existing Room edges and Walls', () => {
+  const projection = projectPointToSegment(
+    { x: 50, y: 4 },
+    { x1: 0, y1: 0, x2: 100, y2: 0 },
+  )
+  assert.deepEqual(projection.point, { x: 50, y: 0 })
+  assert.equal(projection.t, 0.5)
+  assert.equal(projection.distance, 4)
 })
 
 test('Room snapping combines X and Y from different vertices and keeps single-axis snapping', () => {
@@ -600,6 +610,15 @@ test('Room connections persist independently of selection and Rooms remain dragg
 test('existing Rooms remain draggable while Room drawing tool is active', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /if \(item\.locked \|\| \(tool === 'room' && type !== 'room'\) \|\| \(tool === 'wall' && type !== 'wall'\)\) return/)
+})
+
+test('Wall drawing snaps to Room and Wall segments and inserts Room boundary junctions', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /projectPointToSegment\(point, segment\)/)
+  assert.match(source, /sourceType: 'room'/)
+  assert.match(source, /sourceType: 'wall'/)
+  assert.match(source, /When a Wall meets the middle of a Room edge, insert that junction/)
+  assert.match(source, /points\.splice\(edgeIndex \+ 1, 0, \{ x: Math\.round\(projection\.point\.x\), y: Math\.round\(projection\.point\.y\) \}\)/)
 })
 
 test('Room tool switches to move mode when dragging an existing Room and inspector can disconnect it', async () => {
