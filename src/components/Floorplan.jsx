@@ -2562,35 +2562,6 @@ export default function Floorplan({
           </button>
         </div>
         <span className="floorplan-tool-divider" />
-        {reusableRoomMode && (
-          <div className="floorplan-tool-group" role="group" aria-label="Room reusable">
-            <label className="floorplan-structure-label" htmlFor="reuse-room-select">Pakai Room</label>
-            <select
-              id="reuse-room-select"
-              className="floorplan-field"
-              value=""
-              onChange={event => {
-                const roomId = event.target.value
-                if (!roomId || !scene || (scene.roomIds || []).includes(roomId)) return
-                onChange?.(previous => previous.map(item => item.id === scene.id
-                  ? { ...item, roomIds: [...(item.roomIds || []), roomId] }
-                  : item))
-              }}
-              aria-label="Pakai Room yang sudah ada"
-            >
-              <option value="">Pakai Room yang sudah ada…</option>
-              {projectRooms.map(room => {
-                const alreadyUsed = (scene?.roomIds || []).includes(room.id)
-                const usedByOtherScenes = scenes.filter(item => (item.roomIds || []).includes(room.id) && item.id !== scene?.id).length
-                return (
-                  <option key={room.id} value={room.id} disabled={alreadyUsed}>
-                    {(room.label || 'Room tanpa nama')}{alreadyUsed ? ' — sudah dipakai di scene ini' : usedByOtherScenes ? ' — digunakan scene lain' : ''}
-                  </option>
-                )
-              })}
-            </select>
-          </div>
-        )}
         <div className="floorplan-structure-group" role="group" aria-label="Struktur">
           <span className="floorplan-structure-label">Struktur</span>
           <button type="button" className={'floorplan-tool-button' + (showRoomDimensions ? ' active' : '')} onClick={() => setShowRoomDimensions(value => !value)} title={showRoomDimensions ? 'Sembunyikan dimensi Room' : 'Tampilkan dimensi Room'} aria-pressed={showRoomDimensions}><Ruler size={18} /><span>Dimensi</span></button>
