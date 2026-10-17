@@ -37,3 +37,21 @@ export function snapRoomPoint(point, origin, anchors, tolerance) {
 
   return { point: { x: snappedX, y: snappedY }, guides }
 }
+
+
+/**
+ * Project a point onto a finite segment. Used by wall drawing so new walls can
+ * attach to the middle of an existing Room edge or Wall, not only its corners.
+ */
+export function projectPointToSegment(point, segment) {
+  const dx = segment.x2 - segment.x1
+  const dy = segment.y2 - segment.y1
+  const lengthSquared = dx * dx + dy * dy
+  if (!Number.isFinite(lengthSquared) || lengthSquared < 1e-8) {
+    const projected = { x: segment.x1, y: segment.y1 }
+    return { point: projected, t: 0, distance: Math.hypot(point.x - projected.x, point.y - projected.y) }
+  }
+  const t = Math.max(0, Math.min(1, ((point.x - segment.x1) * dx + (point.y - segment.y1) * dy) / lengthSquared))
+  const projected = { x: segment.x1 + dx * t, y: segment.y1 + dy * t }
+  return { point: projected, t, distance: Math.hypot(point.x - projected.x, point.y - projected.y) }
+}
