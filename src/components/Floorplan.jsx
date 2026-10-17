@@ -2562,7 +2562,7 @@ export default function Floorplan({
                       // If a full-height outer wall differs from group bounds only by a tiny alignment sliver,
                       // use the wall's actual span for the total dimension instead of reporting the sliver.
                       const groupFullHeightEdge = groupTotalBounds && groupDimensionLayouts
-                        .filter(item => !item.horizontal && Math.abs(item.edge.length - groupTotalBounds.height) <= 5)
+                        .filter(item => Math.abs(item.edge.x2 - item.edge.x1) < 1 && Math.abs(item.edge.length - groupTotalBounds.height) <= 5)
                         .sort((a, b) => b.edge.length - a.edge.length)[0]?.edge
                       const groupVerticalStartY = groupFullHeightEdge ? Math.min(groupFullHeightEdge.y1, groupFullHeightEdge.y2) : groupTotalBounds?.y
                       const groupVerticalEndY = groupFullHeightEdge ? Math.max(groupFullHeightEdge.y1, groupFullHeightEdge.y2) : (groupTotalBounds ? groupTotalBounds.y + groupTotalBounds.height : 0)
