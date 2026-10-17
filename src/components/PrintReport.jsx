@@ -406,7 +406,6 @@ function PrintFloorplan({ scene, layout }) {
                   strokeLinecap="square"
                 />
               ))}
-              <text x={(wall.x1 + wall.x2) / 2} y={(wall.y1 + wall.y2) / 2 - 9} fontSize="12" fill="#374151" textAnchor="middle">WALL · {meters(metric.length)} × {meters(wall.thickness || 6)}</text>
               {openings.map(opening => {
                 const width = Math.min(Number(opening.width) || 48, metric.length)
                 const center = Math.max(0, Math.min(1, Number(opening.offset) || 0.5)) * metric.length
