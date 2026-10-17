@@ -146,7 +146,9 @@ const getRoomDimensionGeometry = (room, edge) => {
 // Geometry and measured values remain unchanged; only visual placement is adjusted.
 const getRoomDimensionLayouts = (room, edges) => {
   const bounds = getRoomBounds(room)
-  const prepared = edges.map(edge => {
+  // Ignore sub-5-unit sliver edges in dimensions (under 5 cm at 100 units/m).
+  // Keep the actual room polygon/wall intact; this only prevents alignment residue labels.
+  const prepared = edges.filter(edge => edge.length >= 5).map(edge => {
     const dimension = getRoomDimensionGeometry(room, edge)
     const horizontal = Math.abs(edge.x2 - edge.x1) >= Math.abs(edge.y2 - edge.y1)
     const midpoint = { x: (edge.x1 + edge.x2) / 2, y: (edge.y1 + edge.y2) / 2 }
