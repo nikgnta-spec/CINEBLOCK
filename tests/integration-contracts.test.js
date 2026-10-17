@@ -9,7 +9,7 @@ const readSource = path => readFile(new URL(path, import.meta.url), 'utf8')
 test('Room merge supports partial shared walls without requiring equal wall lengths', () => {
   const rectangularRoom = {
     id: 'rect',
-    points: [{ x: 0, y: 0 }, { x: 983, y: 0 }, { x: 983, y: 666 }, { x: 0, y: 666 }],
+    points: [{ x: 0, y: 0 }, { x: 983, y: 0 }, { x: 983, y: 800 }, { x: 0, y: 800 }],
     openings: [],
   }
   const lShapedRoom = {
@@ -23,8 +23,9 @@ test('Room merge supports partial shared walls without requiring equal wall leng
   })
 
   assert.ok(merged, 'partial shared boundary should merge even when the complete wall lengths differ')
-  assert.equal(merged.points.length, 8)
+  assert.equal(merged.points.length, 9)
   assert.ok(merged.points.some(point => point.x === 983 && point.y === 666))
+  assert.ok(merged.points.some(point => point.x === 983 && point.y === 800))
   assert.ok(merged.points.some(point => point.x === 983 && point.y === 0))
 })
 
