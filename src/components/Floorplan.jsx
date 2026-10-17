@@ -2594,7 +2594,7 @@ export default function Floorplan({
                             <line x1={groupVerticalTotalX - 6} y1={groupVerticalEndY} x2={groupVerticalTotalX + 6} y2={groupVerticalEndY} />
                           </g>
                           <text x={groupTotalBounds.x + groupTotalBounds.width / 2} y={groupHorizontalTotalY - 8} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{(groupTotalBounds.width / 100).toFixed(2) + ' m total gabungan'}</text>
-                          <text x={groupVerticalTotalX + 12} y={groupTotalBounds.y + groupTotalBounds.height / 2} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke" transform={'rotate(90 ' + (groupVerticalTotalX + 12) + ' ' + (groupVerticalStartY + groupVerticalMeasuredHeight / 2) + ')'}>{(groupVerticalMeasuredHeight / 100).toFixed(2) + ' m total gabungan'}</text>
+                          <text x={groupVerticalTotalX + 12} y={groupVerticalStartY + groupVerticalMeasuredHeight / 2} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke" transform={'rotate(90 ' + (groupVerticalTotalX + 12) + ' ' + (groupVerticalStartY + groupVerticalMeasuredHeight / 2) + ')'}>{(groupVerticalMeasuredHeight / 100).toFixed(2) + ' m total gabungan'}</text>
                         </>}
                         {showVerticalTotal && <>
                           <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
