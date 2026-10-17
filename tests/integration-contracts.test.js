@@ -618,6 +618,8 @@ test('Wall drawing snaps to Room and Wall segments and inserts Room boundary jun
   assert.match(source, /sourceType: 'room'/)
   assert.match(source, /sourceType: 'wall'/)
   assert.match(source, /When a Wall meets the middle of a Room edge, insert that junction/)
+  assert.match(source, /Split existing Wall segments at new junctions as well/)
+  assert.match(source, /openingProjection\.t <= splitAt/)
   assert.match(source, /points\.splice\(edgeIndex \+ 1, 0, \{ x: Math\.round\(projection\.point\.x\), y: Math\.round\(projection\.point\.y\) \}\)/)
 })
 
