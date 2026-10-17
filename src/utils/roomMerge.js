@@ -189,14 +189,47 @@ export function mergeAdjacentRoomPolygons(movingRoom, targetRoom, candidate, onF
   const mergedPoints = tracePolygon(rawEdges)
   if (!mergedPoints) return fail('Batas luar gabungan tidak membentuk poligon tertutup. Coba sejajarkan sisi dinding yang bertemu.')
 
-  const remapOpenings = (room, originalPoints, sharedEdgeIndex, shiftBy = { x: 0, y: 0 }) => (room.openings || []).filter(opening => !isOpeningOnSharedSegment(opening, originalPoints, sharedEdgeIndex)).map(opening => {
+  const sharedStart = addScaled(movingEdge.a, overlap.av, sharedRange.low)
+  const sharedEnd = addScaled(movingEdge.a, overlap.av, sharedRange.high)
+  const targetInternalWalls = Array.isArray(targetRoom.internalWalls) ? targetRoom.internalWalls : []
+  const movingInternalWalls = Array.isArray(movingRoom.internalWalls) ? movingRoom.internalWalls : []
+  const sharedInternalWallIndex = targetInternalWalls.length + movingInternalWalls.length
+  const sharedLengthSquared = dot(subtract(sharedEnd, sharedStart), subtract(sharedEnd, sharedStart)) || 1
+  const remapOpenings = (room, originalPoints, sharedEdgeIndex, shiftBy = { x: 0, y: 0 }) => (room.openings || []).map(opening => {
+    // Existing openings on an internal wall stay attached to that wall. When
+    // the moving Room is merged, shift its internal-wall indices after the
+    // target Room's existing internal walls.
+    if (opening.wallType === 'internal' && Number.isInteger(opening.internalWallIndex)) {
+      return {
+        ...opening,
+        internalWallIndex: opening.internalWallIndex + (room.id === movingRoom.id ? targetInternalWalls.length : 0),
+      }
+    }
     const oldIndex = Number(opening.edgeIndex)
+    if (Number.isInteger(oldIndex) && oldIndex === sharedEdgeIndex && isOpeningOnSharedSegment(opening, originalPoints, sharedEdgeIndex)) {
+      const originalEdge = edgesOf({ points: originalPoints })[oldIndex]
+      if (originalEdge) {
+        const offset = Math.max(0, Math.min(1, Number(opening.offset ?? 0.5)))
+        const center = addScaled(originalEdge.a, subtract(originalEdge.b, originalEdge.a), offset)
+        center.x += shiftBy.x
+        center.y += shiftBy.y
+        const sharedOffset = dot(subtract(center, sharedStart), subtract(sharedEnd, sharedStart)) / sharedLengthSquared
+        return {
+          ...opening,
+          wallType: 'internal',
+          internalWallIndex: sharedInternalWallIndex,
+          edgeIndex: null,
+          offset: Math.max(0, Math.min(1, sharedOffset)),
+        }
+      }
+    }
     if (!Number.isInteger(oldIndex) || oldIndex < 0 || oldIndex >= originalPoints.length) return { ...opening }
     const originalEdge = edgesOf({ points: originalPoints })[oldIndex]
     if (!originalEdge) return { ...opening }
     const offset = Math.max(0, Math.min(1, Number(opening.offset ?? 0.5)))
     const center = addScaled(originalEdge.a, subtract(originalEdge.b, originalEdge.a), offset)
-    center.x += shiftBy.x; center.y += shiftBy.y
+    center.x += shiftBy.x
+    center.y += shiftBy.y
     let nearest = null
     for (const edge of edgesOf({ points: mergedPoints })) {
       const projection = projectPoint(center, edge)
@@ -204,16 +237,14 @@ export function mergeAdjacentRoomPolygons(movingRoom, targetRoom, candidate, onF
       if (projection.t >= -0.001 && projection.t <= 1.001 && (!nearest || d < nearest.distance)) nearest = { edgeIndex: edge.index, offset: Math.max(0, Math.min(1, projection.t)), distance: d }
     }
     if (!nearest || nearest.distance > 3) return { ...opening, edgeIndex: -1, needsReposition: true }
-    return { ...opening, edgeIndex: nearest.edgeIndex, offset: nearest.offset }
+    return { ...opening, wallType: 'perimeter', internalWallIndex: null, edgeIndex: nearest.edgeIndex, offset: nearest.offset }
   })
   const targetOpenings = remapOpenings(targetRoom, targetPoints, ti, shift)
   const movingOpenings = remapOpenings(movingRoom, movingPoints, mi)
   if ([...targetOpenings, ...movingOpenings].some(opening => opening.needsReposition)) return fail('Posisi pintu atau jendela tidak dapat dipetakan ke dinding gabungan. Pindahkan bukaan dari sisi sambungan lalu coba lagi.')
-  const sharedStart = addScaled(movingEdge.a, overlap.av, sharedRange.low)
-  const sharedEnd = addScaled(movingEdge.a, overlap.av, sharedRange.high)
   const internalWalls = [
-    ...(Array.isArray(targetRoom.internalWalls) ? targetRoom.internalWalls : []),
-    ...(Array.isArray(movingRoom.internalWalls) ? movingRoom.internalWalls : []),
+    ...targetInternalWalls,
+    ...movingInternalWalls,
     { x1: sharedStart.x, y1: sharedStart.y, x2: sharedEnd.x, y2: sharedEnd.y },
   ]
   return { ...targetRoom, points: mergedPoints, openings: [...targetOpenings, ...movingOpenings], internalWalls }
