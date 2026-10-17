@@ -2245,7 +2245,42 @@ export default function Floorplan({
             }
             return changed ? { ...room, points } : room
           }),
-          walls: [...previous.walls, wall],
+          // Split existing Wall segments at new junctions as well. This gives
+          // the wall network shared vertices instead of a new Wall merely
+          // crossing/ending on the middle of another unsplit segment.
+          walls: [
+            ...(previous.walls || []).flatMap(existingWall => {
+              let segments = [{ ...existingWall, openings: [...(existingWall.openings || [])] }]
+              for (const endpoint of wallEndpoints) {
+                segments = segments.flatMap(segment => {
+                  const projection = projectPointToSegment(endpoint, segment)
+                  if (projection.distance >= 1.5 || projection.t <= 0.01 || projection.t >= 0.99) return [segment]
+                  const junction = { x: Math.round(projection.point.x), y: Math.round(projection.point.y) }
+                  const start = { x: segment.x1, y: segment.y1 }
+                  const end = { x: segment.x2, y: segment.y2 }
+                  const splitAt = projection.t
+                  const first = { ...segment, x2: junction.x, y2: junction.y, openings: [] }
+                  const second = { ...segment, id: makeId(), x1: junction.x, y1: junction.y, openings: [] }
+                  for (const opening of segment.openings || []) {
+                    const openingOffset = Math.max(0, Math.min(1, Number(opening.offset ?? 0.5)))
+                    const openingCenter = {
+                      x: start.x + (end.x - start.x) * openingOffset,
+                      y: start.y + (end.y - start.y) * openingOffset,
+                    }
+                    const openingProjection = projectPointToSegment(openingCenter, segment)
+                    if (openingProjection.t <= splitAt) {
+                      first.openings.push({ ...opening, offset: splitAt > 0 ? openingProjection.t / splitAt : 0 })
+                    } else {
+                      second.openings.push({ ...opening, offset: (openingProjection.t - splitAt) / (1 - splitAt) })
+                    }
+                  }
+                  return [first, second]
+                })
+              }
+              return segments
+            }),
+            wall,
+          ],
         }))
         applyEntitySelection([{ type: 'wall', id: wall.id }], { type: 'wall', id: wall.id })
         onSelectedShotIdChange?.('')
