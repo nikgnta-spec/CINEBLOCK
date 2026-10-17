@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { projectPointToSegment, snapRoomPoint } from '../src/utils/roomSnapping.js'
 import { mergeAdjacentRoomPolygons } from '../src/utils/roomMerge.js'
-import { connectWallGeometry, createRoomPolygon } from '../src/utils/floorplanGeometry.js'
+import { connectWallGeometry, createRoomPolygon, updateRoomPolygonGeometry, updateWallEndpointGeometry } from '../src/utils/floorplanGeometry.js'
 
 const readSource = path => readFile(new URL(path, import.meta.url), 'utf8')
 
@@ -703,4 +703,34 @@ test('Room and Wall modes share the same polygon and junction geometry kernel', 
 test('shared Room geometry rejects degenerate rectangles', () => {
   assert.equal(createRoomPolygon({ x: 0, y: 0 }, { x: 10, y: 300 }, 'bad', 'Bad'), null)
   assert.equal(createRoomPolygon({ x: 0, y: 0 }, { x: 300, y: 10 }, 'bad', 'Bad'), null)
+})
+
+
+test('moving a Room vertex keeps attached Wall endpoints connected and preserves openings', () => {
+  const room = { id: 'room', points: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }] }
+  const wall = { id: 'wall', x1: 100, y1: 0, x2: 160, y2: 0, openings: [{ id: 'window', offset: 0.25 }] }
+  const nextPoints = room.points.map((point, index) => index === 1 ? { x: 120, y: 10 } : point)
+  const result = updateRoomPolygonGeometry([room], [wall], 'room', nextPoints)
+  assert.deepEqual(result.rooms[0].points[1], { x: 120, y: 10 })
+  assert.deepEqual({ x: result.walls[0].x1, y: result.walls[0].y1 }, { x: 120, y: 10 })
+  assert.deepEqual(result.walls[0].openings, wall.openings)
+})
+
+test('moving a Wall endpoint moves attached Room vertices and connected Wall endpoints', () => {
+  const room = { id: 'room', points: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }] }
+  const first = { id: 'first', x1: 100, y1: 0, x2: 160, y2: 0, openings: [{ id: 'door', offset: 0.4 }] }
+  const second = { id: 'second', x1: 100, y1: 0, x2: 100, y2: -50, openings: [] }
+  const result = updateWallEndpointGeometry([room], [first, second], 'first', 'start', { x: 115, y: 8 })
+  assert.deepEqual(result.rooms[0].points[1], { x: 115, y: 8 })
+  assert.deepEqual({ x: result.walls[0].x1, y: result.walls[0].y1 }, { x: 115, y: 8 })
+  assert.deepEqual({ x: result.walls[1].x1, y: result.walls[1].y1 }, { x: 115, y: 8 })
+  assert.deepEqual(result.walls[0].openings, first.openings)
+  assert.deepEqual(result.walls.map(wall => wall.id), ['first', 'second'])
+})
+
+test('Floorplan Room edge and vertex edits use the shared junction geometry helpers', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /updateRoomPolygonGeometry\(previous\.rooms \|\| \[\], previous\.walls \|\| \[\], drag\.id, points\)/)
+  assert.match(source, /updateRoomPolygonGeometry\(previous\.rooms \|\| \[\], previous\.walls \|\| \[\], drag\.id, nextPoints\)/)
+  assert.match(source, /updateWallEndpointGeometry\(/)
 })
