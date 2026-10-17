@@ -16,14 +16,14 @@ test('merges two adjacent rectangular Rooms into one polygon and recalculates bo
   assert.equal(Math.max(...ys) - Math.min(...ys), 100)
 })
 
-test('removes openings on the shared internal seam while preserving exterior openings', () => {
+test('moves openings on the shared seam to the internal wall while preserving exterior openings', () => {
   const moving = { id: 'moving', points: [{ x: 100, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 100 }, { x: 100, y: 100 }], openings: [{ id: 'internal-door', edgeIndex: 3, offset: 0.5 }, { id: 'outer-window', edgeIndex: 1, offset: 0.5 }] }
   const target = { id: 'target', points: [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }], openings: [{ id: 'target-window', edgeIndex: 0, offset: 0.5 }] }
   const candidate = findRoomMergeCandidate(moving, [target], 18)
   assert.ok(candidate)
   const merged = mergeAdjacentRoomPolygons(moving, target, candidate)
   assert.ok(merged)
-  assert.ok(!merged.openings.some(opening => opening.id === 'internal-door'), 'opening on the removed internal seam should be removed')
+  assert.ok(merged.openings.some(opening => opening.id === 'internal-door' && opening.wallType === 'internal' && opening.internalWallIndex === 0), 'opening on the shared seam should stay attached to the preserved internal wall')
   assert.ok(merged.openings.some(opening => opening.id === 'outer-window'), 'opening on the exterior wall should be preserved')
   assert.ok(merged.openings.some(opening => opening.id === 'target-window'), 'target exterior opening should be preserved')
 })
