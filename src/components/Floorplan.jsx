@@ -1723,20 +1723,34 @@ export default function Floorplan({
         length = metrics.length || 1
         offset = ((point.x - host.x1) * metrics.ux + (point.y - host.y1) * metrics.uy) / length
       } else {
-        const edges = getRoomEdges(host)
-        const projectedEdges = edges.map(edge => {
-          const projection = getWallMetrics({ x1: edge.x1, y1: edge.y1, x2: edge.x2, y2: edge.y2 })
-          const edgeLength = projection.length || 1
-          const rawOffset = ((point.x - edge.x1) * projection.ux + (point.y - edge.y1) * projection.uy) / edgeLength
-          const clampedOffset = clamp(rawOffset, 0, 1)
-          const projectedX = edge.x1 + projection.ux * edgeLength * clampedOffset
-          const projectedY = edge.y1 + projection.uy * edgeLength * clampedOffset
-          return { ...edge, length: edgeLength, offset: rawOffset, distance: Math.hypot(point.x - projectedX, point.y - projectedY) }
-        })
-        const nearestEdge = projectedEdges.reduce((best, edge) => edge.distance < best.distance ? edge : best)
-        length = nearestEdge.length
-        offset = nearestEdge.offset
-        patch.edgeIndex = nearestEdge.edgeIndex
+        const internalWall = opening.wallType === 'internal' && Number.isInteger(opening.internalWallIndex)
+          ? (host.internalWalls || [])[opening.internalWallIndex]
+          : null
+        if (internalWall) {
+          const metrics = getWallMetrics(internalWall)
+          length = metrics.length || 1
+          offset = ((point.x - internalWall.x1) * metrics.ux + (point.y - internalWall.y1) * metrics.uy) / length
+          patch.wallType = 'internal'
+          patch.internalWallIndex = opening.internalWallIndex
+          patch.edgeIndex = null
+        } else {
+          const edges = getRoomEdges(host)
+          const projectedEdges = edges.map(edge => {
+            const projection = getWallMetrics({ x1: edge.x1, y1: edge.y1, x2: edge.x2, y2: edge.y2 })
+            const edgeLength = projection.length || 1
+            const rawOffset = ((point.x - edge.x1) * projection.ux + (point.y - edge.y1) * projection.uy) / edgeLength
+            const clampedOffset = clamp(rawOffset, 0, 1)
+            const projectedX = edge.x1 + projection.ux * edgeLength * clampedOffset
+            const projectedY = edge.y1 + projection.uy * edgeLength * clampedOffset
+            return { ...edge, length: edgeLength, offset: rawOffset, distance: Math.hypot(point.x - projectedX, point.y - projectedY) }
+          })
+          const nearestEdge = projectedEdges.reduce((best, edge) => edge.distance < best.distance ? edge : best)
+          length = nearestEdge.length
+          offset = nearestEdge.offset
+          patch.wallType = 'perimeter'
+          patch.internalWallIndex = null
+          patch.edgeIndex = nearestEdge.edgeIndex
+        }
       }
       const openingWidth = Math.min(Number(opening.width ?? 48), length)
       const minimumOffset = Math.min(0.49, openingWidth / (2 * length))
@@ -2577,18 +2591,43 @@ export default function Floorplan({
                     <polygon points={pointString} fill={active ? 'var(--bg-hover)' : 'var(--bg-subtle)'} stroke="none" />
                     {groupSelected && !active && <polygon points={pointString} fill="none" stroke="var(--accent)" strokeWidth="2" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
                     {edges.map(edge => {
-                      const edgeOpenings = openings.filter(opening => (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)) === edge.edgeIndex)
+                      const edgeOpenings = openings.filter(opening => opening.wallType !== 'internal' && !Number.isInteger(opening.internalWallIndex) && (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)) === edge.edgeIndex)
                       return getOpeningSegments(edge.length, edgeOpenings).map((segment, index) => {
                         const ux = (edge.x2 - edge.x1) / (edge.length || 1)
                         const uy = (edge.y2 - edge.y1) / (edge.length || 1)
                         return <line key={edge.edgeIndex + '-' + index} x1={edge.x1 + ux * segment.start} y1={edge.y1 + uy * segment.start} x2={edge.x1 + ux * segment.end} y2={edge.y1 + uy * segment.end} stroke={active ? 'var(--text)' : 'var(--border-strong)'} strokeWidth={active ? 3.5 : 2.5} vectorEffect="non-scaling-stroke" pointerEvents="none" />
                       })
                     })}
-                    {(room.internalWalls || []).map((wall, index) => (
-                      <line key={`internal-wall-${index}`} x1={wall.x1} y1={wall.y1} x2={wall.x2} y2={wall.y2}
-                        stroke={active ? 'var(--text)' : 'var(--border-strong)'} strokeWidth={active ? 3.5 : 2.5}
-                        vectorEffect="non-scaling-stroke" pointerEvents="none" />
-                    ))}
+                    {(room.internalWalls || []).map((wall, index) => {
+                      const metrics = getWallMetrics(wall)
+                      const wallOpenings = openings.filter(opening => opening.wallType === 'internal' && opening.internalWallIndex === index)
+                      return (
+                        <g key={`internal-wall-${index}`}>
+                          {getOpeningSegments(metrics.length, wallOpenings).map((segment, segmentIndex) => (
+                            <line key={segmentIndex}
+                              x1={wall.x1 + metrics.ux * segment.start} y1={wall.y1 + metrics.uy * segment.start}
+                              x2={wall.x1 + metrics.ux * segment.end} y2={wall.y1 + metrics.uy * segment.end}
+                              stroke={active ? 'var(--text)' : 'var(--border-strong)'} strokeWidth={active ? 3.5 : 2.5}
+                              vectorEffect="non-scaling-stroke" pointerEvents="none" />
+                          ))}
+                          {active && <line x1={wall.x1} y1={wall.y1} x2={wall.x2} y2={wall.y2}
+                            stroke="transparent" strokeWidth="14" vectorEffect="non-scaling-stroke" style={{ cursor: 'pointer' }}
+                            onPointerDown={event => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id })
+                              setSelected({ type: 'room', id: room.id })
+                              setSelectedRoomEdge({ roomId: room.id, internalWallIndex: index, edgeIndex: null })
+                              setTool('select')
+                            }}
+                            onClick={event => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              setSelectedRoomEdge({ roomId: room.id, internalWallIndex: index, edgeIndex: null })
+                            }} />}
+                        </g>
+                      )
+                    })}
                     <text x={bounds.x + 8} y={bounds.y - 18} fill="var(--text)" fontSize="18" fontWeight="600" pointerEvents="none" paintOrder="stroke" stroke="var(--bg)" strokeWidth="3">
                       {room.label || 'Room'}
                     </text>
