@@ -2546,6 +2546,12 @@ export default function Floorplan({
                       const groupMaxHorizontalLevel = Math.max(0, ...groupDimensionLayouts.filter(item => item.sideKey.startsWith('h-')).map(item => item.dimension.level))
                       const groupMaxVerticalLevel = Math.max(0, ...groupDimensionLayouts.filter(item => item.sideKey.startsWith('v-')).map(item => item.dimension.level))
                       const showIndividualTotals = !hasConnectedRooms
+                      // Suppress an overall total when one wall already represents that exact full span.
+                      // Keep totals for concave rooms when the bounding dimension spans multiple edges.
+                      const showHorizontalTotal = showIndividualTotals && !edges.some(edge =>
+                        Math.abs(edge.y2 - edge.y1) < 1 && Math.abs(Math.abs(edge.x2 - edge.x1) - totalBounds.width) < 1)
+                      const showVerticalTotal = showIndividualTotals && !edges.some(edge =>
+                        Math.abs(edge.x2 - edge.x1) < 1 && Math.abs(Math.abs(edge.y2 - edge.y1) - totalBounds.height) < 1)
                       const horizontalTotalY = totalBounds.y - 112 - maxHorizontalLevel * 30
                       const verticalTotalX = totalBounds.x + totalBounds.width + 112 + maxVerticalLevel * 30
                       const groupHorizontalTotalY = groupTotalBounds ? groupTotalBounds.y - 160 - groupMaxHorizontalLevel * 30 : 0
@@ -2560,7 +2566,7 @@ export default function Floorplan({
                             <text x={d.mx} y={d.my - 5} textAnchor="middle" fontSize="11" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{label}</text>
                           </g>
                         })}
-                        {showIndividualTotals && <>
+                        {showHorizontalTotal && <>
                           <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
                             <line x1={totalBounds.x} y1={horizontalTotalY} x2={totalBounds.x + totalBounds.width} y2={horizontalTotalY} />
                             <line x1={totalBounds.x} y1={horizontalTotalY - 6} x2={totalBounds.x} y2={horizontalTotalY + 6} />
@@ -2580,7 +2586,7 @@ export default function Floorplan({
                           <text x={groupTotalBounds.x + groupTotalBounds.width / 2} y={groupHorizontalTotalY - 8} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{(groupTotalBounds.width / 100).toFixed(2) + ' m total gabungan'}</text>
                           <text x={groupVerticalTotalX + 12} y={groupTotalBounds.y + groupTotalBounds.height / 2} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke" transform={'rotate(90 ' + (groupVerticalTotalX + 12) + ' ' + (groupTotalBounds.y + groupTotalBounds.height / 2) + ')'}>{(groupTotalBounds.height / 100).toFixed(2) + ' m total gabungan'}</text>
                         </>}
-                        {showIndividualTotals && <>
+                        {showVerticalTotal && <>
                           <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
                             <line x1={verticalTotalX} y1={totalBounds.y} x2={verticalTotalX} y2={totalBounds.y + totalBounds.height} />
                             <line x1={verticalTotalX - 6} y1={totalBounds.y} x2={verticalTotalX + 6} y2={totalBounds.y} />
