@@ -565,7 +565,7 @@ test('confirming Room merge creates one draggable polygon and preserves the shar
   assert.match(handler, /\.concat\(\{[\s\S]*?\.\.\.target,[\s\S]*?points: merged\.points,[\s\S]*?openings: merged\.openings,[\s\S]*?internalWalls: merged\.internalWalls/)
   assert.match(handler, /connectedRoomIds: \[\]/)
   assert.match(merge, /internalWalls = \[/)
-  assert.match(source, /\{\(room\.internalWalls \|\| \[\]\)\.map/)
+  assert.match(source, /getRoomInternalWalls\(room\)\.map/)
   assert.match(source, /internalWalls: \(drag\.original\.internalWalls \|\| \[\]\)\.map/)
   assert.match(source, /onPointerDown=\{event => beginObjectDrag\('room', room, event\)\}/)
 })
