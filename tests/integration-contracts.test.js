@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { projectPointToSegment, snapRoomPoint } from '../src/utils/roomSnapping.js'
 import { mergeAdjacentRoomPolygons } from '../src/utils/roomMerge.js'
+import { connectWallGeometry, createRoomPolygon } from '../src/utils/floorplanGeometry.js'
 
 const readSource = path => readFile(new URL(path, import.meta.url), 'utf8')
 
@@ -675,4 +676,27 @@ test('Room total length and width stay visible without hover while edge dimensio
   assert.match(source, /showRoomDimensions && \(\(\) => \{/)
   assert.match(source, /const showIndividualTotals = !hasConnectedRooms/)
   assert.match(source, /\(active \|\| hoveredRoomEdge\?\.roomId === room\.id\) && visibleDimensionLayouts\.map/)
+})
+
+
+test('Room and Wall modes share the same polygon and junction geometry kernel', () => {
+  const room = createRoomPolygon({ x: 0, y: 0 }, { x: 400, y: 300 }, 'room-1', 'Room 1')
+  assert.deepEqual(room.points, [
+    { x: 0, y: 0 }, { x: 400, y: 0 }, { x: 400, y: 300 }, { x: 0, y: 300 },
+  ])
+
+  const existingWall = { id: 'wall-1', x1: 200, y1: 0, x2: 200, y2: 300, thickness: 6, openings: [] }
+  const newWall = { id: 'wall-2', x1: 200, y1: 150, x2: 400, y2: 150, thickness: 6, openings: [] }
+  const connected = connectWallGeometry([room], [existingWall], newWall, () => 'wall-split')
+
+  assert.ok(connected.rooms[0].points.some(point => point.x === 200 && point.y === 150),
+    'Room perimeter geometry records the wall junction as a vertex')
+  assert.equal(connected.walls.length, 3, 'existing wall is split at the junction and the new wall is added')
+  assert.ok(connected.walls.some(wall => wall.x2 === 200 && wall.y2 === 150))
+  assert.ok(connected.walls.some(wall => wall.x1 === 200 && wall.y1 === 150))
+})
+
+test('shared Room geometry rejects degenerate rectangles', () => {
+  assert.equal(createRoomPolygon({ x: 0, y: 0 }, { x: 10, y: 300 }, 'bad', 'Bad'), null)
+  assert.equal(createRoomPolygon({ x: 0, y: 0 }, { x: 300, y: 10 }, 'bad', 'Bad'), null)
 })
