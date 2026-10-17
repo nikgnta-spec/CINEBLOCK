@@ -142,13 +142,12 @@ test('local backup project records include reusable rooms and Scene references',
   assert.match(source, /migrateReusableRooms\(targetScenes, target\.floorplans, target\.rooms\)/)
 })
 
-test('Room picker keeps every project Room visible across Scenes and marks current Scene usage', async () => {
+test('Room picker is removed so Rooms cannot be reused across Scenes', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
 
-  assert.match(source, /projectRooms\.map\(room =>/)
-  assert.match(source, /disabled=\{alreadyUsed\}/)
-  assert.match(source, /sudah dipakai di scene ini/)
-  assert.match(source, /digunakan scene lain/)
+  assert.doesNotMatch(source, /Pakai Room yang sudah ada/)
+  assert.doesNotMatch(source, /projectRooms\.map\(room =>/)
+  assert.match(source, /roomIsolationVersion: 1/)
 })
 
 test('Locked objects remain selectable but cannot move or resize', async () => {
