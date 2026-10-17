@@ -734,3 +734,11 @@ test('Floorplan Room edge and vertex edits use the shared junction geometry help
   assert.match(source, /updateRoomPolygonGeometry\(previous\.rooms \|\| \[\], previous\.walls \|\| \[\], drag\.id, nextPoints\)/)
   assert.match(source, /updateWallEndpointGeometry\(/)
 })
+
+
+test('moving a Room rigidly keeps attached Walls welded to its perimeter', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /if \(drag\.type === 'room'\) \{\s*const movedPoints = getRoomPoints\(drag\.original\)/)
+  assert.match(source, /updateRoomPolygonGeometry\(previous\.rooms \|\| \[\], previous\.walls \|\| \[\], drag\.id, movedPoints\)/)
+  assert.match(source, /internalWalls: \(drag\.original\.internalWalls \|\| \[\]\)\.map/)
+})
