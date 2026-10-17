@@ -218,6 +218,48 @@ const pointInPolygon = (point, points) => {
   }
   return inside
 }
+// Legacy merged Rooms may predate the internalWalls field. Recover a missing
+// shared seam from an orthogonal concave corner so existing local projects keep
+// showing their internal wall after updating the app.
+const getRoomInternalWalls = room => {
+  const stored = Array.isArray(room?.internalWalls) ? room.internalWalls.filter(wall =>
+    [wall.x1, wall.y1, wall.x2, wall.y2].every(value => Number.isFinite(Number(value)))
+      && Math.hypot(Number(wall.x2) - Number(wall.x1), Number(wall.y2) - Number(wall.y1)) > 1
+  ) : []
+  if (stored.length) return stored
+  const points = getRoomPoints(room)
+  if (points.length < 4) return []
+  const area = points.reduce((sum, point, index) => {
+    const next = points[(index + 1) % points.length]
+    return sum + point.x * next.y - next.x * point.y
+  }, 0)
+  const winding = area >= 0 ? 1 : -1
+  const reflex = []
+  points.forEach((point, index) => {
+    const previous = points[(index - 1 + points.length) % points.length]
+    const next = points[(index + 1) % points.length]
+    const cross = (point.x - previous.x) * (next.y - point.y) - (point.y - previous.y) * (next.x - point.x)
+    if (cross * winding < -1) reflex.push(index)
+  })
+  const walls = []
+  const used = new Set()
+  for (const reflexIndex of reflex) {
+    const corner = points[reflexIndex]
+    const candidates = points.map((point, index) => {
+      if (index === reflexIndex || (index + 1) % points.length === reflexIndex || (index - 1 + points.length) % points.length === reflexIndex || used.has(index)) return null
+      const dx = Math.abs(point.x - corner.x), dy = Math.abs(point.y - corner.y)
+      if (Math.min(dx, dy) > 1 || Math.max(dx, dy) < 2) return null
+      const midpoint = { x: (point.x + corner.x) / 2, y: (point.y + corner.y) / 2 }
+      if (!pointInPolygon(midpoint, points)) return null
+      return { index, point, length: Math.hypot(dx, dy) }
+    }).filter(Boolean).sort((a, b) => a.length - b.length)
+    const candidate = candidates[0]
+    if (!candidate) continue
+    walls.push({ x1: corner.x, y1: corner.y, x2: candidate.point.x, y2: candidate.point.y, legacyInferred: true })
+    used.add(candidate.index)
+  }
+  return walls
+}
 const openingLabel = opening => opening.type === 'window' ? 'Jendela' : opening.type === 'doorway' ? (opening.label || 'Pintu Tanpa Daun') : 'Pintu'
 
 const DoorSwingSymbol = ({ opening, width }) => {
@@ -262,7 +304,7 @@ const getOpeningSegments = (length, openings = []) => {
 const getRoomOpeningPlacement = (room, opening) => {
   const offset = clamp(opening.offset, 0.05, 0.95)
   if (opening.wallType === 'internal' && Number.isInteger(opening.internalWallIndex)) {
-    const wall = (room.internalWalls || [])[opening.internalWallIndex]
+    const wall = getRoomInternalWalls(room)[opening.internalWallIndex]
     if (wall) {
       const metrics = getWallMetrics(wall)
       return {
@@ -1436,7 +1478,7 @@ export default function Floorplan({
       const next = { ...opening, ...patch }
       const length = selectedType === 'room'
         ? (next.wallType === 'internal' && Number.isInteger(next.internalWallIndex)
-          ? getWallMetrics((selectedEntity.internalWalls || [])[next.internalWallIndex] || {}).length
+          ? getWallMetrics(getRoomInternalWalls(selectedEntity)[next.internalWallIndex] || {}).length
           : getRoomEdges(selectedEntity)[Math.max(0, Math.min(getRoomEdges(selectedEntity).length - 1, Number(next.edgeIndex) || 0))]?.length) || 1
         : getWallMetrics(selectedEntity).length
       const openingWidth = Math.min(Math.max(1, Number(next.width) || 1), Math.max(1, length))
@@ -2598,7 +2640,7 @@ export default function Floorplan({
                         return <line key={edge.edgeIndex + '-' + index} x1={edge.x1 + ux * segment.start} y1={edge.y1 + uy * segment.start} x2={edge.x1 + ux * segment.end} y2={edge.y1 + uy * segment.end} stroke={active ? 'var(--text)' : 'var(--border-strong)'} strokeWidth={active ? 3.5 : 2.5} vectorEffect="non-scaling-stroke" pointerEvents="none" />
                       })
                     })}
-                    {(room.internalWalls || []).map((wall, index) => {
+                    {getRoomInternalWalls(room).map((wall, index) => {
                       const metrics = getWallMetrics(wall)
                       const wallOpenings = openings.filter(opening => opening.wallType === 'internal' && opening.internalWallIndex === index)
                       return (
@@ -3519,7 +3561,7 @@ export default function Floorplan({
                                 : { wallType: 'perimeter', internalWallIndex: null, edgeIndex: index })
                             }}>
                               {getRoomEdges(selectedEntity).map(edge => <option key={'edge-' + edge.edgeIndex} value={'edge:' + edge.edgeIndex}>Dinding luar {edge.edgeIndex + 1}</option>)}
-                              {(selectedEntity.internalWalls || []).map((wall, index) => <option key={'internal-' + index} value={'internal:' + index}>Dinding sambungan {index + 1}</option>)}
+                              {getRoomInternalWalls(selectedEntity).map((wall, index) => <option key={'internal-' + index} value={'internal:' + index}>Dinding sambungan {index + 1}</option>)}
                             </select>
                           </div>
                           <div className="floorplan-dimension-input">
