@@ -205,7 +205,7 @@ test('Wall drawing captures pointer events on existing Rooms and snaps endpoints
 test('Room drawing snaps positionally to existing vertices with alignment guides and Alt bypass', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   const snapping = await readSource('../src/utils/roomSnapping.js')
-  assert.match(source, /import \{ snapRoomPoint \} from '\.\.\/utils\/roomSnapping'/)
+  assert.match(source, /import \\{[^}]*snapRoomPoint[^}]*\\} from '\\.\\.\\/utils\\/roomSnapping'/)
   assert.match(source, /\.\.\.layout\.rooms\.flatMap\(room => getRoomPoints\(room\)\)/)
   assert.match(snapping, /const xAnchor = nearestOnAxis\(point\.x, 'x'\)/)
   assert.match(snapping, /const yAnchor = nearestOnAxis\(point\.y, 'y'\)/)
