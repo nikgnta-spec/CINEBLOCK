@@ -3,7 +3,7 @@ import {
   MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Undo2, Redo2, Lock, Unlock, Ruler,
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
-import { snapRoomPoint } from '../utils/roomSnapping'
+import { projectPointToSegment, snapRoomPoint } from '../utils/roomSnapping'
 import { findRoomMergeCandidate, mergeAdjacentRoomPolygons, snapRoomToEdge } from '../utils/roomMerge'
 import {
   SIZES as SHOT_SIZES,
@@ -1612,10 +1612,27 @@ export default function Floorplan({
   const snapPointToRoomAndWallGeometry = (point, origin = null) => {
     const anchors = getRoomAndWallSnapAnchors()
     const snapTolerance = 12 * viewBox.width / Math.max(1, svgRef.current?.getBoundingClientRect()?.width || canvasSize.width)
+    const segments = [
+      ...layout.rooms.flatMap(room => getRoomEdges(room).map(edge => ({ ...edge, sourceType: 'room', sourceId: room.id }))),
+      ...(layout.walls || []).map(wall => ({ ...wall, sourceType: 'wall', sourceId: wall.id })),
+    ]
+    const nearestSegment = segments
+      .map(segment => ({ ...projectPointToSegment(point, segment), segment }))
+      .filter(candidate => candidate.distance <= snapTolerance)
+      .sort((a, b) => a.distance - b.distance)[0]
+    // Snap to the actual line segment first. This allows a new wall to meet an
+    // existing Room boundary or Wall at any point, not just at a pre-existing
+    // vertex. Endpoints are still exact shared coordinates.
+    if (nearestSegment) {
+      const projected = nearestSegment.point
+      const guide = Math.abs(nearestSegment.segment.x2 - nearestSegment.segment.x1) >= Math.abs(nearestSegment.segment.y2 - nearestSegment.segment.y1)
+        ? [{ axis: 'horizontal', y: projected.y, x: projected.x }]
+        : [{ axis: 'vertical', x: projected.x, y: projected.y }]
+      return { point: { x: Math.round(projected.x), y: Math.round(projected.y) }, guides: guide, connection: { type: nearestSegment.segment.sourceType, id: nearestSegment.segment.sourceId, t: nearestSegment.t } }
+    }
     if (!anchors.length) return { point, guides: [] }
-    // For the first wall endpoint, use geometry anchors as candidates without
-    // privileging the raw cursor position. For later points, also snap to the
-    // wall's starting point just as Room drawing snaps to its previous vertex.
+    // Preserve axis alignment snapping for endpoints that are not close to a
+    // segment. Existing corners and wall endpoints remain first-class anchors.
     return origin
       ? snapRoomPoint(point, origin, anchors, snapTolerance)
       : snapRoomPoint(point, anchors[0], anchors.slice(1), snapTolerance)
@@ -2203,7 +2220,33 @@ export default function Floorplan({
           thickness: 6,
           openings: [],
         }
-        updateLayout(previous => ({ ...previous, walls: [...previous.walls, wall] }))
+        const wallEndpoints = [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]
+        updateLayout(previous => ({
+          ...previous,
+          // When a Wall meets the middle of a Room edge, insert that junction
+          // into the Room polygon too. This keeps the visible Room boundary and
+          // the new Wall sharing the same geometric vertex.
+          rooms: previous.rooms.map(room => {
+            let points = getRoomPoints(room).map(point => ({ ...point }))
+            let changed = false
+            for (const endpoint of wallEndpoints) {
+              if (points.some(point => Math.hypot(point.x - endpoint.x, point.y - endpoint.y) < 1.5)) continue
+              const edgeIndex = points.findIndex((start, index) => {
+                const end = points[(index + 1) % points.length]
+                const projection = projectPointToSegment(endpoint, { x1: start.x, y1: start.y, x2: end.x, y2: end.y })
+                return projection.distance < 1.5 && projection.t > 0.01 && projection.t < 0.99
+              })
+              if (edgeIndex < 0) continue
+              const start = points[edgeIndex]
+              const end = points[(edgeIndex + 1) % points.length]
+              const projection = projectPointToSegment(endpoint, { x1: start.x, y1: start.y, x2: end.x, y2: end.y })
+              points.splice(edgeIndex + 1, 0, { x: Math.round(projection.point.x), y: Math.round(projection.point.y) })
+              changed = true
+            }
+            return changed ? { ...room, points } : room
+          }),
+          walls: [...previous.walls, wall],
+        }))
         applyEntitySelection([{ type: 'wall', id: wall.id }], { type: 'wall', id: wall.id })
         onSelectedShotIdChange?.('')
         setTool('select')
