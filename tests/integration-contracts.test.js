@@ -39,6 +39,7 @@ test('Room merge supports partial shared walls without requiring equal wall leng
   assert.ok(merged.points.some(point => point.x === 983 && point.y === 666))
   assert.ok(merged.points.some(point => point.x === 983 && point.y === 800))
   assert.ok(merged.points.some(point => point.x === 983 && point.y === 0))
+  assert.ok(merged.internalWalls?.some(wall => wall.x1 === 983 && wall.x2 === 983 && Math.abs(Math.abs(wall.y2 - wall.y1) - 666) <= 1), 'the shared boundary is preserved as an internal wall')
 })
 
 test('App wires shared scene and floorplan state into both planning tabs', async () => {
@@ -46,6 +47,19 @@ test('App wires shared scene and floorplan state into both planning tabs', async
 
   assert.match(source, /<ShotList[\s\S]*?scenes=\{scenes\}[\s\S]*?onChange=\{setScenes\}[\s\S]*?floorplans=\{floorplans\}[\s\S]*?onFloorplansChange=\{setFloorplans\}/)
   assert.match(source, /<Floorplan[\s\S]*?scenes=\{scenes\}[\s\S]*?onChange=\{setScenes\}[\s\S]*?floorplans=\{floorplans\}[\s\S]*?onFloorplansChange=\{setFloorplans\}/)
+})
+
+test('Merged internal walls remain visible in Floorplan and PDF and support openings', async () => {
+  const floorplan = await readSource('../src/components/Floorplan.jsx')
+  const report = await readSource('../src/components/PrintReport.jsx')
+
+  assert.match(floorplan, /const wallOpenings = openings\.filter\(opening => opening\.wallType === 'internal' && opening\.internalWallIndex === index\)/)
+  assert.match(floorplan, /setSelectedRoomEdge\(\{ roomId: room\.id, internalWallIndex: index, edgeIndex: null \}\)/)
+  assert.match(floorplan, /wallType: 'internal', internalWallIndex: selectedRoomEdge\.internalWallIndex/)
+  assert.match(floorplan, /Dinding sambungan/)
+  assert.match(report, /\(room\.internalWalls \|\| \[\]\)\.map\(\(wall, wallIndex\)/)
+  assert.match(report, /opening\.wallType === 'internal' && opening\.internalWallIndex === wallIndex/)
+  assert.match(report, /opening\.wallType === 'internal' && Number\.isInteger\(opening\.internalWallIndex\)/)
 })
 
 test('PDF dimensions avoid duplicate bounding dimensions and shared-wall measurements for connected Rooms', async () => {
