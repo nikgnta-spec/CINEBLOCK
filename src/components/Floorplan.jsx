@@ -589,9 +589,11 @@ export default function Floorplan({
   const storedLayout = scene ? (floorplans?.[scene.id] || EMPTY_LAYOUT) : EMPTY_LAYOUT
   const reusableRoomMode = Array.isArray(projectRooms)
   const layout = scene
-    ? { ...storedLayout, rooms: reusableRoomMode
-      ? projectRooms.filter(room => (scene.roomIds || []).includes(room.id))
-      : (storedLayout.rooms || []) }
+    ? { ...storedLayout, rooms: storedLayout.roomIsolationVersion === 1
+      ? (storedLayout.rooms || [])
+      : reusableRoomMode
+        ? projectRooms.filter(room => (scene.roomIds || []).includes(room.id))
+        : (storedLayout.rooms || []) }
     : EMPTY_LAYOUT
   layoutRef.current = layout
   const allObjects = [
@@ -722,28 +724,13 @@ export default function Floorplan({
     const stored = floorplans?.[scene.id] || EMPTY_LAYOUT
     const currentLayout = { ...stored, rooms: layoutRef.current?.rooms || [] }
     const nextLayout = updater(currentLayout)
-    if (reusableRoomMode && JSON.stringify(nextLayout.rooms || []) !== JSON.stringify(currentLayout.rooms || [])) {
-      const beforeRooms = currentLayout.rooms || []
-      const afterRooms = nextLayout.rooms || []
-      const beforeIds = new Set(beforeRooms.map(room => room.id))
-      const afterIds = new Set(afterRooms.map(room => room.id))
-      const nextRoomIds = (scene.roomIds || []).filter(id => afterIds.has(id))
-      afterRooms.forEach(room => {
-        if (!beforeIds.has(room.id)) nextRoomIds.push(room.id)
-      })
-      onProjectRoomsChange?.(previousRooms => {
-        const roomMap = new Map((previousRooms || []).map(room => [room.id, room]))
-        afterRooms.forEach(room => roomMap.set(room.id, room))
-        return [...roomMap.values()]
-      })
-      onChange?.(previousScenes => previousScenes.map(item => item.id === scene.id
-        ? { ...item, roomIds: [...new Set(nextRoomIds)] }
-        : item))
-    }
-    const { rooms: ignoredRooms, ...persistedLayout } = nextLayout
+    // Persist a private Room collection for this Scene; never write edits back to
+    // the project-level reusable collection.
     onFloorplansChange(previous => ({
       ...previous,
-      [scene.id]: reusableRoomMode ? persistedLayout : nextLayout,
+      [scene.id]: reusableRoomMode
+        ? { ...nextLayout, roomIsolationVersion: 1 }
+        : nextLayout,
     }))
   }
 
