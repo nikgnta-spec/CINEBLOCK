@@ -2890,8 +2890,14 @@ export default function Floorplan({
                 const active = selected?.type === 'wall' && selected.id === wall.id
                 const groupSelected = selectedItems.some(entry => entry.type === 'wall' && entry.id === wall.id)
                 const wallAngle = metrics.angle
+                const dimensionOffset = Math.max(22, (Number(wall.thickness) || 6) + 16)
+                const dimensionX1 = wall.x1 - metrics.uy * dimensionOffset
+                const dimensionY1 = wall.y1 + metrics.ux * dimensionOffset
+                const dimensionX2 = wall.x2 - metrics.uy * dimensionOffset
+                const dimensionY2 = wall.y2 + metrics.ux * dimensionOffset
+                const showWallDimension = showRoomDimensions && (active || hoveredRoomEdge?.wallId === wall.id)
                 return (
-                  <g key={wall.id} data-floorplan-object="true" onPointerDown={event => beginObjectDrag('wall', wall, event)} onClick={event => event.stopPropagation()}>
+                  <g key={wall.id} data-floorplan-object="true" onPointerEnter={() => setHoveredRoomEdge({ wallId: wall.id })} onPointerLeave={() => setHoveredRoomEdge(current => current?.wallId === wall.id ? null : current)} onPointerDown={event => beginObjectDrag('wall', wall, event)} onClick={event => event.stopPropagation()}>
                     {getOpeningSegments(length, openings).map((segment, index) => (
                       <line
                         key={'wall-segment-' + index}
@@ -2934,6 +2940,14 @@ export default function Floorplan({
                           )}
                         </g>
                       )                    })}
+                    {showWallDimension && (
+                      <g pointerEvents="none">
+                        <line x1={dimensionX1} y1={dimensionY1} x2={dimensionX2} y2={dimensionY2} stroke="var(--text-muted)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                        <line x1={dimensionX1 - metrics.ux * 5} y1={dimensionY1 - metrics.uy * 5} x2={dimensionX1 + metrics.ux * 5} y2={dimensionY1 + metrics.uy * 5} stroke="var(--text-muted)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                        <line x1={dimensionX2 - metrics.ux * 5} y1={dimensionY2 - metrics.uy * 5} x2={dimensionX2 + metrics.ux * 5} y2={dimensionY2 + metrics.uy * 5} stroke="var(--text-muted)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                        <text x={(dimensionX1 + dimensionX2) / 2} y={(dimensionY1 + dimensionY2) / 2 - 6} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{formatMeters(length)}</text>
+                      </g>
+                    )}
                     {active && (
                       <>
                         <circle cx={wall.x1} cy={wall.y1} r="6" fill="var(--bg)" stroke="var(--text)" strokeWidth="2" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerDown={event => beginWallEndpointDrag(wall, 'start', event)} />
