@@ -1948,28 +1948,39 @@ export default function Floorplan({
         ...otherRooms.flatMap(room => getRoomPoints(room)),
         ...(layout.walls || []).flatMap(wall => [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]),
       ]
-      let bestVertexSnap = null
+      let bestCorner = null
+      let bestX = null
+      let bestY = null
       for (const vertex of snappedPoints) {
         for (const anchor of anchors) {
           const sx = anchor.x - vertex.x
           const sy = anchor.y - vertex.y
-          if (Math.abs(sx) <= snapTolerance && (!bestVertexSnap || Math.abs(sx) < Math.abs(bestVertexSnap.dx))) bestVertexSnap = { dx: sx, dy: 0, axis: 'vertical', anchor }
-          if (Math.abs(sy) <= snapTolerance && (!bestVertexSnap || Math.abs(sy) < Math.abs(bestVertexSnap.dy))) bestVertexSnap = { dx: 0, dy: sy, axis: 'horizontal', anchor }
           if (Math.abs(sx) <= snapTolerance && Math.abs(sy) <= snapTolerance) {
             const score = Math.hypot(sx, sy)
-            if (!bestVertexSnap || score < bestVertexSnap.score) bestVertexSnap = { dx: sx, dy: sy, score, anchor }
+            if (!bestCorner || score < bestCorner.score) bestCorner = { dx: sx, dy: sy, score, anchor }
           }
+          if (Math.abs(sx) <= snapTolerance && (!bestX || Math.abs(sx) < Math.abs(bestX.delta))) bestX = { delta: sx, anchor }
+          if (Math.abs(sy) <= snapTolerance && (!bestY || Math.abs(sy) < Math.abs(bestY.delta))) bestY = { delta: sy, anchor }
         }
       }
-      if (bestVertexSnap) {
-        dx += bestVertexSnap.dx
-        dy += bestVertexSnap.dy
+      if (bestCorner) {
+        dx += bestCorner.dx
+        dy += bestCorner.dy
         setRoomSnapGuides([
-          ...(bestVertexSnap.axis !== 'horizontal' ? [{ axis: 'vertical', x: bestVertexSnap.anchor.x, y: bestVertexSnap.anchor.y }] : []),
-          ...(bestVertexSnap.axis !== 'vertical' ? [{ axis: 'horizontal', x: bestVertexSnap.anchor.x, y: bestVertexSnap.anchor.y }] : []),
+          { axis: 'vertical', x: bestCorner.anchor.x, y: bestCorner.anchor.y },
+          { axis: 'horizontal', x: bestCorner.anchor.x, y: bestCorner.anchor.y },
         ])
       } else {
-        setRoomSnapGuides(bestEdgeSnap ? [{ axis: Math.abs(bestEdgeSnap.nx) > Math.abs(bestEdgeSnap.ny) ? 'vertical' : 'horizontal', x: movedPoints[0]?.x + dx, y: movedPoints[0]?.y + dy }] : [])
+        if (bestX) dx += bestX.delta
+        if (bestY) dy += bestY.delta
+        const guides = []
+        if (bestX) guides.push({ axis: 'vertical', x: bestX.anchor.x, y: bestX.anchor.y })
+        if (bestY) guides.push({ axis: 'horizontal', x: bestY.anchor.x, y: bestY.anchor.y })
+        if (!guides.length && bestEdgeSnap) {
+          const point = movedPoints[0] || { x: 0, y: 0 }
+          guides.push({ axis: Math.abs(bestEdgeSnap.nx) > Math.abs(bestEdgeSnap.ny) ? 'vertical' : 'horizontal', x: point.x + dx, y: point.y + dy })
+        }
+        setRoomSnapGuides(guides)
       }
     } else if (drag.type === 'room' && event.altKey) {
       setRoomSnapGuides([])
@@ -2030,7 +2041,7 @@ export default function Floorplan({
       const alreadyConnected = candidate && (movedRoom.connectedRoomIds || []).includes(candidate.targetRoomId)
       if (candidate && !alreadyConnected) setRoomMergePrompt(candidate)
     }
-    if (completedDrag?.mode === 'room-vertex') setRoomSnapGuides([])
+    if (completedDrag?.mode === 'room-vertex' || (completedDrag?.mode === 'move' && completedDrag.type === 'room')) setRoomSnapGuides([])
     if (completedDrag?.mode === 'selection-box') {
       const end = completedDrag.current || completedDrag.start
       const bounds = {
