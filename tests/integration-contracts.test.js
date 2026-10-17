@@ -6,6 +6,18 @@ import { mergeAdjacentRoomPolygons } from '../src/utils/roomMerge.js'
 
 const readSource = path => readFile(new URL(path, import.meta.url), 'utf8')
 
+test('Room drag snaps the whole polygon to nearby Room corners and aligned walls', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+
+  assert.match(source, /Snap the entire Room as a rigid body/)
+  assert.match(source, /const snapTolerance = 12 \* viewBox\.width/)
+  assert.match(source, /const otherEdges = otherRooms\.flatMap\(room => getRoomEdges\(room\)\)/)
+  assert.match(source, /const bestEdgeSnap = null|let bestEdgeSnap = null/)
+  assert.match(source, /let bestCorner = null/)
+  assert.match(source, /setRoomSnapGuides\(\[\s*\{ axis: 'vertical'/)
+  assert.match(source, /completedDrag\.type === 'room'\)\) setRoomSnapGuides\(\[\]\)/)
+})
+
 test('Room merge supports partial shared walls without requiring equal wall lengths', () => {
   const rectangularRoom = {
     id: 'rect',
