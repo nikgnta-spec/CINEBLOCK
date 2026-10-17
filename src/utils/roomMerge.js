@@ -129,7 +129,11 @@ function tracePolygon(edges) {
     // while retaining each edge's original direction.
     candidates.sort((left, right) => {
       const turn = edge => Math.atan2(cross(subtract(current, polygon[polygon.length - 1]), subtract(edge.b, edge.a)), dot(subtract(current, polygon[polygon.length - 1]), subtract(edge.b, edge.a)))
-      return turn(left.edge) - turn(right.edge)
+      // In canvas coordinates (positive Y points down), positive turns
+      // follow the exterior clockwise boundary. Prefer that right-hand branch
+      // at T-junctions so partial shared walls close instead of entering the
+      // interior contour and leaving an open chain.
+      return turn(right.edge) - turn(left.edge)
     })
     const chosen = candidates[0]
     remaining.splice(chosen.i, 1)
