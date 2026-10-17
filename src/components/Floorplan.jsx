@@ -1225,10 +1225,32 @@ export default function Floorplan({
           openings: merged.openings,
           internalWalls: merged.internalWalls,
           connectedRoomIds: [],
+          mergeParts: {
+            target: { ...target },
+            moving: { ...snappedMoving },
+          },
         }),
     }))
     applyEntitySelection([{ type: 'room', id: target.id }], { type: 'room', id: target.id })
     setRoomMergePrompt(null)
+  }
+
+  const unmergeRoom = room => {
+    const parts = room?.mergeParts
+    if (!parts?.target || !parts?.moving) return
+    if (room.locked) return
+    updateLayout(previous => ({
+      ...previous,
+      rooms: previous.rooms
+        .filter(item => item.id !== room.id)
+        .concat(
+          { ...parts.target },
+          { ...parts.moving },
+        ),
+    }))
+    applyEntitySelection([{ type: 'room', id: parts.target.id }], { type: 'room', id: parts.target.id })
+    setSelectedRoomEdge(null)
+    setSelectedRoomVertex(null)
   }
 
   const addRoomVertexAtEdgeMidpoint = room => {
@@ -3459,6 +3481,13 @@ export default function Floorplan({
                     <section className="floorplan-inspector-section" role="status">
                       <strong>Room digunakan bersama</strong>
                       <p>Perubahan geometri Room ini akan memengaruhi {scenes.filter(item => (item.roomIds || []).includes(selectedEntity.id)).length} Scene yang menggunakannya.</p>
+                    </section>
+                  )}
+                  {selectedEntity.mergeParts?.target && selectedEntity.mergeParts?.moving && (
+                    <section className="floorplan-inspector-section">
+                      <div className="floorplan-section-title">Ruangan gabungan</div>
+                      <p className="floorplan-field-note">Pisahkan kembali Room ini menjadi {selectedEntity.mergeParts.target.label || 'Room'} dan {selectedEntity.mergeParts.moving.label || 'Room'}. Bentuk dan posisi sebelum penggabungan akan dipulihkan.</p>
+                      <button type="button" className="floorplan-opening-add" onClick={() => unmergeRoom(selectedEntity)} disabled={Boolean(selectedEntity.locked)}>Lepas ruangan</button>
                     </section>
                   )}
                   <section className="floorplan-inspector-section">
