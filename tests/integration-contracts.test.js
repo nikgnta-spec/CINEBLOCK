@@ -616,7 +616,7 @@ test('existing Rooms remain draggable while Room drawing tool is active', async 
 test('Wall drawing delegates junction topology to the shared Room/Wall geometry kernel', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   const geometry = await readSource('../src/utils/floorplanGeometry.js')
-  assert.ok(source.includes("import { createRoomPolygon, connectWallGeometry } from '../utils/floorplanGeometry'"))
+  assert.match(source, /import \{ createRoomPolygon, connectWallGeometry, updateRoomPolygonGeometry, updateWallEndpointGeometry \} from '..\/utils\/floorplanGeometry'/)
   assert.match(source, /projectPointToSegment\(point, segment\)/)
   assert.match(source, /sourceType: 'room'/)
   assert.match(source, /sourceType: 'wall'/)
