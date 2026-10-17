@@ -260,10 +260,23 @@ const getOpeningSegments = (length, openings = []) => {
   return segments
 }
 const getRoomOpeningPlacement = (room, opening) => {
+  const offset = clamp(opening.offset, 0.05, 0.95)
+  if (opening.wallType === 'internal' && Number.isInteger(opening.internalWallIndex)) {
+    const wall = (room.internalWalls || [])[opening.internalWallIndex]
+    if (wall) {
+      const metrics = getWallMetrics(wall)
+      return {
+        x: wall.x1 + metrics.ux * metrics.length * offset,
+        y: wall.y1 + metrics.uy * metrics.length * offset,
+        angle: metrics.angle + 180,
+        length: metrics.length,
+        internalWallIndex: opening.internalWallIndex,
+      }
+    }
+  }
   const edges = getRoomEdges(room)
   const edge = edges[Math.max(0, Math.min(edges.length - 1, Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)))] || edges[0]
   if (!edge) return { x: 0, y: 0, angle: 0, length: 1, edgeIndex: 0 }
-  const offset = clamp(opening.offset, 0.05, 0.95)
   return {
     x: edge.x1 + (edge.x2 - edge.x1) * offset,
     y: edge.y1 + (edge.y2 - edge.y1) * offset,
@@ -1401,7 +1414,11 @@ export default function Floorplan({
       height: type === 'door' ? 210 : 120,
       ...(type === 'door' ? { swingDirection: 'in', doorType: 'single' } : {}),
       ...(type === 'doorway' ? { label: 'Pintu Tanpa Daun', swingDirection: 'in' } : {}),
-      ...(selectedType === 'room' ? { edgeIndex: Math.max(0, getRoomPoints(selectedEntity).length - 1) } : {}),
+      ...(selectedType === 'room' ? (
+        selectedRoomEdge?.roomId === selectedEntity.id && Number.isInteger(selectedRoomEdge.internalWallIndex)
+          ? { wallType: 'internal', internalWallIndex: selectedRoomEdge.internalWallIndex }
+          : { wallType: 'perimeter', edgeIndex: Math.max(0, getRoomPoints(selectedEntity).length - 1) }
+      ) : {}),
     }
     updateSelected({ openings: [...(selectedEntity.openings || []), opening] })
     setTool('select')
@@ -1418,7 +1435,9 @@ export default function Floorplan({
       if (opening.id !== openingId) return opening
       const next = { ...opening, ...patch }
       const length = selectedType === 'room'
-        ? (getRoomEdges(selectedEntity)[Math.max(0, Math.min(getRoomEdges(selectedEntity).length - 1, Number(next.edgeIndex) || 0))]?.length || 1)
+        ? (next.wallType === 'internal' && Number.isInteger(next.internalWallIndex)
+          ? getWallMetrics((selectedEntity.internalWalls || [])[next.internalWallIndex] || {}).length
+          : getRoomEdges(selectedEntity)[Math.max(0, Math.min(getRoomEdges(selectedEntity).length - 1, Number(next.edgeIndex) || 0))]?.length) || 1
         : getWallMetrics(selectedEntity).length
       const openingWidth = Math.min(Math.max(1, Number(next.width) || 1), Math.max(1, length))
       const minimumOffset = Math.min(0.49, openingWidth / (2 * Math.max(1, length)))
@@ -3452,9 +3471,16 @@ export default function Floorplan({
                             </select>
                           </div>}
                           <div className="floorplan-dimension-input">
-                            <label htmlFor={opening.id + '-edge'}>Sisi polygon</label>
-                            <select id={opening.id + '-edge'} className="floorplan-field" value={Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : 0} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { edgeIndex: Number(event.target.value) })}>
-                              {getRoomEdges(selectedEntity).map(edge => <option key={edge.edgeIndex} value={edge.edgeIndex}>Sisi {edge.edgeIndex + 1}</option>)}
+                            <label htmlFor={opening.id + '-edge'}>Dinding pemasangan</label>
+                            <select id={opening.id + '-edge'} className="floorplan-field" value={opening.wallType === 'internal' && Number.isInteger(opening.internalWallIndex) ? 'internal:' + opening.internalWallIndex : 'edge:' + (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : 0)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                              const [kind, rawIndex] = event.target.value.split(':')
+                              const index = Number(rawIndex)
+                              updateOpening(opening.id, kind === 'internal'
+                                ? { wallType: 'internal', internalWallIndex: index, edgeIndex: null }
+                                : { wallType: 'perimeter', internalWallIndex: null, edgeIndex: index })
+                            }}>
+                              {getRoomEdges(selectedEntity).map(edge => <option key={'edge-' + edge.edgeIndex} value={'edge:' + edge.edgeIndex}>Dinding luar {edge.edgeIndex + 1}</option>)}
+                              {(selectedEntity.internalWalls || []).map((wall, index) => <option key={'internal-' + index} value={'internal:' + index}>Dinding sambungan {index + 1}</option>)}
                             </select>
                           </div>
                           <div className="floorplan-dimension-input">
