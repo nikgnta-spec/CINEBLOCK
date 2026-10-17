@@ -613,16 +613,19 @@ test('existing Rooms remain draggable while Room drawing tool is active', async 
   assert.match(source, /if \(item\.locked \|\| \(tool === 'room' && type !== 'room'\) \|\| \(tool === 'wall' && type !== 'wall'\)\) return/)
 })
 
-test('Wall drawing snaps to Room and Wall segments and inserts Room boundary junctions', async () => {
+test('Wall drawing delegates junction topology to the shared Room/Wall geometry kernel', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
+  const geometry = await readSource('../src/utils/floorplanGeometry.js')
   assert.ok(source.includes("import { createRoomPolygon, connectWallGeometry } from '../utils/floorplanGeometry'"))
   assert.match(source, /projectPointToSegment\(point, segment\)/)
   assert.match(source, /sourceType: 'room'/)
   assert.match(source, /sourceType: 'wall'/)
-  assert.match(source, /When a Wall meets the middle of a Room edge, insert that junction/)
-  assert.match(source, /Split existing Wall segments at new junctions as well/)
-  assert.match(source, /openingProjection\.t <= splitAt/)
-  assert.match(source, /points\.splice\(edgeIndex \+ 1, 0, \{ x: Math\.round\(projection\.point\.x\), y: Math\.round\(projection\.point\.y\) \}\)/)
+  assert.match(source, /connectWallGeometry\(previous\.rooms \|\| \[\], previous\.walls \|\| \[\], wall, makeId\)/)
+  assert.match(geometry, /export function createRoomPolygon/)
+  assert.match(geometry, /export function connectWallGeometry/)
+  assert.match(geometry, /points\.splice\(edgeIndex \+ 1/)
+  assert.match(geometry, /const second = \{ \.\.\.segment, id: makeId\(\), x1: junction\.x, y1: junction\.y, openings: \[\] \}/)
+  assert.match(geometry, /openingProjection\.t <= splitAt/)
 })
 
 test('Room tool switches to move mode when dragging an existing Room and inspector can disconnect it', async () => {
