@@ -95,3 +95,83 @@ export function connectWallGeometry(rooms = [], walls = [], wall, makeId) {
 
   return { rooms: nextRooms, walls: [...nextWalls, wall] }
 }
+
+
+const sameJunction = (a, b, tolerance = 1.5) =>
+  Math.hypot(Number(a?.x) - Number(b?.x), Number(a?.y) - Number(b?.y)) <= tolerance
+
+/**
+ * Keep Room vertices and Wall endpoints attached when either side of a
+ * junction is edited. This deliberately changes only coordinates: opening
+ * offsets and all unrelated geometry remain stable.
+ */
+export function synchronizeJunctionMoves(rooms = [], walls = [], moves = [], tolerance = 1.5) {
+  if (!moves.length) return { rooms, walls }
+  const movePoint = point => {
+    const move = moves.find(candidate => sameJunction(point, candidate.from, tolerance))
+    return move ? { x: Math.round(move.to.x), y: Math.round(move.to.y) } : point
+  }
+  const nextRooms = rooms.map(room => {
+    const source = Array.isArray(room.points) && room.points.length >= 3
+      ? room.points
+      : [
+          { x: room.x, y: room.y },
+          { x: room.x + room.width, y: room.y },
+          { x: room.x + room.width, y: room.y + room.height },
+          { x: room.x, y: room.y + room.height },
+        ]
+    let changed = false
+    const points = source.map(point => {
+      const next = movePoint(point)
+      if (next !== point) changed = true
+      return next
+    })
+    if (!changed) return room
+    const xs = points.map(point => point.x), ys = points.map(point => point.y)
+    const x = Math.min(...xs), y = Math.min(...ys)
+    return { ...room, points, x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y }
+  })
+  const nextWalls = walls.map(wall => {
+    const start = movePoint({ x: wall.x1, y: wall.y1 })
+    const end = movePoint({ x: wall.x2, y: wall.y2 })
+    if (start.x === wall.x1 && start.y === wall.y1 && end.x === wall.x2 && end.y === wall.y2) return wall
+    return { ...wall, x1: start.x, y1: start.y, x2: end.x, y2: end.y }
+  })
+  return { rooms: nextRooms, walls: nextWalls }
+}
+
+/**
+ * Move a Room's editable polygon points and propagate every changed junction
+ * to connected Walls. Existing wall endpoints are authoritative connections;
+ * no near-but-unconnected geometry is moved.
+ */
+export function updateRoomPolygonGeometry(rooms = [], walls = [], roomId, nextPoints) {
+  const room = rooms.find(item => item.id === roomId)
+  if (!room || !Array.isArray(nextPoints) || nextPoints.length !== room.points?.length) return { rooms, walls }
+  const previousPoints = room.points
+  const moves = previousPoints.flatMap((from, index) => {
+    const to = nextPoints[index]
+    return to && !sameJunction(from, to, 0.01) ? [{ from, to }] : []
+  })
+  const synchronized = synchronizeJunctionMoves(rooms, walls, moves)
+  const nextRooms = synchronized.rooms.map(item => item.id === roomId
+    ? { ...item, points: nextPoints.map(point => ({ x: Math.round(point.x), y: Math.round(point.y) })) }
+    : item)
+  return { rooms: nextRooms, walls: synchronized.walls }
+}
+
+/**
+ * Move a Wall endpoint and all Room vertices / other Wall endpoints attached
+ * to its old coordinate, keeping a single shared junction rather than a gap.
+ */
+export function updateWallEndpointGeometry(rooms = [], walls = [], wallId, endpoint, point) {
+  const wall = walls.find(item => item.id === wallId)
+  if (!wall || !['start', 'end'].includes(endpoint)) return { rooms, walls }
+  const from = endpoint === 'start' ? { x: wall.x1, y: wall.y1 } : { x: wall.x2, y: wall.y2 }
+  const to = { x: Math.round(point.x), y: Math.round(point.y) }
+  const synchronized = synchronizeJunctionMoves(rooms, walls.filter(item => item.id !== wallId), [{ from, to }])
+  const nextWalls = synchronized.walls.concat(walls.filter(item => item.id === wallId).map(item => endpoint === 'start'
+    ? { ...item, x1: to.x, y1: to.y }
+    : { ...item, x2: to.x, y2: to.y }))
+  return { rooms: synchronized.rooms, walls: nextWalls }
+}
