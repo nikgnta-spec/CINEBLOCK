@@ -4,6 +4,7 @@ import {
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
 import { projectPointToSegment, snapRoomPoint } from '../utils/roomSnapping'
+import { createRoomPolygon, connectWallGeometry } from '../utils/floorplanGeometry'
 import { findRoomMergeCandidate, mergeAdjacentRoomPolygons, snapRoomToEdge } from '../utils/roomMerge'
 import {
   SIZES as SHOT_SIZES,
@@ -2200,14 +2201,8 @@ export default function Floorplan({
       const width = Math.abs(previewPoint.x - drawStart.x)
       const height = Math.abs(previewPoint.y - drawStart.y)
       if (tool === 'room' && width >= 12 && height >= 12) {
-        const room = {
-          id: makeId(),
-          x: Math.round(Math.min(drawStart.x, previewPoint.x)),
-          y: Math.round(Math.min(drawStart.y, previewPoint.y)),
-          width: Math.round(width),
-          height: Math.round(height),
-          label: 'Room ' + padNum(layout.rooms.length + 1),
-        }
+        const room = createRoomPolygon(drawStart, previewPoint, makeId(), 'Room ' + padNum(layout.rooms.length + 1))
+        if (!room) return
         updateLayout(previous => ({ ...previous, rooms: [...previous.rooms, room] }))
         applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id })
         onSelectedShotIdChange?.('')
@@ -2220,68 +2215,10 @@ export default function Floorplan({
           thickness: 6,
           openings: [],
         }
-        const wallEndpoints = [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]
-        updateLayout(previous => ({
-          ...previous,
-          // When a Wall meets the middle of a Room edge, insert that junction
-          // into the Room polygon too. This keeps the visible Room boundary and
-          // the new Wall sharing the same geometric vertex.
-          rooms: previous.rooms.map(room => {
-            let points = getRoomPoints(room).map(point => ({ ...point }))
-            let changed = false
-            for (const endpoint of wallEndpoints) {
-              if (points.some(point => Math.hypot(point.x - endpoint.x, point.y - endpoint.y) < 1.5)) continue
-              const edgeIndex = points.findIndex((start, index) => {
-                const end = points[(index + 1) % points.length]
-                const projection = projectPointToSegment(endpoint, { x1: start.x, y1: start.y, x2: end.x, y2: end.y })
-                return projection.distance < 1.5 && projection.t > 0.01 && projection.t < 0.99
-              })
-              if (edgeIndex < 0) continue
-              const start = points[edgeIndex]
-              const end = points[(edgeIndex + 1) % points.length]
-              const projection = projectPointToSegment(endpoint, { x1: start.x, y1: start.y, x2: end.x, y2: end.y })
-              points.splice(edgeIndex + 1, 0, { x: Math.round(projection.point.x), y: Math.round(projection.point.y) })
-              changed = true
-            }
-            return changed ? { ...room, points } : room
-          }),
-          // Split existing Wall segments at new junctions as well. This gives
-          // the wall network shared vertices instead of a new Wall merely
-          // crossing/ending on the middle of another unsplit segment.
-          walls: [
-            ...(previous.walls || []).flatMap(existingWall => {
-              let segments = [{ ...existingWall, openings: [...(existingWall.openings || [])] }]
-              for (const endpoint of wallEndpoints) {
-                segments = segments.flatMap(segment => {
-                  const projection = projectPointToSegment(endpoint, segment)
-                  if (projection.distance >= 1.5 || projection.t <= 0.01 || projection.t >= 0.99) return [segment]
-                  const junction = { x: Math.round(projection.point.x), y: Math.round(projection.point.y) }
-                  const start = { x: segment.x1, y: segment.y1 }
-                  const end = { x: segment.x2, y: segment.y2 }
-                  const splitAt = projection.t
-                  const first = { ...segment, x2: junction.x, y2: junction.y, openings: [] }
-                  const second = { ...segment, id: makeId(), x1: junction.x, y1: junction.y, openings: [] }
-                  for (const opening of segment.openings || []) {
-                    const openingOffset = Math.max(0, Math.min(1, Number(opening.offset ?? 0.5)))
-                    const openingCenter = {
-                      x: start.x + (end.x - start.x) * openingOffset,
-                      y: start.y + (end.y - start.y) * openingOffset,
-                    }
-                    const openingProjection = projectPointToSegment(openingCenter, segment)
-                    if (openingProjection.t <= splitAt) {
-                      first.openings.push({ ...opening, offset: splitAt > 0 ? openingProjection.t / splitAt : 0 })
-                    } else {
-                      second.openings.push({ ...opening, offset: (openingProjection.t - splitAt) / (1 - splitAt) })
-                    }
-                  }
-                  return [first, second]
-                })
-              }
-              return segments
-            }),
-            wall,
-          ],
-        }))
+        updateLayout(previous => {
+          const connected = connectWallGeometry(previous.rooms || [], previous.walls || [], wall, makeId)
+          return { ...previous, rooms: connected.rooms, walls: connected.walls }
+        })
         applyEntitySelection([{ type: 'wall', id: wall.id }], { type: 'wall', id: wall.id })
         onSelectedShotIdChange?.('')
         setTool('select')
