@@ -1158,10 +1158,7 @@ export default function Floorplan({
       },
       targetEdge,
     }, reason => setRoomMergePrompt({ ...roomMergePrompt, error: reason }))
-    if (!merged) {
-      if (!roomMergePrompt.error) setRoomMergePrompt({ ...roomMergePrompt, error: 'Room belum bisa digabung dengan aman. Periksa bentuk dinding dan posisi pintu/jendela, lalu coba lagi.' })
-      return
-    }
+    if (!merged) return
 
     updateLayout(previous => ({
       ...previous,
