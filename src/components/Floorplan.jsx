@@ -3526,12 +3526,6 @@ export default function Floorplan({
 
               {selectedType === 'room' && (
                 <>
-                  {reusableRoomMode && (scenes.filter(item => (item.roomIds || []).includes(selectedEntity.id)).length > 1) && (
-                    <section className="floorplan-inspector-section" role="status">
-                      <strong>Room digunakan bersama</strong>
-                      <p>Perubahan geometri Room ini akan memengaruhi {scenes.filter(item => (item.roomIds || []).includes(selectedEntity.id)).length} Scene yang menggunakannya.</p>
-                    </section>
-                  )}
                   {selectedEntity.mergeParts?.target && selectedEntity.mergeParts?.moving && (
                     <section className="floorplan-inspector-section">
                       <div className="floorplan-section-title">Ruangan gabungan</div>
