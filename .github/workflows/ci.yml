@@ -21,6 +21,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Run targeted Room dimension layout tests
+        run: node --test --test-name-pattern="Room dimension layout|Connected Rooms use one combined bounding box|Room total length and width" tests/integration-contracts.test.js
       - name: Run automated tests
         run: npm test
       - name: Run lint
