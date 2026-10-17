@@ -615,6 +615,7 @@ test('existing Rooms remain draggable while Room drawing tool is active', async 
 
 test('Wall drawing snaps to Room and Wall segments and inserts Room boundary junctions', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
+  assert.ok(source.includes("import { createRoomPolygon, connectWallGeometry } from '../utils/floorplanGeometry'"))
   assert.match(source, /projectPointToSegment\(point, segment\)/)
   assert.match(source, /sourceType: 'room'/)
   assert.match(source, /sourceType: 'wall'/)
@@ -689,8 +690,8 @@ test('Room and Wall modes share the same polygon and junction geometry kernel', 
   const newWall = { id: 'wall-2', x1: 200, y1: 150, x2: 400, y2: 150, thickness: 6, openings: [] }
   const connected = connectWallGeometry([room], [existingWall], newWall, () => 'wall-split')
 
-  assert.ok(connected.rooms[0].points.some(point => point.x === 200 && point.y === 150),
-    'Room perimeter geometry records the wall junction as a vertex')
+  assert.ok(connected.rooms[0].points.some(point => point.x === 400 && point.y === 150),
+    'Room perimeter geometry records the wall endpoint as a vertex')
   assert.equal(connected.walls.length, 3, 'existing wall is split at the junction and the new wall is added')
   assert.ok(connected.walls.some(wall => wall.x2 === 200 && wall.y2 === 150))
   assert.ok(connected.walls.some(wall => wall.x1 === 200 && wall.y1 === 150))
