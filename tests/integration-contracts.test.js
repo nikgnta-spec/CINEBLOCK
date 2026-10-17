@@ -2,8 +2,31 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { snapRoomPoint } from '../src/utils/roomSnapping.js'
+import { mergeAdjacentRoomPolygons } from '../src/utils/roomMerge.js'
 
 const readSource = path => readFile(new URL(path, import.meta.url), 'utf8')
+
+test('Room merge supports partial shared walls without requiring equal wall lengths', () => {
+  const rectangularRoom = {
+    id: 'rect',
+    points: [{ x: 0, y: 0 }, { x: 983, y: 0 }, { x: 983, y: 666 }, { x: 0, y: 666 }],
+    openings: [],
+  }
+  const lShapedRoom = {
+    id: 'l-shape',
+    points: [{ x: 983, y: 0 }, { x: 1558, y: 0 }, { x: 1558, y: 281 }, { x: 1237, y: 281 }, { x: 1237, y: 666 }, { x: 983, y: 666 }],
+    openings: [],
+  }
+  const merged = mergeAdjacentRoomPolygons(rectangularRoom, lShapedRoom, {
+    movingEdge: { index: 1 },
+    targetEdge: { index: 5 },
+  })
+
+  assert.ok(merged, 'partial shared boundary should merge even when the complete wall lengths differ')
+  assert.equal(merged.points.length, 8)
+  assert.ok(merged.points.some(point => point.x === 983 && point.y === 666))
+  assert.ok(merged.points.some(point => point.x === 983 && point.y === 0))
+})
 
 test('App wires shared scene and floorplan state into both planning tabs', async () => {
   const source = await readSource('../src/App.jsx')
