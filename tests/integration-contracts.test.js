@@ -150,6 +150,17 @@ test('Room picker is removed so Rooms cannot be reused across Scenes', async () 
   assert.match(source, /roomIsolationVersion: 1/)
 })
 
+test('Wall dimensions can be edited numerically and total length is displayed on canvas', async () => {
+  const floorplan = await readSource('../src/components/Floorplan.jsx')
+
+  assert.match(floorplan, /id="wall-length"/)
+  assert.match(floorplan, /id="wall-thickness"/)
+  assert.match(floorplan, /thickness: Math\.round\(meters \* 100\)/)
+  assert.match(floorplan, /x2: wall\.x1 \+ current\.ux \* length/)
+  assert.match(floorplan, /formatMeters\(length\) \+ ' total'/)
+  assert.match(floorplan, /Panjang total dinding:/)
+})
+
 test('Locked objects remain selectable but cannot move or resize', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   const dragHandler = source.slice(source.indexOf('const beginObjectDrag'), source.indexOf('const beginWaypointDrag'))
