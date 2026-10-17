@@ -2558,6 +2558,14 @@ export default function Floorplan({
                       const verticalTotalX = totalBounds.x + totalBounds.width + 112 + maxVerticalLevel * 30
                       const groupHorizontalTotalY = groupTotalBounds ? groupTotalBounds.y - 160 - groupMaxHorizontalLevel * 30 : 0
                       const groupVerticalTotalX = groupTotalBounds ? groupTotalBounds.x + groupTotalBounds.width + 160 + groupMaxVerticalLevel * 30 : 0
+                      // If a full-height outer wall differs from group bounds only by a tiny alignment sliver,
+                      // use the wall's actual span for the total dimension instead of reporting the sliver.
+                      const groupFullHeightEdge = groupTotalBounds && groupDimensionLayouts
+                        .filter(item => !item.horizontal && Math.abs(item.edge.length - groupTotalBounds.height) <= 5)
+                        .sort((a, b) => b.edge.length - a.edge.length)[0]?.edge
+                      const groupVerticalStartY = groupFullHeightEdge ? Math.min(groupFullHeightEdge.y1, groupFullHeightEdge.y2) : groupTotalBounds?.y
+                      const groupVerticalEndY = groupFullHeightEdge ? Math.max(groupFullHeightEdge.y1, groupFullHeightEdge.y2) : (groupTotalBounds ? groupTotalBounds.y + groupTotalBounds.height : 0)
+                      const groupVerticalMeasuredHeight = groupVerticalEndY - groupVerticalStartY
                       return <g pointerEvents="none" opacity={active ? 1 : 0.58}>
                         {(active || hoveredRoomEdge?.roomId === room.id) && visibleDimensionLayouts.map(({ edge, dimension: d }) => {
                           const label = (edge.length / 100).toFixed(2) + ' m'
@@ -2581,12 +2589,12 @@ export default function Floorplan({
                             <line x1={groupTotalBounds.x} y1={groupHorizontalTotalY} x2={groupTotalBounds.x + groupTotalBounds.width} y2={groupHorizontalTotalY} />
                             <line x1={groupTotalBounds.x} y1={groupHorizontalTotalY - 6} x2={groupTotalBounds.x} y2={groupHorizontalTotalY + 6} />
                             <line x1={groupTotalBounds.x + groupTotalBounds.width} y1={groupHorizontalTotalY - 6} x2={groupTotalBounds.x + groupTotalBounds.width} y2={groupHorizontalTotalY + 6} />
-                            <line x1={groupVerticalTotalX} y1={groupTotalBounds.y} x2={groupVerticalTotalX} y2={groupTotalBounds.y + groupTotalBounds.height} />
-                            <line x1={groupVerticalTotalX - 6} y1={groupTotalBounds.y} x2={groupVerticalTotalX + 6} y2={groupTotalBounds.y} />
-                            <line x1={groupVerticalTotalX - 6} y1={groupTotalBounds.y + groupTotalBounds.height} x2={groupVerticalTotalX + 6} y2={groupTotalBounds.y + groupTotalBounds.height} />
+                            <line x1={groupVerticalTotalX} y1={groupVerticalStartY} x2={groupVerticalTotalX} y2={groupVerticalEndY} />
+                            <line x1={groupVerticalTotalX - 6} y1={groupVerticalStartY} x2={groupVerticalTotalX + 6} y2={groupVerticalStartY} />
+                            <line x1={groupVerticalTotalX - 6} y1={groupVerticalEndY} x2={groupVerticalTotalX + 6} y2={groupVerticalEndY} />
                           </g>
                           <text x={groupTotalBounds.x + groupTotalBounds.width / 2} y={groupHorizontalTotalY - 8} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{(groupTotalBounds.width / 100).toFixed(2) + ' m total gabungan'}</text>
-                          <text x={groupVerticalTotalX + 12} y={groupTotalBounds.y + groupTotalBounds.height / 2} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke" transform={'rotate(90 ' + (groupVerticalTotalX + 12) + ' ' + (groupTotalBounds.y + groupTotalBounds.height / 2) + ')'}>{(groupTotalBounds.height / 100).toFixed(2) + ' m total gabungan'}</text>
+                          <text x={groupVerticalTotalX + 12} y={groupTotalBounds.y + groupTotalBounds.height / 2} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke" transform={'rotate(90 ' + (groupVerticalTotalX + 12) + ' ' + (groupVerticalStartY + groupVerticalMeasuredHeight / 2) + ')'}>{(groupVerticalMeasuredHeight / 100).toFixed(2) + ' m total gabungan'}</text>
                         </>}
                         {showVerticalTotal && <>
                           <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
