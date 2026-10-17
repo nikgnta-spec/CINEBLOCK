@@ -36,6 +36,45 @@ function roomPoints(room) {
   return [{ x: room.x, y: room.y }, { x: room.x + room.width, y: room.y }, { x: room.x + room.width, y: room.y + room.height }, { x: room.x, y: room.y + room.height }]
 }
 
+function roomInternalWalls(room) {
+  const stored = Array.isArray(room?.internalWalls) ? room.internalWalls.filter(wall =>
+    [wall.x1, wall.y1, wall.x2, wall.y2].every(value => Number.isFinite(Number(value)))
+      && Math.hypot(Number(wall.x2) - Number(wall.x1), Number(wall.y2) - Number(wall.y1)) > 1
+  ) : []
+  if (stored.length) return stored
+  const points = roomPoints(room)
+  if (points.length < 4) return []
+  const area = points.reduce((sum, point, index) => {
+    const next = points[(index + 1) % points.length]
+    return sum + point.x * next.y - next.x * point.y
+  }, 0)
+  const winding = area >= 0 ? 1 : -1
+  const reflex = []
+  points.forEach((point, index) => {
+    const previous = points[(index - 1 + points.length) % points.length]
+    const next = points[(index + 1) % points.length]
+    const cross = (point.x - previous.x) * (next.y - point.y) - (point.y - previous.y) * (next.x - point.x)
+    if (cross * winding < -1) reflex.push(index)
+  })
+  const walls = []
+  const used = new Set()
+  for (const reflexIndex of reflex) {
+    const corner = points[reflexIndex]
+    const candidates = points.map((point, index) => {
+      if (index === reflexIndex || (index + 1) % points.length === reflexIndex || (index - 1 + points.length) % points.length === reflexIndex || used.has(index)) return null
+      const dx = Math.abs(point.x - corner.x), dy = Math.abs(point.y - corner.y)
+      if (Math.min(dx, dy) > 1 || Math.max(dx, dy) < 2) return null
+      if (!pointInPolygon({ x: (point.x + corner.x) / 2, y: (point.y + corner.y) / 2 }, points)) return null
+      return { index, point, length: Math.hypot(dx, dy) }
+    }).filter(Boolean).sort((a, b) => a.length - b.length)
+    const candidate = candidates[0]
+    if (!candidate) continue
+    walls.push({ x1: corner.x, y1: corner.y, x2: candidate.point.x, y2: candidate.point.y, legacyInferred: true })
+    used.add(candidate.index)
+  }
+  return walls
+}
+
 function roomEdges(room) {
   return roomPoints(room).map((point, index, points) => {
     const next = points[(index + 1) % points.length]
@@ -58,7 +97,7 @@ function pointInPolygon(point, points) {
 function roomOpeningPlacement(room, opening) {
   const offset = Math.max(0.02, Math.min(0.98, Number(opening.offset) || 0.5))
   if (opening.wallType === 'internal' && Number.isInteger(opening.internalWallIndex)) {
-    const wall = (room.internalWalls || [])[opening.internalWallIndex]
+    const wall = roomInternalWalls(room)[opening.internalWallIndex]
     if (wall) {
       const metrics = wallMetrics(wall)
       return { x: wall.x1 + metrics.ux * metrics.length * offset, y: wall.y1 + metrics.uy * metrics.length * offset, angle: metrics.angle + 180, length: metrics.length }
@@ -212,7 +251,7 @@ function PrintFloorplan({ scene, layout }) {
                 const uy = (edge.y2 - edge.y1) / (edge.length || 1)
                 return <line key={edge.edgeIndex + '-' + index} x1={edge.x1 + ux * segment.start} y1={edge.y1 + uy * segment.start} x2={edge.x1 + ux * segment.end} y2={edge.y1 + uy * segment.end} stroke="#111827" strokeWidth="3" />
               }))}
-              {(room.internalWalls || []).map((wall, wallIndex) => {
+              {roomInternalWalls(room).map((wall, wallIndex) => {
                 const metric = wallMetrics(wall)
                 const wallOpenings = openings.filter(opening => opening.wallType === 'internal' && opening.internalWallIndex === wallIndex)
                 return openingSegments(metric.length, wallOpenings).map((segment, segmentIndex) => (
