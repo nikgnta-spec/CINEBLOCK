@@ -2633,3 +2633,119 @@ button:focus-visible,
   /* Backup, Import, and PDF export keep their icons while labels are hidden. */
   .topbar-right > .btn:nth-of-type(n + 3) { font-size: 0; }
 }
+
+
+/* Touch-first compact header. This also applies when Android tablets request
+   desktop-site layout and report a viewport wider than the CSS breakpoints. */
+@media (pointer: coarse) and (hover: none) {
+  .topbar {
+    display: flex !important;
+    flex-flow: row nowrap !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 6px !important;
+    min-height: 44px !important;
+    height: 44px !important;
+    padding: 4px 7px !important;
+    overflow: hidden !important;
+  }
+  .topbar-left {
+    display: flex !important;
+    flex: 1 1 auto !important;
+    flex-flow: row nowrap !important;
+    align-items: center !important;
+    width: auto !important;
+    min-width: 0 !important;
+    gap: 5px !important;
+    overflow: hidden !important;
+  }
+  .topbar-left > span[style] { display: none !important; }
+  .topbar-mark { width: 25px !important; height: 25px !important; flex-basis: 25px !important; }
+  .topbar-wordmark { display: none !important; }
+  .project-switcher {
+    flex: 1 1 90px !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: 150px !important;
+    height: 32px !important;
+    padding: 4px 5px !important;
+    font-size: 12px !important;
+  }
+  .topbar-left > .btn {
+    display: inline-flex !important;
+    flex: 0 0 32px !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 4px !important;
+    overflow: hidden !important;
+    font-size: 0 !important;
+  }
+  .topbar-left > .btn svg { flex: 0 0 auto; width: 15px; height: 15px; }
+  .project-actions-menu { flex: 0 0 32px !important; }
+  .project-actions-trigger { width: 32px !important; height: 32px !important; }
+  .topbar-right {
+    display: flex !important;
+    flex: 0 1 auto !important;
+    flex-flow: row nowrap !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    width: auto !important;
+    max-width: 48% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    gap: 4px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .topbar-right::-webkit-scrollbar { display: none !important; }
+  .save-status {
+    flex: 0 0 7px !important;
+    width: 7px !important;
+    min-width: 7px !important;
+    max-width: 7px !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    font-size: 0 !important;
+    gap: 0 !important;
+  }
+  .save-status::before { flex: 0 0 7px !important; width: 7px !important; height: 7px !important; }
+  .topbar-right > .btn {
+    display: inline-flex !important;
+    flex: 0 0 32px !important;
+    width: 32px !important;
+    min-width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 4px !important;
+    gap: 0 !important;
+    overflow: hidden !important;
+    font-size: 0 !important;
+  }
+  .topbar-right > .btn svg { flex: 0 0 auto !important; width: 15px !important; height: 15px !important; }
+  .topbar-right > .btn > span { display: none !important; }
+  .tabs { min-height: 36px !important; padding-inline: 4px !important; overflow-x: auto !important; scrollbar-width: none !important; }
+  .tabs::-webkit-scrollbar { display: none !important; }
+  .tab { flex: 0 0 auto !important; min-height: 36px !important; padding: 6px 10px !important; font-size: 12px !important; }
+  .floorplan-top { min-height: 38px !important; padding: 3px 6px !important; }
+  .floorplan-main-tools {
+    display: flex !important;
+    flex-flow: row nowrap !important;
+    align-items: center !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    padding: 3px 5px !important;
+    gap: 4px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    align-content: center !important;
+    scrollbar-width: thin !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .floorplan-tool-spacer { display: none !important; }
+  .floorplan-tool-button { flex: 0 0 auto !important; min-height: 32px !important; height: 32px !important; min-width: 34px !important; padding-inline: 6px !important; }
+}
