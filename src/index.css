@@ -2050,3 +2050,91 @@ button:focus-visible,
   .cloud-sync-conflict-actions .btn { justify-content: center; }
   .cloud-sync-trigger span { display: none; }
 }
+
+
+/* Floorplan opening inspector layout: keep the opening header separate from its property grid. */
+.floorplan-opening-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.floorplan-opening-add {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 10px;
+  line-height: 1.3;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.floorplan-opening-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 12px;
+  min-width: 0;
+  padding: 12px 0;
+}
+.floorplan-opening-row .floorplan-opening-kind {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  line-height: 1.35;
+}
+.floorplan-opening-row > .floorplan-icon-button {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+}
+.floorplan-opening-row > .floorplan-opening-actions {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: 100%;
+  min-width: 0;
+  align-self: stretch;
+}
+.floorplan-opening-row .floorplan-dimension-input {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+}
+.floorplan-opening-row .floorplan-dimension-input label {
+  display: block;
+  min-width: 0;
+  min-height: 2.6em;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.floorplan-opening-row .floorplan-field {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  min-height: 38px;
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: 1.25;
+}
+.floorplan-opening-row .floorplan-icon-button {
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0;
+}
+@media (max-width: 340px) {
+  .floorplan-opening-actions { gap: 6px; }
+  .floorplan-opening-add { gap: 5px; padding: 7px 6px; font-size: 11px; }
+  .floorplan-opening-row > .floorplan-opening-actions { column-gap: 7px; row-gap: 10px; }
+  .floorplan-opening-row .floorplan-field { padding-inline: 7px; font-size: 12px; }
+}
