@@ -137,3 +137,15 @@ test('cloud project links are removed from the URL after redemption', async () =
   assert.match(app, /url\.searchParams\.delete\('owner'\)/)
   assert.match(app, /url\.searchParams\.delete\('share'\)/)
 })
+
+
+test('owner bootstrap links are single-use and cloud access stays server-authorized', async () => {
+  const edge = await readSource('../supabase/functions/cineblock-project-access/index.ts')
+  const migration = await readSource('../supabase/migrations/202610190001_cineblock_owner_bootstrap_link.sql')
+  assert.match(edge, /link\.role === "owner"/)
+  assert.match(edge, /\.is\("revoked_at", null\)/)
+  assert.match(edge, /eq\("role", "owner"\)/)
+  assert.match(edge, /SUPABASE_SERVICE_ROLE_KEY/)
+  assert.match(migration, /array\['owner'::text, 'editor'::text, 'viewer'::text\]/)
+  assert.doesNotMatch(edge, /SUPABASE_SERVICE_ROLE_KEY\s*=\s*["']/)
+})
