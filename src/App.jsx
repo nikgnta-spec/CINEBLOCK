@@ -1022,7 +1022,8 @@ export default function App() {
       const session = await ensureCloudSession(displayName)
       setDisplayName(session.displayName)
       const localRecord = snapshotCurrentProject()
-      const created = await createCloudProject(localRecord.name, localRecord)
+      const bootstrapToken = new URLSearchParams(window.location.search).get('owner_bootstrap') || ''
+      const created = await createCloudProject(localRecord.name, localRecord, bootstrapToken)
       const cloudPayload = { ...localRecord, id: created.id, name: created.name || localRecord.name }
       const saved = await saveCloudProject(created.id, cloudPayload, Number(created.revision) || 1)
       if (saved.conflict) {
@@ -1047,6 +1048,11 @@ export default function App() {
       setCloudStatus('synced')
       setCloudError('')
       setShareUrl('')
+      if (bootstrapToken) {
+        const cleanUrl = new URL(window.location.href)
+        cleanUrl.searchParams.delete('owner_bootstrap')
+        window.history.replaceState({}, '', cleanUrl.toString())
+      }
     } catch (error) {
       console.error('CINEBLOCK could not connect project to cloud:', error)
       setCloudError(error.message || 'Proyek gagal dihubungkan ke cloud.')

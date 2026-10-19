@@ -78,9 +78,9 @@ export async function fetchCloudProject(projectId) {
   return data
 }
 
-export async function createCloudProject(name, payload) {
+export async function createCloudProject(name, payload, bootstrapToken = '') {
   const { data, error } = await getCloudClient().functions.invoke('cineblock-project-access', {
-    body: { action: 'create_project', name, payload },
+    body: { action: 'create_project', name, payload, bootstrap_token: bootstrapToken },
   })
   if (error) {
     let serverMessage = data?.error

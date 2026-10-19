@@ -45,9 +45,6 @@ Deno.serve(async (req: Request) => {
   // so the owner can initialize the first cloud project without email/password login.
   // After bootstrap, project ownership is enforced by owner membership and RLS.
   if (action === "create_project") {
-    const bootstrapOwnerIds = new Set([
-      "6f47b458-c3d8-437e-9ee3-d9374b823892",
-    ]);
     const { data: ownerMembership } = await admin
       .from("cineblock_project_members")
       .select("project_id")
@@ -56,17 +53,48 @@ Deno.serve(async (req: Request) => {
       .limit(1)
       .maybeSingle();
     const isRootOperator = caller.id === "cf4a51e8-825e-4db4-8b8a-037d3908663c";
-    const isBootstrappedOwner = bootstrapOwnerIds.has(caller.id) || Boolean(ownerMembership);
-    if (!isRootOperator && !isBootstrappedOwner) {
-      return reply(403, { error: "Pembuatan proyek cloud hanya tersedia untuk pemilik CineBlock yang sudah diaktifkan." });
+    const suppliedBootstrapToken = String(body.bootstrap_token ?? "").trim();
+    let bootstrapTokenHash: string | null = null;
+    let validBootstrapToken = false;
+
+    if (!isRootOperator && !ownerMembership && suppliedBootstrapToken) {
+      const digest = await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(suppliedBootstrapToken),
+      );
+      bootstrapTokenHash = Array.from(new Uint8Array(digest))
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
+      const { data: tokenRecord, error: tokenError } = await admin
+        .from("cineblock_owner_bootstrap_tokens")
+        .select("token_hash")
+        .eq("token_hash", bootstrapTokenHash)
+        .is("redeemed_at", null)
+        .gt("expires_at", new Date().toISOString())
+        .maybeSingle();
+      if (tokenError) {
+        console.error("CineBlock owner bootstrap lookup failed", tokenError.code);
+        return reply(500, { error: "Aktivasi pemilik sementara tidak dapat diverifikasi." });
+      }
+      validBootstrapToken = Boolean(tokenRecord);
     }
+
+    if (!isRootOperator && !ownerMembership && !validBootstrapToken) {
+      return reply(403, {
+        error: suppliedBootstrapToken
+          ? "Tautan aktivasi pemilik tidak valid, sudah digunakan, atau kedaluwarsa. Minta tautan aktivasi baru."
+          : "Aktivasi pemilik satu kali diperlukan sebelum proyek lokal dapat disinkronkan.",
+        code: "OWNER_BOOTSTRAP_REQUIRED",
+      });
+    }
+
     const name = String(body.name ?? "").trim().slice(0, 160);
     if (!name) return reply(400, { error: "Nama proyek wajib diisi." });
     const payload = body.payload && typeof body.payload === "object" && !Array.isArray(body.payload)
       ? body.payload
       : {};
-    // The database guard only permits the trusted root operator as project owner_id.
-    // The first-device identity receives the explicit owner membership below.
+    // Database policy reserves owner_id for the trusted root operator.
+    // The browser's anonymous identity is granted owner access via membership.
     const ownerId = isRootOperator ? caller.id : "cf4a51e8-825e-4db4-8b8a-037d3908663c";
     const { data: created, error: createError } = await admin
       .from("cineblock_projects")
@@ -77,6 +105,7 @@ Deno.serve(async (req: Request) => {
       console.error("CineBlock project creation failed", createError?.code ?? "unknown");
       return reply(500, { error: "Database menolak pembuatan proyek. Kode: " + (createError?.code ?? "unknown") });
     }
+
     if (!isRootOperator) {
       const { error: membershipError } = await admin.from("cineblock_project_members").upsert({
         project_id: created.id, user_id: caller.id, role: "owner",
@@ -86,6 +115,24 @@ Deno.serve(async (req: Request) => {
         return reply(500, { error: "Proyek awal dibuat tetapi aktivasi pemilik gagal. Silakan coba lagi." });
       }
     }
+
+    if (validBootstrapToken && bootstrapTokenHash) {
+      const { data: redeemed, error: redeemError } = await admin
+        .from("cineblock_owner_bootstrap_tokens")
+        .update({ redeemed_at: new Date().toISOString(), redeemed_by: caller.id })
+        .eq("token_hash", bootstrapTokenHash)
+        .is("redeemed_at", null)
+        .gt("expires_at", new Date().toISOString())
+        .select("token_hash")
+        .maybeSingle();
+      if (redeemError || !redeemed) {
+        await admin.from("cineblock_project_members").delete()
+          .eq("project_id", created.id).eq("user_id", caller.id);
+        await admin.from("cineblock_projects").delete().eq("id", created.id);
+        return reply(409, { error: "Tautan aktivasi sudah digunakan. Muat ulang halaman dan gunakan tautan aktivasi yang masih berlaku." });
+      }
+    }
+
     return reply(201, { project: created, role: "owner" });
   }
 

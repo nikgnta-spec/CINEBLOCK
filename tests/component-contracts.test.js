@@ -139,15 +139,21 @@ test('cloud project links are removed from the URL after redemption', async () =
 })
 
 
-test('owner bootstrap links are single-use and cloud access stays server-authorized', async () => {
+test('first-device owner bootstrap uses a single-use hashed token and grants explicit owner membership', async () => {
   const edge = await readSource('../supabase/functions/cineblock-project-access/index.ts')
-  const migration = await readSource('../supabase/migrations/202610190001_cineblock_owner_bootstrap_link.sql')
-  assert.match(edge, /link\.role === "owner"/)
-  assert.match(edge, /\.is\("revoked_at", null\)/)
-  assert.match(edge, /eq\("role", "owner"\)/)
-  assert.match(edge, /SUPABASE_SERVICE_ROLE_KEY/)
-  assert.match(migration, /array\['owner'::text, 'editor'::text, 'viewer'::text\]/)
-  assert.doesNotMatch(edge, /SUPABASE_SERVICE_ROLE_KEY\s*=\s*["']/)
+  const migration = await readSource('../supabase/migrations/202610190002_cineblock_owner_bootstrap_tokens.sql')
+  const app = await readSource('../src/App.jsx')
+  const cloud = await readSource('../src/cloudSync.js')
+  assert.match(edge, /cineblock_owner_bootstrap_tokens/)
+  assert.match(edge, /crypto\.subtle\.digest\(/)
+  assert.match(edge, /\.is\("redeemed_at", null\)/)
+  assert.match(edge, /project_id: created\.id, user_id: caller\.id, role: "owner"/)
+  assert.match(migration, /enable row level security/)
+  assert.match(migration, /revoke all on table/)
+  assert.match(app, /get\('owner_bootstrap'\)/)
+  assert.match(app, /searchParams\.delete\('owner_bootstrap'\)/)
+  assert.match(cloud, /bootstrap_token: bootstrapToken/)
+  assert.doesNotMatch(edge, /bootstrapOwnerIds/)
 })
 
 
