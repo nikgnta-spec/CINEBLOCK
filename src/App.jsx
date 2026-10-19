@@ -1068,8 +1068,11 @@ export default function App() {
       const session = await ensureCloudSession(displayName)
       setDisplayName(session.displayName)
       const link = await createCloudShareLink(cloudProjectId, 'editor')
-      const shareAddress = new URL(link.url)
-      shareAddress.origin = window.location.origin
+      const generatedShareAddress = new URL(link.url)
+      const shareAddress = new URL(window.location.origin)
+      shareAddress.pathname = generatedShareAddress.pathname
+      shareAddress.search = generatedShareAddress.search
+      shareAddress.hash = generatedShareAddress.hash
       setShareUrl(shareAddress.toString())
     } catch (error) {
       setCloudError(error.message || 'Tautan berbagi gagal dibuat.')
