@@ -69,7 +69,7 @@ test('movement path endpoints render the same object icon and name without a bac
   const endpoint = source.slice(source.indexOf('data-floorplan-path-end-object="true"'), source.indexOf('{(showPath ? (object.path || []) : []).map'))
   assert.match(source, /data-floorplan-path-end-object="true"/)
   assert.match(source, /const movementWaypoints = showPath \? \(object\.path \|\| \[\]\) : \[\]/)
-  assert.match(endpoint, /const endpointName = type === 'actor'/)
+  assert.match(source, /const endpointName = type === 'actor'/)
   assert.match(endpoint, /\{endpointName\}/)
   assert.match(endpoint, /type === 'actor' \? \(/)
   assert.match(endpoint, /type === 'camera' \? \(/)
