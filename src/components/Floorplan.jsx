@@ -3478,7 +3478,7 @@ export default function Floorplan({
 
               {selectedType === 'camera' && (
                 <>
-                  <section className="floorplan-inspector-section">
+                  <section className="floorplan-inspector-section floorplan-camera-link-section">
                     <label htmlFor="camera-linked-shot">Tautan Shot List</label>
                     <select
                       id="camera-linked-shot"
@@ -3557,7 +3557,7 @@ export default function Floorplan({
                         </div>
                       </section>
 
-                      <section className="floorplan-inspector-section">
+                      <section className="floorplan-inspector-section floorplan-shotlist-chip-section">
                         <label>Movement</label>
                         <div className="floorplan-shot-chips">
                           {(selectedShot.movements || []).map(movement => (
@@ -3593,7 +3593,7 @@ export default function Floorplan({
                         )}
                       </section>
 
-                      <section className="floorplan-inspector-section">
+                      <section className="floorplan-inspector-section floorplan-shotlist-chip-section">
                         <label>Equipment</label>
                         <div className="floorplan-shot-chips">
                           {(selectedShot.equipment || []).map(item => (
