@@ -2222,3 +2222,15 @@ button:focus-visible,
   .floorplan-inspector-section .floorplan-opening-actions { gap: 8px; }
   .floorplan-inspector-section .floorplan-field { padding-inline: 8px; font-size: 12px; }
 }
+
+
+/* Scene navigator scrolling: constrain the list to the sidebar and let its contents scroll. */
+.scene-sidebar {
+  min-height: 0;
+}
+.scene-navigator-list {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
