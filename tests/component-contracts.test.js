@@ -62,3 +62,19 @@ test('autosave is paused after an external-tab save conflict is detected', async
   assert.match(source, /if \(!hydrated \|\| !activeProjectId \|\| externalSaveDetectedRef\.current\) return undefined/)
   assert.match(source, /if \(externalSaveDetectedRef\.current\) return/)
 })
+
+
+test('movement path endpoints display the same object marker for path-capable objects', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /data-floorplan-path-end-object="true"/)
+  assert.match(source, /FloorplanObjectIcon type=\{type\} size=\{22\}/)
+  assert.match(source, /const movementWaypoints = showPath \? \(object\.path \|\| \[\]\) : \[\]/)
+})
+
+test('reusable Rooms can be added to another Scene and edits update the Project Room collection', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /Gunakan Room yang sudah dibuat/)
+  assert.match(source, /roomIds: \[\.\.\.new Set\(\[\.\.\.\(item\.roomIds \|\| \[\]\), roomId\]\)\]/)
+  assert.match(source, /onProjectRoomsChange\?\.\(previous =>/)
+  assert.match(source, /byId\.set\(room\.id, room\)/)
+})

@@ -724,14 +724,26 @@ export default function Floorplan({
     const stored = floorplans?.[scene.id] || EMPTY_LAYOUT
     const currentLayout = { ...stored, rooms: layoutRef.current?.rooms || [] }
     const nextLayout = updater(currentLayout)
-    // Persist a private Room collection for this Scene; never write edits back to
-    // the project-level reusable collection.
-    onFloorplansChange(previous => ({
-      ...previous,
-      [scene.id]: reusableRoomMode
-        ? { ...nextLayout, roomIsolationVersion: 1 }
-        : nextLayout,
-    }))
+    if (reusableRoomMode) {
+      const previousRoomIds = new Set((scene.roomIds || []))
+      const nextRoomIds = new Set((nextLayout.rooms || []).map(room => room.id))
+      onProjectRoomsChange?.(previous => {
+        const current = Array.isArray(previous) ? previous : []
+        const byId = new Map(current.map(room => [room.id, room]))
+        ;(nextLayout.rooms || []).forEach(room => byId.set(room.id, room))
+        return [...byId.values()]
+      })
+      onChange?.(previous => previous.map(item => item.id !== scene.id ? item : {
+        ...item,
+        roomIds: [...new Set([...(item.roomIds || []).filter(id => !previousRoomIds.has(id)), ...nextRoomIds])],
+      }))
+      onFloorplansChange(previous => ({
+        ...previous,
+        [scene.id]: { ...nextLayout, rooms: [], roomIsolationVersion: undefined },
+      }))
+      return
+    }
+    onFloorplansChange(previous => ({ ...previous, [scene.id]: nextLayout }))
   }
 
   const applyEntitySelection = (items, primary = null) => {
@@ -2568,6 +2580,30 @@ export default function Floorplan({
           <button className={'floorplan-tool-button' + (tool === 'room' ? ' active' : '')} onClick={() => setTool('room')} title="Gambar Room titik demi titik" aria-label="Gambar Room baru" aria-pressed={tool === 'room'}>
             <Square size={18} /><span>Ruang</span>
           </button>
+          {reusableRoomMode && projectRooms.some(room => !(scene?.roomIds || []).includes(room.id)) && (
+            <label className="floorplan-reuse-room-control">
+              <span>Gunakan Room</span>
+              <select
+                aria-label="Gunakan Room yang sudah dibuat"
+                value=""
+                onChange={event => {
+                  const roomId = event.target.value
+                  if (!roomId || !scene) return
+                  onChange?.(previous => previous.map(item => item.id === scene.id
+                    ? { ...item, roomIds: [...new Set([...(item.roomIds || []), roomId])] }
+                    : item))
+                  setSelected({ type: 'room', id: roomId })
+                  setTool('select')
+                  event.target.value = ''
+                }}
+              >
+                <option value="">Pilih Room tersimpan…</option>
+                {projectRooms.filter(room => !(scene?.roomIds || []).includes(room.id)).map(room => (
+                  <option key={room.id} value={room.id}>{room.label || 'Room'}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <button className={'floorplan-tool-button' + (tool === 'wall' ? ' active' : '')} onClick={() => setTool('wall')} title="Gambar dinding dengan menggeser kedua ujungnya" aria-label="Gambar dinding" aria-pressed={tool === 'wall'}>
             <Minus size={19} /><span>Dinding</span>
           </button>
@@ -2957,9 +2993,10 @@ export default function Floorplan({
                 const panLeft = type === 'camera' && shotMovements.includes('Pan Left')
                 const panRight = type === 'camera' && shotMovements.includes('Pan Right')
                 const panBoth = type === 'camera' && shotMovements.includes('Pan') && !panLeft && !panRight
+                const movementWaypoints = showPath ? (object.path || []) : []
                 const points = [
                   { x: object.x, y: object.y },
-                  ...(showPath ? (object.path || []) : []),
+                  ...movementWaypoints,
                 ]
                 const pointString = points.map(point => point.x + ',' + point.y).join(' ')
                 const handleBaseAngle = type === 'actor' ? -90 : type === 'light' ? 90 : 0
@@ -2973,6 +3010,23 @@ export default function Floorplan({
                     {points.length > 1 && (
                       <polyline points={pointString} fill="none" stroke={active ? 'var(--text)' : 'var(--text-muted)'} strokeOpacity={active ? 0.95 : 0.3} strokeWidth={active ? 3 : 2} strokeDasharray={active ? '9 6' : '5 9'} markerEnd="url(#floorplan-arrow)" vectorEffect="non-scaling-stroke" pointerEvents="none" />
                     )}
+                    {movementWaypoints.length > 0 && (() => {
+                      const endpoint = movementWaypoints[movementWaypoints.length - 1]
+                      return (
+                        <g
+                          key="movement-path-end-object"
+                          data-floorplan-path-end-object="true"
+                          transform={'translate(' + endpoint.x + ' ' + endpoint.y + ')'}
+                          pointerEvents="none"
+                          opacity={active ? 1 : 0.55}
+                        >
+                          <circle r="15" fill="var(--bg)" stroke="var(--text)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+                          <g transform="scale(0.58)">
+                            <FloorplanObjectIcon type={type} size={22} />
+                          </g>
+                        </g>
+                      )
+                    })()}
                     {(showPath ? (object.path || []) : []).map((point, index) => {
                       const pointSelected = selectedWaypoint?.type === type
                         && selectedWaypoint.id === object.id
