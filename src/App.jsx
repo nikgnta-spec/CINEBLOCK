@@ -533,6 +533,7 @@ export default function App() {
   const [cloudRevision, setCloudRevision] = useState(0)
   const [cloudError, setCloudError] = useState('')
   const [shareUrl, setShareUrl] = useState('')
+  const [shareLinkToOpen, setShareLinkToOpen] = useState('')
   const [displayName, setDisplayName] = useState(() => getSavedDisplayName())
   const [cloudConflict, setCloudConflict] = useState(null)
   const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine)
@@ -1009,6 +1010,24 @@ export default function App() {
     setFloorplans(targetFloorplans)
     setProjectRooms(migratedTarget.rooms)
     setTab('floorplan')
+  }
+
+  const handleOpenExistingCloudLink = () => {
+    setCloudError('')
+    try {
+      const pasted = shareLinkToOpen.trim()
+      if (!pasted) throw new Error('Tempel tautan editor NEPTU terlebih dahulu.')
+      const parsed = new URL(pasted)
+      const token = parsed.searchParams.get('share')
+      if (!token) throw new Error('Tautan tidak memiliki token editor. Gunakan tautan yang dibuat melalui tombol “Buat tautan editor”.')
+      const destination = new URL(window.location.origin)
+      destination.searchParams.set('share', token)
+      window.location.assign(destination.toString())
+    } catch (error) {
+      setCloudError(error instanceof TypeError
+        ? 'Format tautan tidak valid. Tempel seluruh tautan editor, termasuk bagian ?share=… .'
+        : error.message || 'Tautan editor tidak dapat dibuka.')
+    }
   }
 
   const handleConnectCloud = async () => {
