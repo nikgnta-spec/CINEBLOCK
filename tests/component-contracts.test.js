@@ -159,6 +159,8 @@ test('first-device owner bootstrap uses a single-use hashed token and grants exp
 
 test('share links use the current deployment origin so preview pairing is testable', async () => {
   const app = await readSource('../src/App.jsx')
-  assert.match(app, /const shareAddress = new URL\(link\.url\)/)
-  assert.match(app, /shareAddress\.origin = window\.location\.origin/)
+  assert.match(app, /const generatedShareAddress = new URL\(link\.url\)/)
+  assert.match(app, /const shareAddress = new URL\(window\.location\.origin\)/)
+  assert.match(app, /shareAddress\.search = generatedShareAddress\.search/)
+  assert.doesNotMatch(app, /shareAddress\.origin = window\.location\.origin/)
 })
