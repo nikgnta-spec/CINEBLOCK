@@ -133,7 +133,7 @@ test('backup import has a pre-read size limit and validates before replacing act
   assert.match(source, /catch \(error\) \{[\s\S]*?could not import backup/i)
 })
 
-test('legacy Room references can be detached per Scene and Room reuse UI is removed', async () => {
+test('reusable Rooms are project-level records that can be attached to individual Scenes', async () => {
   const source = await readSource('../src/App.jsx')
   const floorplan = await readSource('../src/components/Floorplan.jsx')
 
@@ -142,10 +142,9 @@ test('legacy Room references can be detached per Scene and Room reuse UI is remo
   assert.match(source, /projectRooms/)
   assert.match(source, /rooms: Array\.isArray\(rooms\) \? rooms : \[\]/)
   assert.match(floorplan, /projectRooms\.filter\(room => \(scene\.roomIds \|\| \[\]\)\.includes\(room\.id\)\)/)
-  assert.doesNotMatch(floorplan, /Room digunakan bersama/) 
-  assert.match(floorplan, /roomIsolationVersion === 1/) 
-  assert.match(floorplan, /roomIsolationVersion: 1/) 
-  assert.doesNotMatch(floorplan, /Pakai Room yang sudah ada/)
+  assert.match(floorplan, /Gunakan Room yang sudah dibuat/)
+  assert.match(floorplan, /onProjectRoomsChange\?\.\(previous =>/)
+  assert.match(floorplan, /roomIds: \[\.\.\.new Set\(\[\.\.\.\(item\.roomIds \|\| \[\]\), roomId\]\)\]/)
   assert.match(source, /const resolvedFloorplans = projectRooms === null/)
 })
 
@@ -157,12 +156,13 @@ test('local backup project records include reusable rooms and Scene references',
   assert.match(source, /migrateReusableRooms\(targetScenes, target\.floorplans, target\.rooms\)/)
 })
 
-test('Room picker is removed so Rooms cannot be reused across Scenes', async () => {
+test('Room picker lets a Scene reuse a Room from the project collection', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
 
-  assert.doesNotMatch(source, /Pakai Room yang sudah ada/)
-  assert.doesNotMatch(source, /projectRooms\.map\(room =>/)
-  assert.match(source, /roomIsolationVersion: 1/)
+  assert.match(source, /Gunakan Room yang sudah dibuat/)
+  assert.match(source, /projectRooms\.filter\(room => !\(scene\?\.roomIds \|\| \[\]\)\.includes\(room\.id\)\)/)
+  assert.match(source, /roomIds: \[\.\.\.new Set\(\[\.\.\.\(item\.roomIds \|\| \[\]\), roomId\]\)\]/)
+  assert.doesNotMatch(source, /roomIsolationVersion: 1/)
 })
 
 test('Wall dimensions can be edited numerically and total length is displayed on canvas', async () => {
