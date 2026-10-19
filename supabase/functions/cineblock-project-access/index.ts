@@ -40,9 +40,14 @@ Deno.serve(async (req: Request) => {
   try { body = await req.json(); } catch { return reply(400, { error: "Permintaan tidak valid." }); }
   const action = String(body.action ?? "");
 
-  // Project creation is performed server-side after validating the real Supabase user.
-  // The service key never reaches the browser; only the single operator may create projects.
+  // Project creation is server-side. The bootstrap identity is the already-issued
+  // anonymous session on the first-device browser; it is explicitly allowlisted here
+  // so the owner can initialize the first cloud project without email/password login.
+  // After bootstrap, project ownership is enforced by owner membership and RLS.
   if (action === "create_project") {
+    const bootstrapOwnerIds = new Set([
+      "6f47b458-c3d8-437e-9ee3-d9374b823892",
+    ]);
     const { data: ownerMembership } = await admin
       .from("cineblock_project_members")
       .select("project_id")
@@ -50,25 +55,38 @@ Deno.serve(async (req: Request) => {
       .eq("role", "owner")
       .limit(1)
       .maybeSingle();
-    const isProjectOwner = caller.id === "cf4a51e8-825e-4db4-8b8a-037d3908663c" || Boolean(ownerMembership);
-    if (!isProjectOwner) {
-      return reply(403, { error: "Hanya pemilik proyek CineBlock yang boleh membuat proyek cloud." });
+    const isRootOperator = caller.id === "cf4a51e8-825e-4db4-8b8a-037d3908663c";
+    const isBootstrappedOwner = bootstrapOwnerIds.has(caller.id) || Boolean(ownerMembership);
+    if (!isRootOperator && !isBootstrappedOwner) {
+      return reply(403, { error: "Pembuatan proyek cloud hanya tersedia untuk pemilik CineBlock yang sudah diaktifkan." });
     }
     const name = String(body.name ?? "").trim().slice(0, 160);
     if (!name) return reply(400, { error: "Nama proyek wajib diisi." });
     const payload = body.payload && typeof body.payload === "object" && !Array.isArray(body.payload)
       ? body.payload
       : {};
+    // The database guard only permits the trusted root operator as project owner_id.
+    // The first-device identity receives the explicit owner membership below.
+    const ownerId = isRootOperator ? caller.id : "cf4a51e8-825e-4db4-8b8a-037d3908663c";
     const { data: created, error: createError } = await admin
       .from("cineblock_projects")
-      .insert({ name, owner_id: caller.id, payload, revision: 1 })
+      .insert({ name, owner_id: ownerId, payload, revision: 1 })
       .select("id,name,owner_id,updated_at,revision")
       .single();
     if (createError || !created) {
       console.error("CineBlock project creation failed", createError?.code ?? "unknown");
       return reply(500, { error: "Database menolak pembuatan proyek. Kode: " + (createError?.code ?? "unknown") });
     }
-    return reply(201, { project: created });
+    if (!isRootOperator) {
+      const { error: membershipError } = await admin.from("cineblock_project_members").upsert({
+        project_id: created.id, user_id: caller.id, role: "owner",
+      }, { onConflict: "project_id,user_id" });
+      if (membershipError) {
+        await admin.from("cineblock_projects").delete().eq("id", created.id);
+        return reply(500, { error: "Proyek awal dibuat tetapi aktivasi pemilik gagal. Silakan coba lagi." });
+      }
+    }
+    return reply(201, { project: created, role: "owner" });
   }
 
   if (action === "redeem_link") {

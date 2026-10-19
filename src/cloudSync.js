@@ -82,7 +82,17 @@ export async function createCloudProject(name, payload) {
   const { data, error } = await getCloudClient().functions.invoke('cineblock-project-access', {
     body: { action: 'create_project', name, payload },
   })
-  if (error) throw new Error(data?.error || error.message || 'Proyek cloud gagal dibuat.')
+  if (error) {
+    let serverMessage = data?.error
+    try {
+      const response = error.context
+      if (!serverMessage && response && typeof response.clone === 'function') {
+        const body = await response.clone().json()
+        serverMessage = body?.error || body?.message
+      }
+    } catch { /* preserve the Supabase client error as a fallback */ }
+    throw new Error(serverMessage || error.message || 'Proyek cloud gagal dibuat.')
+  }
   if (!data?.project?.id) throw new Error(data?.error || 'Server tidak mengembalikan proyek cloud.')
   return data.project
 }
