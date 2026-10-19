@@ -2888,3 +2888,53 @@ button:focus-visible,
   .floorplan-shot-chips { gap: 5px; }
   .floorplan-shot-chip { min-height: 26px; font-size: 11px; }
 }
+
+
+/* Door/window property controls: compact two-column form matching the requested layout. */
+.floorplan-opening-row .floorplan-opening-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: row;
+  align-items: start;
+  column-gap: 10px;
+  row-gap: 10px;
+}
+.floorplan-opening-row .floorplan-dimension-input {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+}
+.floorplan-opening-row .floorplan-dimension-input label {
+  min-height: 0;
+  height: auto;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: normal;
+}
+.floorplan-opening-row .floorplan-field {
+  width: 100%;
+  height: 38px;
+  min-height: 38px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.floorplan-opening-row .floorplan-opening-hint {
+  grid-column: 1 / -1;
+  margin-top: 0;
+  padding: 1px 0 0;
+  text-align: center;
+  line-height: 1.4;
+}
+@media (max-width: 340px) {
+  .floorplan-opening-row .floorplan-opening-actions {
+    column-gap: 7px;
+    row-gap: 9px;
+  }
+  .floorplan-opening-row .floorplan-field {
+    padding-inline: 7px;
+    font-size: 12px;
+  }
+}
