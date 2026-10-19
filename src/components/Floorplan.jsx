@@ -3038,10 +3038,37 @@ export default function Floorplan({
                               <path d="M-25 12 C-28 15 -28 19 -25 23 M25 12 C28 15 28 19 25 23" />
                             </g>
                           ) : type === 'camera' ? (
-                            <g transform={'rotate(' + (object.angle || 0) + ') scale(0.42)'} fill="var(--bg)" stroke={getObjectColor(type, object)} strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
-                              <path d="M9 -9 L33 -20 L33 20 L9 9 Z" />
-                              <rect x="-29" y="-15" width="40" height="30" rx="6" />
-                            </g>
+                            <>
+                              {cameraFov && (
+                                <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
+                                  <path
+                                    d={cameraFov.widePath}
+                                    fill={getCameraFovColor(object)}
+                                    fillOpacity={active ? 0.2 : 0.12}
+                                    stroke={getCameraFovColor(object)}
+                                    strokeOpacity={active ? 1 : 0.88}
+                                    strokeWidth={active ? 1.6 : 1.2}
+                                    vectorEffect="non-scaling-stroke"
+                                  />
+                                  {cameraFov.narrowPath && (
+                                    <path
+                                      d={cameraFov.narrowPath}
+                                      fill="var(--bg)"
+                                      fillOpacity="0.28"
+                                      stroke={getCameraFovColor(object)}
+                                      strokeOpacity={active ? 1 : 0.9}
+                                      strokeWidth="1.2"
+                                      strokeDasharray="5 4"
+                                      vectorEffect="non-scaling-stroke"
+                                    />
+                                  )}
+                                </g>
+                              )}
+                              <g transform={'rotate(' + (object.angle || 0) + ') scale(0.42)'} fill="var(--bg)" stroke={getObjectColor(type, object)} strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+                                <path d="M9 -9 L33 -20 L33 20 L9 9 Z" />
+                                <rect x="-29" y="-15" width="40" height="30" rx="6" />
+                              </g>
+                            </>
                           ) : type === 'light' ? (
                             <g transform={'rotate(' + (90 + (object.angle || 0)) + ') scale(0.48)'} fill="var(--bg)" stroke={getObjectColor(type, object)} strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
                               <path d="M-13 -8 L-8 -11 L3 -11 L11 -7 L11 7 L3 11 L-8 11 L-13 8 Z" />

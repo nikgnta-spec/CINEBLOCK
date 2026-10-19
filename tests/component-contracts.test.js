@@ -98,3 +98,16 @@ test('Floorplan zoom has no hard minimum or maximum viewBox width', async () => 
   assert.doesNotMatch(zoomCanvas, /clamp\(current\.width \* factor/)
   assert.doesNotMatch(zoomCanvas, /MAP_WIDTH \* 2\.5/)
 })
+
+
+test('camera Movement Path endpoint inherits the source camera FOV cone', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  const endpointStart = source.indexOf('data-floorplan-path-end-object="true"')
+  const endpointEnd = source.indexOf('{(showPath ? (object.path || []) : []).map', endpointStart)
+  const endpoint = source.slice(endpointStart, endpointEnd)
+  assert.match(endpoint, /type === 'camera' \? \(/)
+  assert.match(endpoint, /cameraFov &&/)
+  assert.match(endpoint, /d=\{cameraFov\.widePath\}/)
+  assert.match(endpoint, /getCameraFovColor\(object\)/)
+  assert.match(endpoint, /cameraFov\.narrowPath &&/)
+})
