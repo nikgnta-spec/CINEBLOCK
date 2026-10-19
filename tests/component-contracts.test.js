@@ -149,3 +149,10 @@ test('owner bootstrap links are single-use and cloud access stays server-authori
   assert.match(migration, /array\['owner'::text, 'editor'::text, 'viewer'::text\]/)
   assert.doesNotMatch(edge, /SUPABASE_SERVICE_ROLE_KEY\s*=\s*["']/)
 })
+
+
+test('share links use the current deployment origin so preview pairing is testable', async () => {
+  const app = await readSource('../src/App.jsx')
+  assert.match(app, /const shareAddress = new URL\(link\.url\)/)
+  assert.match(app, /shareAddress\.origin = window\.location\.origin/)
+})

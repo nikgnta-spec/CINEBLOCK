@@ -752,7 +752,7 @@ export default function App() {
     if (skipCloudSave) {
       skipCloudSaveRef.current = false
       cloudDirtyRef.current = false
-    } else if (cloudProjectRef.current?.id === activeProjectId) {
+    } else if (cloudProjectRef.current?.id === activeProjectId && cloudProjectRef.current.role !== 'viewer') {
       cloudDirtyRef.current = true
       const map = readCloudProjectMap()
       map[activeProjectId] = { ...cloudProjectRef.current, pending: true }
@@ -1062,7 +1062,9 @@ export default function App() {
       const session = await ensureCloudSession(displayName)
       setDisplayName(session.displayName)
       const link = await createCloudShareLink(cloudProjectId, 'editor')
-      setShareUrl(link.url)
+      const shareAddress = new URL(link.url)
+      shareAddress.origin = window.location.origin
+      setShareUrl(shareAddress.toString())
     } catch (error) {
       setCloudError(error.message || 'Tautan berbagi gagal dibuat.')
     }
