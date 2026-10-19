@@ -544,6 +544,19 @@ export default function App() {
   const cloudLinkHandledRef = useRef(false)
   const cloudConflictRef = useRef(null)
   const cloudLatestSnapshotRef = useRef(null)
+  const saveCloudProjectWithEchoGuard = async (projectId, payload, expectedRevision) => {
+    const result = await saveCloudProject(projectId, payload, expectedRevision)
+    // Supabase Realtime can deliver our own UPDATE before the save promise
+    // resolves. Advance the known revision immediately so that echo is not
+    // mistaken for a competing edit while the autosave effect is still dirty.
+    if (result?.ok && result.project?.id === projectId) {
+      const nextRevision = Number(result.project.revision) || 0
+      if (cloudProjectId === projectId || cloudProjectRef.current?.id === projectId) {
+        cloudRevisionRef.current = Math.max(cloudRevisionRef.current, nextRevision)
+      }
+    }
+    return result
+  }
 
   const applyCloudRecord = (remote, role, replaceCurrentProject = false) => {
     const payload = remote?.payload && typeof remote.payload === 'object' ? remote.payload : {}
@@ -785,7 +798,7 @@ export default function App() {
           } else {
             setCloudStatus('syncing')
             try {
-              const result = await saveCloudProject(activeProjectId, { ...currentRecord, id: activeProjectId }, cloudRevisionRef.current)
+              const result = await saveCloudProjectWithEchoGuard(activeProjectId, { ...currentRecord, id: activeProjectId }, cloudRevisionRef.current)
               if (result.conflict) {
                 cloudConflictRef.current = result.project
                 setCloudConflict(result.project)
@@ -845,7 +858,7 @@ export default function App() {
       if (bootstrapEmptyProject && linkKind === 'owner') {
         const localRecord = createProjectRecord(activeProjectId, project, scenes, activeSceneId, floorplans, projectRooms || [])
         const payload = { ...localRecord, id: remote.id, name: remote.name || localRecord.name }
-        const saved = await saveCloudProject(remote.id, payload, remote.revision)
+        const saved = await saveCloudProjectWithEchoGuard(remote.id, payload, remote.revision)
         if (saved.conflict) {
           remote = saved.project
           setCloudError('Proyek cloud berubah saat aktivasi. Versi cloud tidak ditimpa; periksa konflik sebelum melanjutkan.')
@@ -941,7 +954,7 @@ export default function App() {
         }
       } else if (localMapEntry?.pending && isOnline && !cloudConflictRef.current) {
         const snapshot = cloudLatestSnapshotRef.current || createProjectRecord(activeProjectId, project, scenes, activeSceneId, floorplans, projectRooms || [])
-        saveCloudProject(remote.id, { ...snapshot, id: remote.id }, remote.revision).then(result => {
+        saveCloudProjectWithEchoGuard(remote.id, { ...snapshot, id: remote.id }, remote.revision).then(result => {
           if (cancelled) return
           if (result.conflict) {
             cloudConflictRef.current = result.project
@@ -1063,7 +1076,7 @@ export default function App() {
       const bootstrapToken = new URLSearchParams(window.location.search).get('owner_bootstrap') || ''
       const created = await createCloudProject(localRecord.name, localRecord, bootstrapToken)
       const cloudPayload = { ...localRecord, id: created.id, name: created.name || localRecord.name }
-      const saved = await saveCloudProject(created.id, cloudPayload, Number(created.revision) || 1)
+      const saved = await saveCloudProjectWithEchoGuard(created.id, cloudPayload, Number(created.revision) || 1)
       if (saved.conflict) {
         cloudConflictRef.current = saved.project
         setCloudConflict(saved.project)
@@ -1146,7 +1159,7 @@ export default function App() {
         return
       }
       const snapshot = { ...snapshotCurrentProject(), id: cloudProjectId }
-      const result = await saveCloudProject(cloudProjectId, snapshot, latest.revision)
+      const result = await saveCloudProjectWithEchoGuard(cloudProjectId, snapshot, latest.revision)
       if (result.conflict) {
         cloudConflictRef.current = result.project
         setCloudConflict(result.project)
@@ -1192,7 +1205,7 @@ export default function App() {
     try {
       const latest = await fetchCloudProject(activeProjectId)
       const currentRecord = { ...snapshotCurrentProject(), id: activeProjectId }
-      const result = await saveCloudProject(activeProjectId, currentRecord, latest.revision)
+      const result = await saveCloudProjectWithEchoGuard(activeProjectId, currentRecord, latest.revision)
       if (result.conflict) {
         cloudConflictRef.current = result.project
         setCloudConflict(result.project)
