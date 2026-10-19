@@ -2236,18 +2236,81 @@ button:focus-visible,
 }
 
 
-/* Shot List: let the workspace fill the available app height so the scene list scrolls within its full sidebar. */
+/* Shot List layout: keep the scene summary, scene navigator, and shot table in distinct flex regions. */
 .content:has(.shotlist-page) {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.shotlist-tab-panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
   overflow: hidden;
 }
 .shotlist-page {
+  display: flex;
   flex: 1 1 auto;
+  flex-direction: column;
+  height: 100%;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.shotlist-toolbar {
+  flex: 0 0 auto;
 }
 .shotlist-layout {
+  display: flex;
   flex: 1 1 auto;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.shotlist-layout > .scene-sidebar {
+  display: flex;
+  flex: 0 0 190px;
+  flex-direction: column;
+  width: 190px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.shotlist-layout > .scene-sidebar > .scene-navigator-list {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+.shot-table-wrap {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+}
+@media (max-width: 1024px) {
+  .shotlist-layout > .scene-sidebar {
+    flex-basis: 156px;
+    width: 156px;
+  }
+}
+@media (max-width: 680px) {
+  .shotlist-layout {
+    flex-direction: column;
+  }
+  .shotlist-layout > .scene-sidebar {
+    flex: 0 0 112px;
+    width: 100%;
+    height: 112px;
+  }
+  .shotlist-layout > .scene-sidebar > .scene-navigator-list {
+    flex: 1 1 auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
 }
