@@ -3075,6 +3075,9 @@ export default function Floorplan({
                       )
                     })()}
                     {(showPath ? (object.path || []) : []).map((point, index) => {
+                      // The object's own icon already represents a waypoint at its origin.
+                      // Avoid drawing a filled waypoint handle over the icon's face/center.
+                      if (Math.hypot(point.x - object.x, point.y - object.y) < 0.5) return null
                       const pointSelected = selectedWaypoint?.type === type
                         && selectedWaypoint.id === object.id
                         && selectedWaypoint.index === index
