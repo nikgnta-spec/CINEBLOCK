@@ -111,3 +111,29 @@ test('camera Movement Path endpoint inherits the source camera FOV cone', async 
   assert.match(endpoint, /getCameraFovColor\(object\)/)
   assert.match(endpoint, /cameraFov\.narrowPath &&/)
 })
+
+
+test('cross-device sync keeps local storage and adds anonymous cloud collaboration', async () => {
+  const app = await readSource('../src/App.jsx')
+  const cloud = await readSource('../src/cloudSync.js')
+  const dialog = await readSource('../src/components/CloudSyncDialog.jsx')
+
+  assert.match(app, /saveAppState\(/)
+  assert.match(app, /subscribeToCloudProject\(/)
+  assert.match(app, /cloudConflictRef/)
+  assert.match(app, /applyCloudRecord\(/)
+  assert.match(app, /<CloudSyncDialog/)
+  assert.match(cloud, /signInAnonymously\(/)
+  assert.match(cloud, /display_name/)
+  assert.match(cloud, /\.eq\('revision', expectedRevision\)/)
+  assert.match(cloud, /postgres_changes/)
+  assert.match(cloud, /cineblock-project-access/)
+  assert.match(dialog, /Buat tautan editor/)
+  assert.match(dialog, /Timpa dengan versi perangkat ini/)
+})
+
+test('cloud project links are removed from the URL after redemption', async () => {
+  const app = await readSource('../src/App.jsx')
+  assert.match(app, /url\.searchParams\.delete\('owner'\)/)
+  assert.match(app, /url\.searchParams\.delete\('share'\)/)
+})

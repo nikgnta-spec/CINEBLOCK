@@ -1998,3 +1998,55 @@ button:focus-visible,
   color: #111827;
   font-weight: 650;
 }
+
+
+/* Cloud sync dialog: compact, accessible, and consistent with CineBlock's dark UI. */
+.cloud-sync-backdrop {
+  position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center;
+  justify-content: center; padding: 20px; background: rgba(0, 0, 0, 0.64); backdrop-filter: blur(5px);
+}
+.cloud-sync-dialog {
+  width: min(100%, 520px); max-height: min(86vh, 760px); overflow: auto;
+  border: 1px solid var(--border); border-radius: 14px; padding: 20px;
+  background: var(--panel, var(--bg)); color: var(--text); box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+}
+.cloud-sync-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
+.cloud-sync-heading-icon { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 auto; border-radius: 10px; color: var(--accent); background: var(--bg-subtle); }
+.cloud-sync-heading-copy { flex: 1; min-width: 0; }
+.cloud-sync-heading-copy h2 { margin: 1px 0 5px; font-size: 18px; }
+.cloud-sync-heading-copy p { margin: 0; color: var(--text-muted); font-size: 12px; overflow-wrap: anywhere; }
+.cloud-sync-close { padding: 7px !important; }
+.cloud-sync-status { display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--border); border-radius: 9px; padding: 12px; margin-bottom: 16px; background: var(--bg-subtle); }
+.cloud-sync-status > svg { margin-top: 2px; color: var(--accent); flex: 0 0 auto; }
+.cloud-sync-status div { display: grid; gap: 4px; }
+.cloud-sync-status strong { font-size: 13px; }
+.cloud-sync-status span, .cloud-sync-helper { color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+.cloud-sync-status.is-offline > svg, .cloud-sync-status.is-error > svg, .cloud-sync-status.is-conflict > svg { color: var(--danger, #ef4444); }
+.cloud-sync-field { display: grid; gap: 7px; margin: 14px 0; }
+.cloud-sync-field > span { font-size: 12px; font-weight: 600; }
+.cloud-sync-field input, .cloud-sync-link-row input { min-width: 0; width: 100%; border: 1px solid var(--border); border-radius: 7px; padding: 10px; background: var(--bg); color: var(--text); font: inherit; font-size: 13px; }
+.cloud-sync-field small, .cloud-sync-share small { color: var(--text-muted); font-size: 11px; line-height: 1.5; }
+.cloud-sync-notice { border: 1px solid var(--border); border-radius: 8px; padding: 11px 12px; margin: 12px 0; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.cloud-sync-notice.is-error { border-color: rgba(239, 68, 68, .45); color: var(--text); background: rgba(239, 68, 68, .08); }
+.cloud-sync-connect p, .cloud-sync-share p, .cloud-sync-conflict p { color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+.cloud-sync-connect .btn { width: 100%; justify-content: center; }
+.cloud-sync-connected { display: grid; gap: 14px; }
+.cloud-sync-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; }
+.cloud-sync-meta span { color: var(--text-muted); }
+.cloud-sync-share { display: grid; gap: 10px; }
+.cloud-sync-share .btn { justify-self: start; }
+.cloud-sync-link-row { display: flex; gap: 7px; }
+.cloud-sync-link-row input { flex: 1; }
+.cloud-sync-conflict { margin-top: 16px; border: 1px solid rgba(239, 68, 68, .5); border-radius: 9px; padding: 13px; }
+.cloud-sync-conflict > strong { font-size: 13px; }
+.cloud-sync-conflict-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.cloud-sync-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border); }
+.cloud-sync-footer > span { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 10px; }
+.cloud-sync-trigger { gap: 7px; }
+@media (max-width: 760px) {
+  .cloud-sync-backdrop { padding: 10px; align-items: flex-end; }
+  .cloud-sync-dialog { max-height: 92vh; padding: 16px; border-radius: 14px 14px 8px 8px; }
+  .cloud-sync-conflict-actions { display: grid; }
+  .cloud-sync-conflict-actions .btn { justify-content: center; }
+  .cloud-sync-trigger span { display: none; }
+}

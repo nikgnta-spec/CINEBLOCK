@@ -4,8 +4,23 @@ import ProjectInfo from './components/ProjectInfo'
 import ShotList from './components/ShotList'
 import Floorplan from './components/Floorplan'
 import PrintReport from './components/PrintReport'
-import { Download, Upload, Plus, Trash2, X, FileText, PanelsTopLeft, RectangleHorizontal, RectangleVertical, MoreHorizontal, Sun, Moon } from 'lucide-react'
+import { Download, Upload, Plus, Trash2, X, FileText, PanelsTopLeft, RectangleHorizontal, RectangleVertical, MoreHorizontal, Sun, Moon, Cloud } from 'lucide-react'
 import { loadAppState, saveAppState, subscribeToExternalSave } from './storage'
+import CloudSyncDialog from './components/CloudSyncDialog'
+import {
+  createCloudProject,
+  createCloudShareLink,
+  ensureCloudSession,
+  fetchCloudProject,
+  getSavedDisplayName,
+  isCloudSyncConfigured,
+  isEmptyCloudPayload,
+  readCloudProjectMap,
+  redeemCloudLink,
+  saveCloudProject,
+  subscribeToCloudProject,
+  writeCloudProjectMap,
+} from './cloudSync'
 
 const MAX_BACKUP_FILE_SIZE_BYTES = 10 * 1024 * 1024
 
@@ -511,6 +526,83 @@ export default function App() {
   const saveRevisionRef = useRef(0)
   const externalSaveDetectedRef = useRef(false)
   const backupInputRef = useRef(null)
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false)
+  const [cloudStatus, setCloudStatus] = useState('local')
+  const [cloudRole, setCloudRole] = useState('')
+  const [cloudProjectId, setCloudProjectId] = useState('')
+  const [cloudRevision, setCloudRevision] = useState(0)
+  const [cloudError, setCloudError] = useState('')
+  const [shareUrl, setShareUrl] = useState('')
+  const [displayName, setDisplayName] = useState(() => getSavedDisplayName())
+  const [cloudConflict, setCloudConflict] = useState(null)
+  const [isOnline, setIsOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine)
+  const cloudProjectRef = useRef(null)
+  const cloudRevisionRef = useRef(0)
+  const cloudDirtyRef = useRef(false)
+  const skipCloudSaveRef = useRef(false)
+  const cloudLinkHandledRef = useRef(false)
+  const cloudConflictRef = useRef(null)
+  const cloudLatestSnapshotRef = useRef(null)
+
+  const applyCloudRecord = (remote, role, replaceCurrentProject = false) => {
+    const payload = remote?.payload && typeof remote.payload === 'object' ? remote.payload : {}
+    const rawRecord = {
+      ...payload,
+      id: remote.id,
+      name: remote.name || payload.name || payload.project?.title || 'Proyek tanpa judul',
+      updatedAt: remote.updated_at || payload.updatedAt || new Date().toISOString(),
+    }
+    const remoteScenes = normalizeSavedScenes(rawRecord.scenes) || [defaultScene(1)]
+    const migrated = migrateReusableRooms(remoteScenes, rawRecord.floorplans, rawRecord.rooms)
+    const nextActiveSceneId = migrated.scenes.some(scene => scene.id === rawRecord.activeSceneId)
+      ? rawRecord.activeSceneId
+      : migrated.scenes[0]?.id || ''
+    const normalizedRecord = {
+      ...rawRecord,
+      scenes: migrated.scenes,
+      floorplans: migrated.floorplans,
+      rooms: migrated.rooms,
+      activeSceneId: nextActiveSceneId,
+    }
+
+    skipCloudSaveRef.current = true
+    cloudDirtyRef.current = false
+    cloudConflictRef.current = null
+    setCloudConflict(null)
+    cloudRevisionRef.current = Number(remote.revision) || 1
+    cloudProjectRef.current = { id: remote.id, role, revision: cloudRevisionRef.current, pending: false }
+    const map = readCloudProjectMap()
+    map[remote.id] = { id: remote.id, role, revision: cloudRevisionRef.current, pending: false }
+    writeCloudProjectMap(map)
+    setCloudProjectId(remote.id)
+    setCloudRole(role)
+    setCloudRevision(cloudRevisionRef.current)
+    setCloudStatus('synced')
+    setCloudError('')
+    setProjects(previous => {
+      const base = replaceCurrentProject
+        ? previous.filter(item => item.id !== activeProjectId || item.id === remote.id)
+        : previous
+      return upsertProject(base, normalizedRecord)
+    })
+    setActiveProjectId(remote.id)
+    setProject(normalizeSavedProject(normalizedRecord.project))
+    setScenes(normalizedRecord.scenes)
+    setActiveSceneId(nextActiveSceneId)
+    setFloorplans(migrated.floorplans)
+    setProjectRooms(migrated.rooms)
+    setTab('floorplan')
+  }
+
+  useEffect(() => {
+    const updateOnlineStatus = () => setIsOnline(navigator.onLine)
+    window.addEventListener('online', updateOnlineStatus)
+    window.addEventListener('offline', updateOnlineStatus)
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus)
+      window.removeEventListener('offline', updateOnlineStatus)
+    }
+  }, [])
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -616,6 +708,14 @@ export default function App() {
         setProjectRooms(restoredRooms)
         setProjects(restoredProjects)
         setActiveProjectId(restoredProjectId)
+        const query = new URLSearchParams(window.location.search)
+        const hasIncomingCloudLink = query.has('share') || query.has('owner')
+        const savedCloudInfo = readCloudProjectMap()[restoredProjectId]
+        if (!hasIncomingCloudLink && savedCloudInfo && !savedCloudInfo.pending) {
+          skipCloudSaveRef.current = true
+          cloudProjectRef.current = savedCloudInfo
+          cloudRevisionRef.current = Number(savedCloudInfo.revision) || 0
+        }
         setSaveStatus('saved')
         setHydrated(true)
       })
@@ -648,12 +748,24 @@ export default function App() {
     if (!hydrated || !activeProjectId || externalSaveDetectedRef.current) return undefined
 
     const revision = ++saveRevisionRef.current
+    const skipCloudSave = skipCloudSaveRef.current
+    if (skipCloudSave) {
+      skipCloudSaveRef.current = false
+      cloudDirtyRef.current = false
+    } else if (cloudProjectRef.current?.id === activeProjectId) {
+      cloudDirtyRef.current = true
+      const map = readCloudProjectMap()
+      map[activeProjectId] = { ...cloudProjectRef.current, pending: true }
+      cloudProjectRef.current = map[activeProjectId]
+      writeCloudProjectMap(map)
+    }
     setSaveStatus('saving')
     const timeout = window.setTimeout(async () => {
       if (externalSaveDetectedRef.current) return
       try {
         const currentRecord = createProjectRecord(activeProjectId, project, scenes, activeSceneId, floorplans, projectRooms || [])
         const savedProjects = upsertProject(projects, currentRecord)
+        cloudLatestSnapshotRef.current = currentRecord
         await saveAppState({
           tab,
           project,
@@ -664,6 +776,35 @@ export default function App() {
           projects: savedProjects,
           activeProjectId,
         })
+
+        const cloudInfo = cloudProjectRef.current
+        if (!skipCloudSave && cloudInfo?.id === activeProjectId && cloudInfo.role !== 'viewer' && !cloudConflictRef.current) {
+          if (!isOnline) {
+            setCloudStatus('offline')
+          } else {
+            setCloudStatus('syncing')
+            try {
+              const result = await saveCloudProject(activeProjectId, { ...currentRecord, id: activeProjectId }, cloudRevisionRef.current)
+              if (result.conflict) {
+                cloudConflictRef.current = result.project
+                setCloudConflict(result.project)
+                setCloudStatus('conflict')
+              } else {
+                cloudRevisionRef.current = result.project.revision
+                cloudProjectRef.current = { ...cloudInfo, revision: result.project.revision, pending: false }
+                const map = readCloudProjectMap()
+                map[activeProjectId] = cloudProjectRef.current
+                writeCloudProjectMap(map)
+                cloudDirtyRef.current = false
+                setCloudRevision(result.project.revision)
+                setCloudStatus('synced')
+              }
+            } catch (cloudSaveError) {
+              console.warn('CINEBLOCK cloud save deferred; local copy is safe:', cloudSaveError)
+              setCloudStatus(navigator.onLine ? 'error' : 'offline')
+            }
+          }
+        }
         if (revision === saveRevisionRef.current) setSaveStatus('saved')
       } catch (error) {
         console.error('CINEBLOCK could not save data:', error)
@@ -672,7 +813,165 @@ export default function App() {
     }, 250)
 
     return () => window.clearTimeout(timeout)
-  }, [hydrated, tab, project, scenes, activeSceneId, floorplans, projectRooms, projects, activeProjectId])
+  }, [hydrated, tab, project, scenes, activeSceneId, floorplans, projectRooms, projects, activeProjectId, isOnline])
+
+  useEffect(() => {
+    if (!hydrated || !isCloudSyncConfigured()) return undefined
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get('owner') || params.get('share')
+    if (!token || cloudLinkHandledRef.current) return undefined
+    cloudLinkHandledRef.current = true
+    const linkKind = params.has('owner') ? 'owner' : 'share'
+    let cancelled = false
+
+    const connectFromLink = async () => {
+      setCloudStatus('connecting')
+      setCloudError('')
+      const session = await ensureCloudSession(displayName)
+      if (cancelled) return
+      setDisplayName(session.displayName)
+      const access = await redeemCloudLink(token)
+      if (cancelled) return
+      const url = new URL(window.location.href)
+      url.searchParams.delete('owner')
+      url.searchParams.delete('share')
+      window.history.replaceState({}, document.title, url.pathname + url.search + url.hash)
+
+      let remote = await fetchCloudProject(access.id)
+      const bootstrapEmptyProject = isEmptyCloudPayload(remote.payload)
+      if (bootstrapEmptyProject && linkKind === 'owner') {
+        const localRecord = createProjectRecord(activeProjectId, project, scenes, activeSceneId, floorplans, projectRooms || [])
+        const payload = { ...localRecord, id: remote.id, name: remote.name || localRecord.name }
+        const saved = await saveCloudProject(remote.id, payload, remote.revision)
+        if (saved.conflict) {
+          remote = saved.project
+          setCloudError('Proyek cloud berubah saat aktivasi. Versi cloud tidak ditimpa; periksa konflik sebelum melanjutkan.')
+          cloudConflictRef.current = remote
+          setCloudConflict(remote)
+          setCloudStatus('conflict')
+          return
+        }
+        remote = saved.project
+      } else if (isEmptyCloudPayload(remote.payload)) {
+        throw new Error('Proyek cloud belum memiliki data. Minta pemilik menyelesaikan sinkronisasi awal terlebih dahulu.')
+      } else if (linkKind === 'owner') {
+        const useRemote = window.confirm('Proyek cloud ini sudah berisi data. Muat versi cloud? Versi lokal tetap disimpan sebagai proyek terpisah.')
+        if (!useRemote) {
+          setCloudError('Akses pemilik berhasil diaktifkan. Proyek lokal belum dihubungkan; buka Sinkronisasi untuk mengunggahnya sebagai proyek baru.')
+          setCloudStatus('error')
+          return
+        }
+      }
+
+      if (cancelled) return
+      applyCloudRecord(remote, access.role, linkKind === 'owner' && bootstrapEmptyProject)
+      setSyncDialogOpen(false)
+    }
+
+    connectFromLink().catch(error => {
+      if (cancelled) return
+      console.error('CINEBLOCK could not connect using a share link:', error)
+      setCloudError(error.message || 'Tautan sinkronisasi gagal dibuka.')
+      setCloudStatus('error')
+      setSyncDialogOpen(true)
+    })
+
+    return () => { cancelled = true }
+  // Incoming links are processed once after the local workspace has been restored.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated])
+
+  useEffect(() => {
+    if (!hydrated || !isCloudSyncConfigured()) return undefined
+    const info = readCloudProjectMap()[activeProjectId]
+    if (!info?.id) {
+      cloudProjectRef.current = null
+      cloudDirtyRef.current = false
+      setCloudProjectId('')
+      setCloudRole('')
+      setCloudRevision(0)
+      if (!cloudLinkHandledRef.current || cloudStatus !== 'error') setCloudStatus('local')
+      return undefined
+    }
+    cloudProjectRef.current = info
+    cloudRevisionRef.current = Number(info.revision) || 1
+    cloudDirtyRef.current = Boolean(info.pending)
+    setCloudProjectId(info.id)
+    setCloudRole(info.role || 'editor')
+    setCloudRevision(cloudRevisionRef.current)
+    if (info.pending) setCloudStatus(isOnline ? 'syncing' : 'offline')
+    else setCloudStatus(isOnline ? 'synced' : 'offline')
+    return undefined
+  // The mapping is per-project; switching projects swaps the active cloud target.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, activeProjectId])
+
+  useEffect(() => {
+    if (!hydrated || !cloudProjectId || !isCloudSyncConfigured()) return undefined
+    let cancelled = false
+    const handleRemoteUpdate = remote => {
+      if (cancelled || !remote || Number(remote.revision) <= cloudRevisionRef.current) return
+      const localMapEntry = readCloudProjectMap()[remote.id]
+      if (cloudDirtyRef.current || localMapEntry?.pending) {
+        cloudConflictRef.current = remote
+        setCloudConflict(remote)
+        setCloudStatus('conflict')
+        return
+      }
+      applyCloudRecord(remote, cloudProjectRef.current?.role || cloudRole, false)
+    }
+    const unsubscribe = subscribeToCloudProject(cloudProjectId, handleRemoteUpdate, status => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        setCloudStatus(navigator.onLine ? 'error' : 'offline')
+      }
+    })
+    fetchCloudProject(cloudProjectId).then(remote => {
+      if (cancelled) return
+      const localMapEntry = readCloudProjectMap()[remote.id]
+      if (Number(remote.revision) > cloudRevisionRef.current) {
+        if (cloudDirtyRef.current || localMapEntry?.pending) {
+          cloudConflictRef.current = remote
+          setCloudConflict(remote)
+          setCloudStatus('conflict')
+        } else {
+          applyCloudRecord(remote, cloudProjectRef.current?.role || cloudRole, false)
+        }
+      } else if (localMapEntry?.pending && isOnline && !cloudConflictRef.current) {
+        const snapshot = cloudLatestSnapshotRef.current || createProjectRecord(activeProjectId, project, scenes, activeSceneId, floorplans, projectRooms || [])
+        saveCloudProject(remote.id, { ...snapshot, id: remote.id }, remote.revision).then(result => {
+          if (cancelled) return
+          if (result.conflict) {
+            cloudConflictRef.current = result.project
+            setCloudConflict(result.project)
+            setCloudStatus('conflict')
+          } else {
+            cloudRevisionRef.current = result.project.revision
+            cloudProjectRef.current = { ...localMapEntry, revision: result.project.revision, pending: false }
+            const map = readCloudProjectMap()
+            map[remote.id] = cloudProjectRef.current
+            writeCloudProjectMap(map)
+            cloudDirtyRef.current = false
+            setCloudRevision(result.project.revision)
+            setCloudStatus('synced')
+          }
+        }).catch(error => {
+          console.warn('CINEBLOCK pending cloud save remains queued:', error)
+          setCloudStatus(navigator.onLine ? 'error' : 'offline')
+        })
+      }
+    }).catch(error => {
+      if (!cancelled) {
+        console.warn('CINEBLOCK could not refresh cloud project:', error)
+        setCloudStatus(navigator.onLine ? 'error' : 'offline')
+      }
+    })
+    return () => {
+      cancelled = true
+      unsubscribe?.()
+    }
+  // Cloud changes are scoped to the active project; CAS revision checks protect concurrent edits.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, cloudProjectId, cloudRole])
 
   const snapshotCurrentProject = () => (
     createProjectRecord(activeProjectId, project, scenes, activeSceneId, floorplans, projectRooms || [])
@@ -708,6 +1007,118 @@ export default function App() {
     setFloorplans(targetFloorplans)
     setProjectRooms(migratedTarget.rooms)
     setTab('floorplan')
+  }
+
+  const handleConnectCloud = async () => {
+    if (!isCloudSyncConfigured()) {
+      setCloudError('Sinkronisasi cloud belum dikonfigurasi.')
+      return
+    }
+    setCloudStatus('connecting')
+    setCloudError('')
+    try {
+      const session = await ensureCloudSession(displayName)
+      setDisplayName(session.displayName)
+      const localRecord = snapshotCurrentProject()
+      const created = await createCloudProject(localRecord.name, localRecord)
+      const cloudPayload = { ...localRecord, id: created.id, name: created.name || localRecord.name }
+      const saved = await saveCloudProject(created.id, cloudPayload, Number(created.revision) || 1)
+      if (saved.conflict) {
+        cloudConflictRef.current = saved.project
+        setCloudConflict(saved.project)
+        setCloudStatus('conflict')
+        throw new Error('Proyek cloud berubah saat dibuat. Periksa konflik sebelum melanjutkan.')
+      }
+      const syncedRecord = { ...cloudPayload, updatedAt: saved.project.updated_at }
+      const map = readCloudProjectMap()
+      map[created.id] = { id: created.id, role: 'owner', revision: saved.project.revision, pending: false }
+      writeCloudProjectMap(map)
+      cloudProjectRef.current = map[created.id]
+      cloudRevisionRef.current = saved.project.revision
+      cloudDirtyRef.current = false
+      skipCloudSaveRef.current = true
+      setProjects(previous => upsertProject(previous.filter(item => item.id !== activeProjectId), syncedRecord))
+      setActiveProjectId(created.id)
+      setCloudProjectId(created.id)
+      setCloudRole('owner')
+      setCloudRevision(saved.project.revision)
+      setCloudStatus('synced')
+      setCloudError('')
+      setShareUrl('')
+    } catch (error) {
+      console.error('CINEBLOCK could not connect project to cloud:', error)
+      setCloudError(error.message || 'Proyek gagal dihubungkan ke cloud.')
+      if (navigator.onLine) setCloudStatus('error')
+      else setCloudStatus('offline')
+    }
+  }
+
+  const handleCreateShareLink = async () => {
+    if (!cloudProjectId || cloudRole !== 'owner') return
+    setCloudError('')
+    try {
+      await ensureCloudSession(displayName)
+      const link = await createCloudShareLink(cloudProjectId, 'editor')
+      setShareUrl(link.url)
+    } catch (error) {
+      setCloudError(error.message || 'Tautan berbagi gagal dibuat.')
+    }
+  }
+
+  const handleCopyShareLink = async () => {
+    if (!shareUrl) return
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCloudError('Tautan berhasil disalin. Kirim ke HP untuk membuka proyek yang sama.')
+    } catch {
+      setCloudError('Salin tautan secara manual dari kolom tautan berbagi.')
+    }
+  }
+
+  const handleLoadRemoteConflict = () => {
+    const remote = cloudConflictRef.current
+    if (!remote) return
+    if (!window.confirm('Muat versi cloud? Versi lokal yang belum tersinkron akan disimpan sebagai salinan lokal terpisah.')) return
+    const localRecord = snapshotCurrentProject()
+    const localCopy = {
+      ...localRecord,
+      id: crypto.randomUUID(),
+      name: ((localRecord.name || 'Proyek tanpa judul') + ' (versi lokal konflik)').slice(0, 200),
+      updatedAt: new Date().toISOString(),
+    }
+    setProjects(previous => upsertProject(previous, localCopy))
+    applyCloudRecord(remote, cloudRole || cloudProjectRef.current?.role || 'editor', false)
+  }
+
+  const handleOverwriteRemoteConflict = async () => {
+    if (!cloudConflictRef.current || !activeProjectId) return
+    if (!window.confirm('Timpa versi cloud dengan versi perangkat ini? Perubahan cloud saat ini akan digantikan.')) return
+    setCloudStatus('syncing')
+    setCloudError('')
+    try {
+      const latest = await fetchCloudProject(activeProjectId)
+      const currentRecord = { ...snapshotCurrentProject(), id: activeProjectId }
+      const result = await saveCloudProject(activeProjectId, currentRecord, latest.revision)
+      if (result.conflict) {
+        cloudConflictRef.current = result.project
+        setCloudConflict(result.project)
+        setCloudStatus('conflict')
+        return
+      }
+      const map = readCloudProjectMap()
+      map[activeProjectId] = { id: activeProjectId, role: cloudRole || 'editor', revision: result.project.revision, pending: false }
+      writeCloudProjectMap(map)
+      cloudProjectRef.current = map[activeProjectId]
+      cloudRevisionRef.current = result.project.revision
+      cloudDirtyRef.current = false
+      cloudConflictRef.current = null
+      setCloudConflict(null)
+      setCloudRevision(result.project.revision)
+      setCloudStatus('synced')
+    } catch (error) {
+      setCloudError(error.message || 'Versi perangkat gagal dikirim.')
+      setCloudStatus(navigator.onLine ? 'error' : 'offline')
+    }
   }
 
   const createNewProject = () => {
@@ -879,6 +1290,15 @@ export default function App() {
                     : 'Tersimpan di perangkat ini'}
           </span>
           <button
+            className="btn btn-secondary cloud-sync-trigger"
+            type="button"
+            onClick={() => { setCloudError(''); setSyncDialogOpen(true) }}
+            title="Sinkronkan proyek ke perangkat lain"
+          >
+            <Cloud size={15} />
+            <span>{cloudProjectId ? (cloudStatus === 'synced' ? 'Tersinkron' : 'Sinkronisasi') : 'Sinkronisasi'}</span>
+          </button>
+          <button
             className="btn btn-secondary theme-toggle"
             type="button"
             onClick={() => setTheme(current => current === 'dark' ? 'light' : 'dark')}
@@ -1038,6 +1458,26 @@ export default function App() {
         )}
       </div>
       {hydrated && <PrintReport project={project} scenes={scenes} floorplans={resolvedFloorplans} mode={exportMode} orientation={exportOrientation} />}
+      <CloudSyncDialog
+        open={syncDialogOpen}
+        onClose={() => setSyncDialogOpen(false)}
+        configured={isCloudSyncConfigured()}
+        projectName={project.title.trim() || 'Proyek tanpa judul'}
+        displayName={displayName}
+        onDisplayNameChange={setDisplayName}
+        cloudStatus={cloudStatus}
+        cloudRole={cloudRole}
+        cloudProjectId={cloudProjectId}
+        cloudError={cloudError}
+        shareUrl={shareUrl}
+        isOnline={isOnline}
+        onConnect={handleConnectCloud}
+        onCreateShareLink={handleCreateShareLink}
+        onCopyShareLink={handleCopyShareLink}
+        onLoadRemote={handleLoadRemoteConflict}
+        onOverwriteRemote={handleOverwriteRemoteConflict}
+        conflictRemote={cloudConflict}
+      />
     </div>
   )
 }
