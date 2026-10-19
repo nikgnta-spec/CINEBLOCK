@@ -3024,8 +3024,11 @@ export default function Floorplan({
                           key="movement-path-end-object"
                           data-floorplan-path-end-object="true"
                           transform={'translate(' + endpoint.x + ' ' + endpoint.y + ')'}
-                          pointerEvents="none"
+                          pointerEvents="all"
                           opacity={active ? 1 : 0.72}
+                          style={{ cursor: object.locked ? 'default' : 'grab' }}
+                          onPointerDown={event => beginWaypointDrag(type, object, movementWaypoints.length - 1, event)}
+                          onClick={event => event.stopPropagation()}
                         >
                           {type === 'actor' ? (
                             <g transform={'rotate(' + (object.angle || 0) + ') scale(0.28)'} fill="#C084FC" fillOpacity="0.12" stroke={getObjectColor(type, object)} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
