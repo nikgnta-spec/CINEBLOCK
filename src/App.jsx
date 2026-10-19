@@ -968,8 +968,27 @@ export default function App() {
         setCloudStatus(navigator.onLine ? 'error' : 'offline')
       }
     })
+
+    // Realtime is the fast path, but some browsers/networks can silently drop
+    // websocket events. Poll the same cloud project as a recovery path so all
+    // devices eventually receive the newest revision without requiring refresh.
+    let pollInFlight = false
+    const pollTimer = window.setInterval(async () => {
+      if (cancelled || pollInFlight || !navigator.onLine) return
+      pollInFlight = true
+      try {
+        const remote = await fetchCloudProject(cloudProjectId)
+        if (!cancelled) handleRemoteUpdate(remote)
+      } catch (error) {
+        if (!cancelled) console.warn('CINEBLOCK cloud polling retry failed:', error)
+      } finally {
+        pollInFlight = false
+      }
+    }, 2500)
+
     return () => {
       cancelled = true
+      window.clearInterval(pollTimer)
       unsubscribe?.()
     }
   // Cloud changes are scoped to the active project; CAS revision checks protect concurrent edits.
