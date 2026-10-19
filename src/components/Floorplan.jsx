@@ -1665,8 +1665,15 @@ export default function Floorplan({
       return
     }
 
+    // On touch devices, dragging empty canvas space in Select mode pans the
+    // floorplan instead of creating a selection box. Touching an actual object
+    // still reaches that object's handler, so object dragging remains intact.
+    const touchPanOnEmptyCanvas = event.pointerType === 'touch'
+      && tool === 'select'
+      && !event.target?.closest?.('[data-floorplan-object="true"], [data-floorplan-waypoint="true"], foreignObject')
+
     // Navigation takes priority over any object handler, including on top of objects.
-    if (event.button !== 1 && !(event.button === 0 && spaceHeld) && tool !== 'pan') return
+    if (!touchPanOnEmptyCanvas && event.button !== 1 && !(event.button === 0 && spaceHeld) && tool !== 'pan') return
     event.preventDefault()
     event.stopPropagation()
     svgRef.current?.setPointerCapture?.(event.pointerId)
