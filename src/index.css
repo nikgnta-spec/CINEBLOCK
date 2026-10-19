@@ -2314,3 +2314,178 @@ button:focus-visible,
     overflow-y: hidden;
   }
 }
+
+
+/* Responsive pass — tablet and phone workspace ergonomics. */
+@media (max-width: 1024px) {
+  .topbar {
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  .topbar-left {
+    flex: 1 1 100%;
+    min-width: 0;
+    gap: 7px;
+  }
+  .topbar-right {
+    flex: 1 1 100%;
+    min-width: 0;
+    margin-left: 0;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+  .topbar-right > .btn {
+    min-height: 38px;
+    padding-inline: 10px;
+  }
+  .save-status { flex: 1 1 auto; min-width: 0; }
+  .floorplan-top {
+    flex-basis: auto;
+    min-height: 54px;
+    padding: 7px 12px;
+    gap: 10px;
+  }
+  .floorplan-main-tools {
+    flex: 0 0 auto;
+    min-height: 0;
+    height: auto;
+    max-height: 116px;
+    flex-wrap: wrap;
+    align-content: center;
+    overflow-x: hidden;
+    overflow-y: auto;
+    gap: 5px;
+    padding: 6px 8px;
+  }
+  .floorplan-tool-spacer { display: none; }
+  .floorplan-tool-button { min-height: 38px; height: 38px; }
+  .floorplan-editor { grid-template-columns: minmax(0, 1fr) minmax(250px, 30%); }
+  .floorplan-canvas-column { padding: 10px; }
+  .floorplan-inspector-head { padding: 12px; }
+  .floorplan-inspector-section { padding: 12px; }
+}
+@media (max-width: 780px) {
+  html, body, #root { min-height: 100%; }
+  .app { height: 100dvh; min-height: 0; overflow: hidden; }
+  .topbar {
+    flex: 0 0 auto;
+    padding: 7px 9px;
+    gap: 7px;
+  }
+  .topbar-left {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .topbar-brand { flex: 0 0 auto; }
+  .project-switcher { flex: 1 1 0; width: 1px; max-width: none; }
+  .topbar-left > .btn { flex: 0 0 auto; min-height: 36px; padding: 5px 9px; }
+  .topbar-right {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .save-status { order: 0; flex: 1 1 100%; font-size: 11px; }
+  .topbar-right > .btn { flex: 0 0 auto; min-height: 38px; }
+  .topbar-right > .btn-primary { margin-left: auto; }
+  .tabs { flex: 0 0 auto; padding-inline: 6px; overflow-x: auto; }
+  .tab { flex: 0 0 auto; min-height: 42px; padding: 9px 12px; }
+  .content:has(.floorplan-tab-panel) { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+  .floorplan-tab-panel { min-height: 0; overflow: hidden; }
+  .floorplan-workspace {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .floorplan-top {
+    flex: 0 0 auto;
+    min-height: 48px;
+    padding: 6px 8px;
+  }
+  .floorplan-scene-control { min-width: 0; gap: 6px; }
+  .floorplan-scene-select { width: min(52vw, 220px); min-width: 0; max-width: none; font-size: 14px; }
+  .floorplan-icon-button { width: 36px; height: 36px; flex-basis: 36px; }
+  .floorplan-top-meta { min-width: 0; }
+  .floorplan-main-tools {
+    flex: 0 0 auto;
+    max-height: 106px;
+    align-content: flex-start;
+    gap: 4px;
+    padding: 5px 6px;
+  }
+  .floorplan-tool-group { gap: 3px; }
+  .floorplan-tool-button {
+    min-width: 38px;
+    width: auto;
+    height: 38px;
+    min-height: 38px;
+    padding: 0 8px;
+    gap: 5px;
+  }
+  .floorplan-tool-button span { display: none; }
+  .floorplan-tool-divider { height: 26px; }
+  .floorplan-structure-group { gap: 1px; padding: 2px; }
+  .floorplan-structure-label { display: none; }
+  .floorplan-reuse-room-control { max-width: 100%; }
+  .floorplan-reuse-room-control select { width: min(42vw, 160px); max-width: 160px; }
+  .floorplan-editor {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .floorplan-canvas-column {
+    flex: 0 0 auto;
+    min-height: 0;
+    padding: 7px;
+    overflow: hidden;
+  }
+  .floorplan-canvas-frame {
+    width: 100%;
+    height: clamp(190px, 37dvh, 340px);
+    min-height: 0;
+    max-height: 42dvh;
+    aspect-ratio: auto;
+    flex: 0 0 auto;
+  }
+  .floorplan-inspector {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    border-top: 1px solid var(--border);
+    border-left: 0;
+  }
+  .floorplan-inspector-head { padding: 9px 12px; gap: 9px; }
+  .floorplan-type-icon { width: 34px; height: 34px; flex-basis: 34px; }
+  .floorplan-inspector-title strong { font-size: 14px; }
+  .floorplan-inspector-title span { font-size: 11px; }
+  .floorplan-inspector-section { padding: 11px 12px; gap: 8px; }
+  .floorplan-view-controls { right: 6px; bottom: 6px; }
+  .floorplan-scale-indicator { left: 7px; bottom: 7px; }
+}
+@media (max-width: 480px) {
+  .topbar { padding: 6px; gap: 6px; }
+  .topbar-left { gap: 5px; }
+  .topbar-mark { width: 25px; height: 25px; flex-basis: 25px; }
+  .project-switcher { min-width: 0; padding: 5px 6px; font-size: 12px; }
+  .topbar-left > .btn { gap: 4px; padding-inline: 7px; font-size: 12px; }
+  .topbar-left > .btn svg { width: 13px; height: 13px; }
+  .topbar-right { gap: 5px; }
+  .topbar-right > .btn { min-height: 36px; padding-inline: 8px; gap: 5px; font-size: 12px; }
+  .topbar-right > .btn svg { width: 14px; height: 14px; }
+  .cloud-sync-trigger span { display: inline; }
+  .tabs { padding-inline: 2px; }
+  .tab { padding-inline: 10px; font-size: 12px; }
+  .floorplan-main-tools { max-height: 100px; }
+  .floorplan-tool-button { min-width: 36px; padding-inline: 7px; }
+  .floorplan-history-button { min-width: 36px; }
+  .floorplan-canvas-frame { height: clamp(175px, 34dvh, 270px); max-height: 38dvh; }
+  .floorplan-view-control-button { min-width: 32px; height: 32px; padding-inline: 5px; }
+  .floorplan-zoom-level { min-width: 36px; font-size: 11px; }
+  .floorplan-fit-button { padding-inline: 6px; }
+}
