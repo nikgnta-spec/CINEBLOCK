@@ -2627,3 +2627,9 @@ button:focus-visible,
   .floorplan-history-tools { flex: 0 0 auto; }
   .floorplan-structure-group { flex: 0 0 auto; }
 }
+
+
+@media (max-width: 1024px) {
+  /* Backup, Import, and PDF export keep their icons while labels are hidden. */
+  .topbar-right > .btn:nth-of-type(n + 3) { font-size: 0; }
+}
