@@ -988,7 +988,7 @@ export default function Floorplan({
     const pointerX = rect && Number.isFinite(clientX) ? clamp((clientX - rect.left) / rect.width, 0, 1) : 0.5
     const pointerY = rect && Number.isFinite(clientY) ? clamp((clientY - rect.top) / rect.height, 0, 1) : 0.5
     setViewBox(current => {
-      const width = clamp(current.width * factor, 80, MAP_WIDTH * 2.5)
+      const width = current.width * factor
       const height = width / (MAP_WIDTH / MAP_HEIGHT)
       const anchorX = current.x + pointerX * current.width
       const anchorY = current.y + pointerY * current.height

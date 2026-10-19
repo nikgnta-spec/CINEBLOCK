@@ -87,3 +87,14 @@ test('reusable Rooms can be added to another Scene and edits update the Project 
   assert.match(source, /onProjectRoomsChange\?\.\(previous =>/)
   assert.match(source, /byId\.set\(room\.id, room\)/)
 })
+
+
+test('Floorplan zoom has no hard minimum or maximum viewBox width', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  const start = source.indexOf('const zoomCanvas =')
+  const end = source.indexOf('const handleCanvasWheel =', start)
+  const zoomCanvas = source.slice(start, end)
+  assert.match(zoomCanvas, /const width = current\.width \* factor/)
+  assert.doesNotMatch(zoomCanvas, /clamp\(current\.width \* factor/)
+  assert.doesNotMatch(zoomCanvas, /MAP_WIDTH \* 2\.5/)
+})
