@@ -81,7 +81,7 @@ a { color: inherit; text-decoration: none; }
 .tab.active { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); background: color-mix(in srgb, var(--accent-bg) 55%, transparent); }
 
 .content { flex: 1; min-height: 0; min-width: 0; overflow: auto; }
-.content:has(.floorplan-tab-panel[style*="display: flex"]) { display: flex; flex-direction: column; overflow: hidden; }
+.content-floorplan { display: flex; flex-direction: column; overflow: hidden; }
 .floorplan-tab-panel { flex: 1 1 auto; min-height: 0; min-width: 0; overflow: hidden; }
 .floorplan-tab-panel > .floorplan-workspace { flex: 1 1 auto; min-height: 0; height: 100%; }
 
@@ -2237,7 +2237,7 @@ button:focus-visible,
 
 
 /* Shot List layout: keep the scene summary, scene navigator, and shot table in distinct flex regions. */
-.content:has(.shotlist-page) {
+.content-shotlist {
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -2393,7 +2393,7 @@ button:focus-visible,
   .topbar-right > .btn-primary { margin-left: auto; }
   .tabs { flex: 0 0 auto; padding-inline: 6px; overflow-x: auto; }
   .tab { flex: 0 0 auto; min-height: 42px; padding: 9px 12px; }
-  .content:has(.floorplan-tab-panel[style*="display: flex"]) { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+  .content-floorplan { flex: 1 1 auto; min-height: 0; overflow: hidden; }
   .floorplan-tab-panel { min-height: 0; overflow: hidden; }
   .floorplan-workspace {
     height: 100%;
