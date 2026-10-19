@@ -1507,7 +1507,7 @@ export default function App() {
         ))}
       </div>
 
-      <div className="content">
+      <div className={`content content-${tab}`}>
         {!hydrated ? (
           <div className="app-loading" role="status">Memuat data proyek…</div>
         ) : (
