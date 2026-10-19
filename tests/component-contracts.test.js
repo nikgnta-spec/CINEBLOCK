@@ -64,11 +64,17 @@ test('autosave is paused after an external-tab save conflict is detected', async
 })
 
 
-test('movement path endpoints display the same object marker for path-capable objects', async () => {
+test('movement path endpoints render the same object icon and name without a backing circle', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
+  const endpoint = source.slice(source.indexOf('data-floorplan-path-end-object="true"'), source.indexOf('{(showPath ? (object.path || []) : []).map'))
   assert.match(source, /data-floorplan-path-end-object="true"/)
-  assert.match(source, /FloorplanObjectIcon type=\{type\} size=\{22\}/)
   assert.match(source, /const movementWaypoints = showPath \? \(object\.path \|\| \[\]\) : \[\]/)
+  assert.match(endpoint, /const endpointName = type === 'actor'/)
+  assert.match(endpoint, /\{endpointName\}/)
+  assert.match(endpoint, /type === 'actor' \? \(/)
+  assert.match(endpoint, /type === 'camera' \? \(/)
+  assert.match(endpoint, /type === 'light' \? \(/)
+  assert.doesNotMatch(endpoint, /<circle r="15"/)
 })
 
 test('reusable Rooms can be added to another Scene and edits update the Project Room collection', async () => {
