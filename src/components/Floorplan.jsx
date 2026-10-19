@@ -649,12 +649,8 @@ export default function Floorplan({
     setRoomDrawPoints([])
     setRoomLengthInputOpen(false)
     setPreviewPoint(null)
-    // On touch devices, automatically fit the current scene so the drawing
-    // uses the available canvas instead of appearing tiny in a desktop-sized
-    // default viewBox. Desktop users retain their existing zoom/pan behavior.
-    const isTouchViewport = typeof window !== 'undefined'
-      && window.matchMedia?.('(pointer: coarse) and (hover: none)').matches
-    if (isTouchViewport) setViewBox(getFittedViewBox(layout))
+    // Keep the user's current zoom and pan when switching scenes.
+    // Fitting the canvas remains available through the explicit Fit control.
   }, [scene?.id])
 
   useEffect(() => {
