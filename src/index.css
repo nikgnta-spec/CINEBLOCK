@@ -2234,3 +2234,20 @@ button:focus-visible,
   overflow-y: auto;
   overscroll-behavior-y: contain;
 }
+
+
+/* Shot List: let the workspace fill the available app height so the scene list scrolls within its full sidebar. */
+.content:has(.shotlist-page) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.shotlist-page {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.shotlist-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+}
