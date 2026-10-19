@@ -26,6 +26,9 @@ export default function CloudSyncDialog({
   onConnect,
   onCreateShareLink,
   onCopyShareLink,
+  shareLinkToOpen,
+  onShareLinkToOpenChange,
+  onOpenExistingCloudLink,
   onRetrySync,
   onLoadRemote,
   onOverwriteRemote,
@@ -104,6 +107,27 @@ export default function CloudSyncDialog({
                 <button className="btn btn-primary" type="button" onClick={onConnect} disabled={busy || !displayName.trim()}>
                   <Cloud size={15} /> {busy ? 'Menghubungkan…' : 'Sinkronkan proyek ini'}
                 </button>
+
+                <div className="cloud-sync-existing-link">
+                  <label className="cloud-sync-field">
+                    <span>Sudah punya tautan editor?</span>
+                    <input
+                      value={shareLinkToOpen}
+                      onChange={event => onShareLinkToOpenChange(event.target.value)}
+                      placeholder="Tempel tautan editor proyek cloud"
+                      aria-label="Tautan editor proyek cloud yang sudah ada"
+                    />
+                    <small>Buka proyek cloud yang sudah ada di domain ini tanpa membuat proyek duplikat atau aktivasi pemilik ulang.</small>
+                  </label>
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    onClick={onOpenExistingCloudLink}
+                    disabled={busy || !shareLinkToOpen.trim()}
+                  >
+                    <Link2 size={15} /> Buka proyek cloud yang sudah ada
+                  </button>
+                </div>
               </div>
             )}
 
