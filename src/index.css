@@ -2749,3 +2749,48 @@ button:focus-visible,
   .floorplan-tool-spacer { display: none !important; }
   .floorplan-tool-button { flex: 0 0 auto !important; min-height: 32px !important; height: 32px !important; min-width: 34px !important; padding-inline: 6px !important; }
 }
+
+
+/* Touch-device Floorplan: prioritize the drawing surface over the inspector.
+   In landscape tablets the CSS viewport can be desktop-sized, so this rule is
+   keyed to touch capability instead of width alone. */
+@media (pointer: coarse) and (hover: none) {
+  .floorplan-editor {
+    display: flex !important;
+    flex: 1 1 0 !important;
+    flex-direction: column !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+  .floorplan-canvas-column {
+    display: flex !important;
+    flex: 1 1 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 5px !important;
+    overflow: hidden !important;
+  }
+  .floorplan-canvas-frame {
+    flex: 1 1 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    aspect-ratio: auto !important;
+    align-self: stretch !important;
+  }
+  .floorplan-inspector {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-height: 18dvh !important;
+    min-height: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    border-left: 0 !important;
+    border-top: 1px solid var(--border) !important;
+  }
+  .floorplan-inspector-head { padding: 6px 10px !important; }
+  .floorplan-inspector-section { padding: 8px 10px !important; }
+}
