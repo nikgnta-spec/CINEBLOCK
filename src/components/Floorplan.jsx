@@ -2557,6 +2557,38 @@ export default function Floorplan({
           onAddScene={onAddScene}
           onRenameScene={onRenameScene}
         />
+        <div className="floorplan-scene-slugline" aria-label="Informasi scene, tersinkron dengan Shot List">
+          <select
+            className="floorplan-scene-slugline-type"
+            aria-label="Interior atau eksterior"
+            value={scene.intExt || 'INT'}
+            onChange={event => onChange(previous => previous.map(item => item.id === scene.id ? { ...item, intExt: event.target.value } : item))}
+          >
+            <option>INT</option>
+            <option>EXT</option>
+            <option>INT/EXT</option>
+          </select>
+          <input
+            className="floorplan-scene-slugline-location"
+            aria-label="Lokasi scene"
+            value={scene.location || ''}
+            onChange={event => onChange(previous => previous.map(item => item.id === scene.id ? { ...item, location: event.target.value } : item))}
+            placeholder="Lokasi"
+            maxLength={300}
+          />
+          <span className="floorplan-scene-slugline-separator" aria-hidden="true">·</span>
+          <select
+            className="floorplan-scene-slugline-time"
+            aria-label="Waktu scene"
+            value={scene.dayNight || 'DAY'}
+            onChange={event => onChange(previous => previous.map(item => item.id === scene.id ? { ...item, dayNight: event.target.value } : item))}
+          >
+            <option>DAY</option>
+            <option>NIGHT</option>
+            <option>DAWN</option>
+            <option>DUSK</option>
+          </select>
+        </div>
       </header>
 
       <div className="floorplan-main-tools" role="toolbar" aria-label="Alat Floorplan">
