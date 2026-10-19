@@ -1515,7 +1515,7 @@ export default function App() {
             {tab === 'project' && (
               <ProjectInfo project={project} onChange={setProject} />
             )}
-            <div style={{ display: tab === 'shotlist' ? 'block' : 'none' }}>
+            <div className="shotlist-tab-panel" style={{ display: tab === 'shotlist' ? 'flex' : 'none' }}>
               <ShotList
                 scenes={scenes}
                 onChange={setScenes}
