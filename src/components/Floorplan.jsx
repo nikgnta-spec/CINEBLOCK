@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Undo2, Redo2, Lock, Unlock,
+  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Undo2, Redo2, Lock, Unlock, Ruler,
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
+import { projectPointToSegment, snapRoomPoint } from '../utils/roomSnapping'
+import { createRoomPolygon, connectWallGeometry, updateRoomPolygonGeometry, updateWallEndpointGeometry } from '../utils/floorplanGeometry'
+import { findRoomMergeCandidate, mergeAdjacentRoomPolygons, snapRoomToEdge } from '../utils/roomMerge'
 import {
   SIZES as SHOT_SIZES,
   ANGLES as SHOT_ANGLES,
@@ -39,8 +42,7 @@ function getFittedViewBox(layout) {
   }
 
   ;(layout.rooms || []).forEach(room => {
-    addPoint(room.x, room.y)
-    addPoint(Number(room.x) + Number(room.width), Number(room.y) + Number(room.height))
+    getRoomPoints(room).forEach(point => addPoint(point.x, point.y))
   })
   ;(layout.walls || []).forEach(wall => {
     addPoint(wall.x1, wall.y1)
@@ -84,16 +86,209 @@ const RESIZE_HANDLES = [
   { key: 'sw', sx: -1, sy: 1, cursor: 'nesw-resize' },
   { key: 'se', sx: 1, sy: 1, cursor: 'nwse-resize' },
 ]
-const ROOM_SIDES = [
-  { value: 'top', label: 'Top wall' },
-  { value: 'right', label: 'Right wall' },
-  { value: 'bottom', label: 'Bottom wall' },
-  { value: 'left', label: 'Left wall' },
-]
+const getRoomPoints = room => Array.isArray(room?.points) && room.points.length >= 3
+  ? room.points
+  : [{ x: room.x, y: room.y }, { x: room.x + room.width, y: room.y }, { x: room.x + room.width, y: room.y + room.height }, { x: room.x, y: room.y + room.height }]
+const getRoomBounds = room => {
+  const points = getRoomPoints(room)
+  const xs = points.map(point => point.x)
+  const ys = points.map(point => point.y)
+  return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) }
+}
+const resizeRoomBounds = (room, dimension, targetUnits) => {
+  const points = getRoomPoints(room)
+  const bounds = getRoomBounds(room)
+  const current = dimension === 'length' ? bounds.width : bounds.height
+  if (!Number.isFinite(targetUnits) || targetUnits <= 0 || current <= 0) return room
+  const scale = targetUnits / current
+  const nextPoints = points.map(point => dimension === 'length'
+    ? { x: Math.round(bounds.x + (point.x - bounds.x) * scale), y: point.y }
+    : { x: point.x, y: Math.round(bounds.y + (point.y - bounds.y) * scale) })
+  return { ...room, points: nextPoints }
+}
+const getRoomEdges = room => getRoomPoints(room).map((point, index, points) => {
+  const next = points[(index + 1) % points.length]
+  const dx = next.x - point.x
+  const dy = next.y - point.y
+  return { edgeIndex: index, x1: point.x, y1: point.y, x2: next.x, y2: next.y, length: Math.hypot(dx, dy), angle: Math.atan2(dy, dx) * 180 / Math.PI }
+})
+const getRoomDimensionGeometry = (room, edge) => {
+  const points = getRoomPoints(room)
+  const dx = edge.x2 - edge.x1, dy = edge.y2 - edge.y1
+  const length = Math.hypot(dx, dy) || 1
+  let nx = dy / length, ny = -dx / length
+  const midpoint = { x: (edge.x1 + edge.x2) / 2, y: (edge.y1 + edge.y2) / 2 }
+  // For concave polygons, centroid-based normals can point into the room.
+  // Probe both sides of the edge and choose the side outside the polygon.
+  const probeDistance = Math.max(2, Math.min(8, length * 0.04))
+  const positiveProbe = { x: midpoint.x + nx * probeDistance, y: midpoint.y + ny * probeDistance }
+  const negativeProbe = { x: midpoint.x - nx * probeDistance, y: midpoint.y - ny * probeDistance }
+  if (pointInPolygon(positiveProbe, points) && !pointInPolygon(negativeProbe, points)) { nx *= -1; ny *= -1 }
+  const offset = 72
+  // Dimension lines are always axis-aligned. For horizontal-ish edges,
+  // draw a horizontal dimension; for vertical-ish edges, draw a vertical one.
+  // Keep the measured label based on the actual edge length.
+  let x1, y1, x2, y2
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    const guideY = midpoint.y + ny * offset
+    x1 = Math.min(edge.x1, edge.x2)
+    x2 = Math.max(edge.x1, edge.x2)
+    y1 = y2 = guideY
+  } else {
+    const guideX = midpoint.x + nx * offset
+    y1 = Math.min(edge.y1, edge.y2)
+    y2 = Math.max(edge.y1, edge.y2)
+    x1 = x2 = guideX
+  }
+  return { x1, y1, x2, y2, mx: (x1 + x2) / 2, my: (y1 + y2) / 2, length: edge.length, angle: 0 }
+}
+
+// Assign stable, evenly spaced lanes to dimensions that share an exterior side.
+// Geometry and measured values remain unchanged; only visual placement is adjusted.
+const getRoomDimensionLayouts = (room, edges) => {
+  const bounds = getRoomBounds(room)
+  // Ignore sub-5-unit sliver edges in dimensions (under 5 cm at 100 units/m).
+  // Keep the actual room polygon/wall intact; this only prevents alignment residue labels.
+  const prepared = edges.filter(edge => edge.length >= 5).map(edge => {
+    const dimension = getRoomDimensionGeometry(room, edge)
+    const horizontal = Math.abs(edge.x2 - edge.x1) >= Math.abs(edge.y2 - edge.y1)
+    const midpoint = { x: (edge.x1 + edge.x2) / 2, y: (edge.y1 + edge.y2) / 2 }
+    const side = horizontal
+      ? (dimension.my < midpoint.y ? 'top' : 'bottom')
+      : (dimension.mx < midpoint.x ? 'left' : 'right')
+    const sideKey = (horizontal ? 'h-' : 'v-') + side
+    const intervalStart = horizontal ? Math.min(edge.x1, edge.x2) : Math.min(edge.y1, edge.y2)
+    const intervalEnd = horizontal ? Math.max(edge.x1, edge.x2) : Math.max(edge.y1, edge.y2)
+    return { edge, dimension, sideKey, horizontal, side, intervalStart, intervalEnd }
+  })
+  const groups = new Map()
+  prepared.forEach(item => {
+    if (!groups.has(item.sideKey)) groups.set(item.sideKey, [])
+    groups.get(item.sideKey).push(item)
+  })
+  for (const group of groups.values()) {
+    group.sort((a, b) => a.intervalStart - b.intervalStart || a.edge.edgeIndex - b.edge.edgeIndex)
+    const lanes = []
+    group.forEach(item => {
+      // All dimensions on one exterior side use a shared rectangular baseline.
+      // Add another lane only when the projected label ranges would collide.
+      // Lane collision is determined by label footprints, not full wall spans.
+      // Adjacent wall segments can share one straight dimension row when their labels
+      // have enough room, matching conventional floor-plan dimension chains.
+      const labelCenter = (item.intervalStart + item.intervalEnd) / 2
+      const labelHalfWidth = 30
+      const paddedStart = labelCenter - labelHalfWidth
+      const paddedEnd = labelCenter + labelHalfWidth
+      let level = lanes.findIndex(lane => lane.every(interval => paddedEnd < interval.start || paddedStart > interval.end))
+      if (level < 0) level = lanes.length
+      if (!lanes[level]) lanes[level] = []
+      lanes[level].push({ start: paddedStart, end: paddedEnd })
+      const offset = 72 + level * 30
+      if (item.horizontal) {
+        const baseline = item.side === 'top' ? bounds.y - offset : bounds.y + bounds.height + offset
+        item.dimension.x1 = Math.min(item.edge.x1, item.edge.x2)
+        item.dimension.x2 = Math.max(item.edge.x1, item.edge.x2)
+        item.dimension.y1 = item.dimension.y2 = baseline
+        item.dimension.mx = (item.dimension.x1 + item.dimension.x2) / 2
+        item.dimension.my = baseline
+      } else {
+        const baseline = item.side === 'left' ? bounds.x - offset : bounds.x + bounds.width + offset
+        item.dimension.y1 = Math.min(item.edge.y1, item.edge.y2)
+        item.dimension.y2 = Math.max(item.edge.y1, item.edge.y2)
+        item.dimension.x1 = item.dimension.x2 = baseline
+        item.dimension.mx = baseline
+        item.dimension.my = (item.dimension.y1 + item.dimension.y2) / 2
+      }
+      item.dimension.x1 = Math.round(item.dimension.x1 * 100) / 100
+      item.dimension.x2 = Math.round(item.dimension.x2 * 100) / 100
+      item.dimension.y1 = Math.round(item.dimension.y1 * 100) / 100
+      item.dimension.y2 = Math.round(item.dimension.y2 * 100) / 100
+      item.dimension.level = level
+    })
+  }
+  return prepared
+}
+
+const pointInPolygon = (point, points) => {
+  let inside = false
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const a = points[i], b = points[j]
+    const intersects = ((a.y > point.y) !== (b.y > point.y))
+      && point.x < ((b.x - a.x) * (point.y - a.y)) / ((b.y - a.y) || 1e-9) + a.x
+    if (intersects) inside = !inside
+  }
+  return inside
+}
+// Legacy merged Rooms may predate the internalWalls field. Recover a missing
+// shared seam from an orthogonal concave corner so existing local projects keep
+// showing their internal wall after updating the app.
+const getRoomInternalWalls = room => {
+  const stored = Array.isArray(room?.internalWalls) ? room.internalWalls.filter(wall =>
+    [wall.x1, wall.y1, wall.x2, wall.y2].every(value => Number.isFinite(Number(value)))
+      && Math.hypot(Number(wall.x2) - Number(wall.x1), Number(wall.y2) - Number(wall.y1)) > 1
+  ) : []
+  if (stored.length) return stored
+  const points = getRoomPoints(room)
+  if (points.length < 4) return []
+  const area = points.reduce((sum, point, index) => {
+    const next = points[(index + 1) % points.length]
+    return sum + point.x * next.y - next.x * point.y
+  }, 0)
+  const winding = area >= 0 ? 1 : -1
+  const reflex = []
+  points.forEach((point, index) => {
+    const previous = points[(index - 1 + points.length) % points.length]
+    const next = points[(index + 1) % points.length]
+    const cross = (point.x - previous.x) * (next.y - point.y) - (point.y - previous.y) * (next.x - point.x)
+    if (cross * winding < -1) reflex.push(index)
+  })
+  const walls = []
+  const used = new Set()
+  for (const reflexIndex of reflex) {
+    const corner = points[reflexIndex]
+    const candidates = points.map((point, index) => {
+      if (index === reflexIndex || (index + 1) % points.length === reflexIndex || (index - 1 + points.length) % points.length === reflexIndex || used.has(index)) return null
+      const dx = Math.abs(point.x - corner.x), dy = Math.abs(point.y - corner.y)
+      if (Math.min(dx, dy) > 1 || Math.max(dx, dy) < 2) return null
+      const midpoint = { x: (point.x + corner.x) / 2, y: (point.y + corner.y) / 2 }
+      if (!pointInPolygon(midpoint, points)) return null
+      return { index, point, length: Math.hypot(dx, dy) }
+    }).filter(Boolean).sort((a, b) => a.length - b.length)
+    const candidate = candidates[0]
+    if (!candidate) continue
+    walls.push({ x1: corner.x, y1: corner.y, x2: candidate.point.x, y2: candidate.point.y, legacyInferred: true })
+    used.add(candidate.index)
+  }
+  return walls
+}
+const openingLabel = opening => opening.type === 'window' ? 'Jendela' : opening.type === 'doorway' ? (opening.label || 'Pintu Tanpa Daun') : 'Pintu'
+
+const DoorSwingSymbol = ({ opening, width }) => {
+  const direction = opening.swingDirection === 'out' ? -1 : 1
+  const hingeSide = opening.hingeSide === 'right' ? 'right' : 'left'
+  const leafCount = opening.doorType === 'double' ? 2 : 1
+  const half = width / 2
+  const leaf = width / leafCount
+  const swing = Math.max(leaf, 24)
+  const hingeX = hingeSide === 'right' ? half : -half
+  const freeX = -hingeX
+  return <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke" pointerEvents="none">
+    {/* Solid stroke = actual door leaf; dashed curve = swing arc. */}
+    {leafCount === 1 ? <>
+      <path d={'M ' + (-half) + ' 0 H ' + half} />
+      <path d={'M ' + hingeX + ' 0 L ' + hingeX + ' ' + (direction * swing)} strokeWidth="3" />
+      <path d={'M ' + hingeX + ' ' + (direction * swing) + ' A ' + swing + ' ' + swing + ' 0 0 ' + (hingeSide === 'left' ? (direction < 0 ? 1 : 0) : (direction > 0 ? 1 : 0)) + ' ' + freeX + ' 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
+    </> : <>
+      <path d={'M ' + (-half) + ' 0 H ' + half} />
+      <path d={'M ' + (-half) + ' 0 L ' + (-half) + ' ' + (direction * swing) + ' M ' + half + ' 0 L ' + half + ' ' + (direction * swing)} strokeWidth="3" />
+      <path d={'M ' + (-half) + ' ' + (direction * swing) + ' A ' + swing + ' ' + swing + ' 0 0 ' + (direction < 0 ? 1 : 0) + ' 0 0 M ' + half + ' ' + (direction * swing) + ' A ' + swing + ' ' + swing + ' 0 0 ' + (direction > 0 ? 1 : 0) + ' 0 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
+    </>}
+  </g>
+}
 const getOpeningSegments = (length, openings = []) => {
   const ranges = openings
     .map(opening => {
-      const width = Math.min(Number(opening.width) || 48, length)
+      const width = Math.min(Number(opening.width ?? 48), length)
       const center = clamp(opening.offset, 0, 1) * length
       return { start: clamp(center - width / 2, 0, length), end: clamp(center + width / 2, 0, length) }
     })
@@ -108,12 +303,30 @@ const getOpeningSegments = (length, openings = []) => {
   return segments
 }
 const getRoomOpeningPlacement = (room, opening) => {
-  const side = ROOM_SIDES.some(item => item.value === opening.side) ? opening.side : 'bottom'
   const offset = clamp(opening.offset, 0.05, 0.95)
-  if (side === 'top') return { x: room.x + offset * room.width, y: room.y, angle: 180, length: room.width }
-  if (side === 'right') return { x: room.x + room.width, y: room.y + offset * room.height, angle: -90, length: room.height }
-  if (side === 'left') return { x: room.x, y: room.y + offset * room.height, angle: 90, length: room.height }
-  return { x: room.x + offset * room.width, y: room.y + room.height, angle: 0, length: room.width }
+  if (opening.wallType === 'internal' && Number.isInteger(opening.internalWallIndex)) {
+    const wall = getRoomInternalWalls(room)[opening.internalWallIndex]
+    if (wall) {
+      const metrics = getWallMetrics(wall)
+      return {
+        x: wall.x1 + metrics.ux * metrics.length * offset,
+        y: wall.y1 + metrics.uy * metrics.length * offset,
+        angle: metrics.angle + 180,
+        length: metrics.length,
+        internalWallIndex: opening.internalWallIndex,
+      }
+    }
+  }
+  const edges = getRoomEdges(room)
+  const edge = edges[Math.max(0, Math.min(edges.length - 1, Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)))] || edges[0]
+  if (!edge) return { x: 0, y: 0, angle: 0, length: 1, edgeIndex: 0 }
+  return {
+    x: edge.x1 + (edge.x2 - edge.x1) * offset,
+    y: edge.y1 + (edge.y2 - edge.y1) * offset,
+    angle: edge.angle + 180,
+    length: edge.length,
+    edgeIndex: edge.edgeIndex,
+  }
 }
 const getWallMetrics = wall => {
   const dx = wall.x2 - wall.x1
@@ -173,7 +386,7 @@ function FloorplanObjectIcon({ type, size = 20 }) {
     <svg
       width={size}
       height={size}
-      viewBox={type === 'camera' ? '-36 -25 72 50' : type === 'light' ? '-26 -28 52 56' : ['door', 'window', 'prop', 'room', 'wall'].includes(type) ? '-26 -22 52 44' : '-50 -42 100 84'}
+      viewBox={type === 'camera' ? '-36 -25 72 50' : type === 'light' ? '-26 -28 52 56' : ['door', 'doorway', 'window', 'prop', 'room', 'wall'].includes(type) ? '-26 -22 52 44' : '-50 -42 100 84'}
       fill="none"
       stroke="currentColor"
       strokeWidth="3.5"
@@ -186,6 +399,10 @@ function FloorplanObjectIcon({ type, size = 20 }) {
         <rect x="-17" y="-13" width="34" height="26" />
       ) : type === 'wall' ? (
         <path d="M-20 0 H20" strokeWidth="5" />
+      ) : type === 'doorway' ? (
+        <g>
+          <path d="M-20 -5 H-8 M8 -5 H20 M-20 5 H-8 M8 5 H20" />
+        </g>
       ) : type === 'door' ? (
         <g>
           <path d="M-16 -5 H16 M-16 5 H16" />
@@ -343,7 +560,19 @@ export default function Floorplan({
   const [spaceHeld, setSpaceHeld] = useState(false)
   const pinchRef = useRef(null)
   const [drawStart, setDrawStart] = useState(null)
+  const [roomDrawPoints, setRoomDrawPoints] = useState([])
+  const [roomLengthInputOpen, setRoomLengthInputOpen] = useState(false)
+  const [roomLengthInput, setRoomLengthInput] = useState('')
+  const [roomManualAngle, setRoomManualAngle] = useState(null)
+  const [roomDrawMessage, setRoomDrawMessage] = useState('')
+  const [showRoomDimensions, setShowRoomDimensions] = useState(true)
+  const [hoveredRoomEdge, setHoveredRoomEdge] = useState(null)
+  const [selectedRoomEdge, setSelectedRoomEdge] = useState(null)
   const [previewPoint, setPreviewPoint] = useState(null)
+  const [roomSnapGuides, setRoomSnapGuides] = useState([])
+  const [roomMergePrompt, setRoomMergePrompt] = useState(null)
+  const [roomVertexPrompt, setRoomVertexPrompt] = useState(null)
+  const [selectedRoomVertex, setSelectedRoomVertex] = useState(null)
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: MAP_WIDTH, height: MAP_HEIGHT })
   const [historyRevision, setHistoryRevision] = useState(0)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 520 })
@@ -360,9 +589,11 @@ export default function Floorplan({
   const storedLayout = scene ? (floorplans?.[scene.id] || EMPTY_LAYOUT) : EMPTY_LAYOUT
   const reusableRoomMode = Array.isArray(projectRooms)
   const layout = scene
-    ? { ...storedLayout, rooms: reusableRoomMode
-      ? projectRooms.filter(room => (scene.roomIds || []).includes(room.id))
-      : (storedLayout.rooms || []) }
+    ? { ...storedLayout, rooms: storedLayout.roomIsolationVersion === 1
+      ? (storedLayout.rooms || [])
+      : reusableRoomMode
+        ? projectRooms.filter(room => (scene.roomIds || []).includes(room.id))
+        : (storedLayout.rooms || []) }
     : EMPTY_LAYOUT
   layoutRef.current = layout
   const allObjects = [
@@ -415,6 +646,8 @@ export default function Floorplan({
     }
     setHistoryRevision(value => value + 1)
     setDrawStart(null)
+    setRoomDrawPoints([])
+    setRoomLengthInputOpen(false)
     setPreviewPoint(null)
     // Keep the user's current zoom and pan when switching scenes.
     // Fitting the canvas remains available through the explicit Fit control.
@@ -491,28 +724,13 @@ export default function Floorplan({
     const stored = floorplans?.[scene.id] || EMPTY_LAYOUT
     const currentLayout = { ...stored, rooms: layoutRef.current?.rooms || [] }
     const nextLayout = updater(currentLayout)
-    if (reusableRoomMode && JSON.stringify(nextLayout.rooms || []) !== JSON.stringify(currentLayout.rooms || [])) {
-      const beforeRooms = currentLayout.rooms || []
-      const afterRooms = nextLayout.rooms || []
-      const beforeIds = new Set(beforeRooms.map(room => room.id))
-      const afterIds = new Set(afterRooms.map(room => room.id))
-      const nextRoomIds = (scene.roomIds || []).filter(id => afterIds.has(id))
-      afterRooms.forEach(room => {
-        if (!beforeIds.has(room.id)) nextRoomIds.push(room.id)
-      })
-      onProjectRoomsChange?.(previousRooms => {
-        const roomMap = new Map((previousRooms || []).map(room => [room.id, room]))
-        afterRooms.forEach(room => roomMap.set(room.id, room))
-        return [...roomMap.values()]
-      })
-      onChange?.(previousScenes => previousScenes.map(item => item.id === scene.id
-        ? { ...item, roomIds: [...new Set(nextRoomIds)] }
-        : item))
-    }
-    const { rooms: ignoredRooms, ...persistedLayout } = nextLayout
+    // Persist a private Room collection for this Scene; never write edits back to
+    // the project-level reusable collection.
     onFloorplansChange(previous => ({
       ...previous,
-      [scene.id]: reusableRoomMode ? persistedLayout : nextLayout,
+      [scene.id]: reusableRoomMode
+        ? { ...nextLayout, roomIsolationVersion: 1 }
+        : nextLayout,
     }))
   }
 
@@ -744,9 +962,11 @@ export default function Floorplan({
   const getPoint = event => {
     const rect = svgRef.current?.getBoundingClientRect()
     if (!rect || !rect.width || !rect.height) return { x: 0, y: 0 }
+    // Workspace coordinates are intentionally unbounded: users can draw and pan
+    // beyond the original 10 × 6 area without hitting an invisible canvas edge.
     return {
-      x: clamp(viewBox.x + ((event.clientX - rect.left) / rect.width) * viewBox.width, 0, MAP_WIDTH),
-      y: clamp(viewBox.y + ((event.clientY - rect.top) / rect.height) * viewBox.height, 0, MAP_HEIGHT),
+      x: viewBox.x + ((event.clientX - rect.left) / rect.width) * viewBox.width,
+      y: viewBox.y + ((event.clientY - rect.top) / rect.height) * viewBox.height,
     }
   }
 
@@ -770,6 +990,25 @@ export default function Floorplan({
   }
 
   const handleCanvasWheel = event => {
+    const canvas = svgRef.current
+    const editor = canvas?.closest('.floorplan-editor')
+    const inspector = editor?.querySelector('.floorplan-inspector')
+    const inspectorRect = inspector?.getBoundingClientRect()
+    const pointerIsOverInspector = inspectorRect
+      && event.clientX >= inspectorRect.left
+      && event.clientX <= inspectorRect.right
+      && event.clientY >= inspectorRect.top
+      && event.clientY <= inspectorRect.bottom
+
+    // If the pointer is visually over the properties panel, route the wheel
+    // there instead of zooming the SVG, even if hit-testing overlaps the canvas.
+    if (pointerIsOverInspector && inspector) {
+      event.preventDefault()
+      event.stopPropagation()
+      inspector.scrollTop += event.deltaY
+      return
+    }
+
     event.preventDefault()
     event.stopPropagation()
     zoomCanvas(event.deltaY < 0 ? 0.9 : 1.1, event.clientX, event.clientY)
@@ -870,6 +1109,173 @@ export default function Floorplan({
     setTool('select')
   }
 
+  const beginRoomEdgeDrag = (room, edgeIndex, event) => {
+    if (tool === 'pan' || room.locked || event.button !== 0) return
+    event.stopPropagation()
+    event.preventDefault()
+    applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id })
+    setSelectedRoomEdge({ roomId: room.id, edgeIndex })
+    onSelectedShotIdChange?.('')
+    beginDragHistory()
+    dragRef.current = {
+      mode: 'room-edge',
+      id: room.id,
+      edgeIndex,
+      start: getPoint(event),
+      originalPoints: getRoomPoints(room).map(point => ({ ...point })),
+    }
+    svgRef.current?.setPointerCapture?.(event.pointerId)
+    setSelected({ type: 'room', id: room.id })
+    setTool('select')
+  }
+
+  const addRoomVertexOnEdge = (room, edgeIndex, event) => {
+    if (tool === 'pan' || room.locked || event.button !== 0) return
+    event.preventDefault()
+    event.stopPropagation()
+    const points = getRoomPoints(room).map(point => ({ ...point }))
+    const start = points[edgeIndex]
+    const end = points[(edgeIndex + 1) % points.length]
+    if (!start || !end) return
+    const dx = end.x - start.x
+    const dy = end.y - start.y
+    const lengthSquared = dx * dx + dy * dy
+    if (lengthSquared < 4) return
+    const pointer = getPoint(event)
+    const t = Math.max(0.02, Math.min(0.98, ((pointer.x - start.x) * dx + (pointer.y - start.y) * dy) / lengthSquared))
+    const point = { x: Math.round(start.x + dx * t), y: Math.round(start.y + dy * t) }
+    // Avoid creating a duplicate vertex close to either endpoint.
+    if (Math.hypot(point.x - start.x, point.y - start.y) < 3 || Math.hypot(point.x - end.x, point.y - end.y) < 3) return
+    applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id })
+    updateLayout(previous => ({
+      ...previous,
+      rooms: previous.rooms.map(item => {
+        if (item.id !== room.id) return item
+        const nextPoints = getRoomPoints(item).map(vertex => ({ ...vertex }))
+        nextPoints.splice(edgeIndex + 1, 0, point)
+        return { ...item, points: nextPoints }
+      }),
+    }))
+    setSelected({ type: 'room', id: room.id })
+    setTool('select')
+  }
+
+  const beginRoomFromVertex = () => {
+    if (!roomVertexPrompt) return
+    const point = { ...roomVertexPrompt.point }
+    setRoomDrawPoints([point])
+    setPreviewPoint(point)
+    setRoomDrawMessage('Titik awal Room baru dipilih. Klik titik berikutnya untuk menggambar.')
+    setRoomVertexPrompt(null)
+    setTool('room')
+  }
+
+  const confirmRoomMerge = () => {
+    if (!roomMergePrompt) return
+    const moving = layout.rooms.find(room => room.id === roomMergePrompt.movingRoomId)
+    const target = layout.rooms.find(room => room.id === roomMergePrompt.targetRoomId)
+    if (!moving || !target) {
+      setRoomMergePrompt(null)
+      return
+    }
+
+    // A confirmed merge is one Room entity. Keep the target Room's ID, name,
+    // and ceiling height, union the outer polygons, and preserve the former
+    // shared wall as a visible internal wall. The resulting single polygon
+    // remains draggable through the existing Room drag path.
+    const movingEdge = roomMergePrompt.movingEdge
+    const targetEdge = roomMergePrompt.targetEdge
+    const snappedPoints = snapRoomToEdge(moving, movingEdge, targetEdge)
+    if (!snappedPoints) {
+      setRoomMergePrompt({ ...roomMergePrompt, error: 'Dinding tidak dapat disejajarkan. Coba geser Room sedikit lalu sambungkan kembali.' })
+      return
+    }
+
+    const snappedMoving = { ...moving, points: snappedPoints }
+    const merged = mergeAdjacentRoomPolygons(snappedMoving, target, {
+      ...roomMergePrompt,
+      movingEdge: {
+        ...movingEdge,
+        a: snappedPoints[movingEdge.index],
+        b: snappedPoints[(movingEdge.index + 1) % snappedPoints.length],
+      },
+      targetEdge,
+    }, reason => setRoomMergePrompt({ ...roomMergePrompt, error: reason }))
+    if (!merged) return
+
+    updateLayout(previous => ({
+      ...previous,
+      rooms: previous.rooms
+        .filter(room => room.id !== moving.id && room.id !== target.id)
+        .concat({
+          ...target,
+          points: merged.points,
+          openings: merged.openings,
+          internalWalls: merged.internalWalls,
+          connectedRoomIds: [],
+          mergeParts: {
+            target: { ...target },
+            moving: { ...snappedMoving },
+          },
+        }),
+    }))
+    applyEntitySelection([{ type: 'room', id: target.id }], { type: 'room', id: target.id })
+    setRoomMergePrompt(null)
+  }
+
+  const unmergeRoom = room => {
+    const parts = room?.mergeParts
+    if (!parts?.target || !parts?.moving) return
+    if (room.locked) return
+    updateLayout(previous => ({
+      ...previous,
+      rooms: previous.rooms
+        .filter(item => item.id !== room.id)
+        .concat(
+          { ...parts.target },
+          { ...parts.moving },
+        ),
+    }))
+    applyEntitySelection([{ type: 'room', id: parts.target.id }], { type: 'room', id: parts.target.id })
+    setSelectedRoomEdge(null)
+    setSelectedRoomVertex(null)
+  }
+
+  const addRoomVertexAtEdgeMidpoint = room => {
+    if (!room || room.locked || selectedRoomEdge?.roomId !== room.id) return
+    const edgeIndex = selectedRoomEdge.edgeIndex
+    const points = getRoomPoints(room).map(point => ({ ...point }))
+    const start = points[edgeIndex]
+    const end = points[(edgeIndex + 1) % points.length]
+    if (!start || !end || Math.hypot(end.x - start.x, end.y - start.y) < 6) return
+    const point = { x: Math.round((start.x + end.x) / 2), y: Math.round((start.y + end.y) / 2) }
+    beginDragHistory()
+    updateLayout(previous => ({
+      ...previous,
+      rooms: previous.rooms.map(item => {
+        if (item.id !== room.id) return item
+        const nextPoints = getRoomPoints(item).map(vertex => ({ ...vertex }))
+        nextPoints.splice(edgeIndex + 1, 0, point)
+        return { ...item, points: nextPoints }
+      }),
+    }))
+    finishDragHistory()
+    setSelectedRoomVertex({ roomId: room.id, vertexIndex: edgeIndex + 1 })
+  }
+
+  const beginRoomVertexDrag = (room, vertexIndex, event) => {
+    if (tool === 'pan' || room.locked || event.detail > 1) return
+    event.stopPropagation()
+    event.preventDefault()
+    applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id })
+    setSelectedRoomVertex({ roomId: room.id, vertexIndex })
+    beginDragHistory()
+    dragRef.current = { mode: 'room-vertex', id: room.id, vertexIndex, start: getPoint(event), originalPoints: getRoomPoints(room).map(point => ({ ...point })) }
+    svgRef.current?.setPointerCapture?.(event.pointerId)
+    setSelected({ type: 'room', id: room.id })
+    setTool('select')
+  }
+
   const beginResize = (type, item, sx, sy, event) => {
     if (tool === 'pan') return
     event.stopPropagation()
@@ -917,6 +1323,7 @@ export default function Floorplan({
   const beginObjectDrag = (type, item, event) => {
     event.stopPropagation()
     if (tool === 'pan') return
+    if (type === 'room' && !pointInPolygon(getPoint(event), getRoomPoints(item))) return
 
     if (event.shiftKey) {
       const wasSelected = selectionRef.current.some(entry => entry.type === type && entry.id === item.id)
@@ -927,7 +1334,7 @@ export default function Floorplan({
 
     const currentSelection = selectionRef.current
     const alreadySelected = currentSelection.some(entry => entry.type === type && entry.id === item.id)
-    if (alreadySelected && currentSelection.length > 1) {
+    if (type !== 'room' && alreadySelected && currentSelection.length > 1) {
       setSelected({ type, id: item.id })
       setSelectedWaypoint(null)
     } else {
@@ -936,11 +1343,11 @@ export default function Floorplan({
 
     if (type === 'camera') onSelectedShotIdChange?.(item.shotId || '')
     else if (!alreadySelected || currentSelection.length <= 1) onSelectedShotIdChange?.('')
-    if (item.locked || tool === 'room' || tool === 'wall') return
-    if (tool === 'path') setTool('select')
+    if (item.locked || (tool === 'room' && type !== 'room') || (tool === 'wall' && type !== 'wall')) return
+    if (tool === 'path' || (tool === 'room' && type === 'room')) setTool('select')
     const point = getPoint(event)
 
-    if (alreadySelected && currentSelection.length > 1) {
+    if (type !== 'room' && alreadySelected && currentSelection.length > 1) {
       const items = currentSelection.map(entry => ({
         ...entry,
         original: (layout[entry.type + 's'] || []).find(candidate => candidate.id === entry.id),
@@ -950,7 +1357,19 @@ export default function Floorplan({
       dragRef.current = { mode: 'multi-move', start: point, items }
     } else {
       beginDragHistory()
-      dragRef.current = { mode: 'move', type, id: item.id, start: point, original: item }
+      // A connected Room behaves like an opening hosted on a wall: it can
+      // slide along the shared wall, but cannot drift away from that wall.
+      let attachmentVector = null
+      if (type === 'room' && Array.isArray(item.connectedRoomIds) && item.connectedRoomIds.length) {
+        const connectedIds = new Set(item.connectedRoomIds)
+        const candidate = findRoomMergeCandidate(item, layout.rooms, 18)
+        if (candidate && connectedIds.has(candidate.targetRoomId)) {
+          const edge = candidate.movingEdge
+          const length = Math.hypot(edge.b.x - edge.a.x, edge.b.y - edge.a.y) || 1
+          attachmentVector = { x: (edge.b.x - edge.a.x) / length, y: (edge.b.y - edge.a.y) / length }
+        }
+      }
+      dragRef.current = { mode: 'move', type, id: item.id, start: point, original: item, attachmentVector }
     }
     svgRef.current?.setPointerCapture?.(event.pointerId)
   }
@@ -1044,7 +1463,14 @@ export default function Floorplan({
       type,
       offset: 0.5,
       width: type === 'door' ? 48 : 58,
-      ...(selectedType === 'room' ? { side: 'bottom' } : {}),
+      height: type === 'door' ? 210 : 120,
+      ...(type === 'door' ? { swingDirection: 'in', doorType: 'single' } : {}),
+      ...(type === 'doorway' ? { label: 'Pintu Tanpa Daun', swingDirection: 'in' } : {}),
+      ...(selectedType === 'room' ? (
+        selectedRoomEdge?.roomId === selectedEntity.id && Number.isInteger(selectedRoomEdge.internalWallIndex)
+          ? { wallType: 'internal', internalWallIndex: selectedRoomEdge.internalWallIndex }
+          : { wallType: 'perimeter', edgeIndex: Math.max(0, getRoomPoints(selectedEntity).length - 1) }
+      ) : {}),
     }
     updateSelected({ openings: [...(selectedEntity.openings || []), opening] })
     setTool('select')
@@ -1061,7 +1487,9 @@ export default function Floorplan({
       if (opening.id !== openingId) return opening
       const next = { ...opening, ...patch }
       const length = selectedType === 'room'
-        ? (['left', 'right'].includes(next.side) ? selectedEntity.height : selectedEntity.width)
+        ? (next.wallType === 'internal' && Number.isInteger(next.internalWallIndex)
+          ? getWallMetrics(getRoomInternalWalls(selectedEntity)[next.internalWallIndex] || {}).length
+          : getRoomEdges(selectedEntity)[Math.max(0, Math.min(getRoomEdges(selectedEntity).length - 1, Number(next.edgeIndex) || 0))]?.length) || 1
         : getWallMetrics(selectedEntity).length
       const openingWidth = Math.min(Math.max(1, Number(next.width) || 1), Math.max(1, length))
       const minimumOffset = Math.min(0.49, openingWidth / (2 * Math.max(1, length)))
@@ -1083,7 +1511,140 @@ export default function Floorplan({
     setTool('select')
   }
 
+  const finishRoomDrawing = points => {
+    if (points.length < 3) {
+      setRoomDrawMessage('Room membutuhkan minimal 3 titik.')
+      return false
+    }
+    const cleanPoints = points.map(point => ({ x: Math.round(point.x), y: Math.round(point.y) }))
+    const area = Math.abs(cleanPoints.reduce((sum, point, index) => {
+      const next = cleanPoints[(index + 1) % cleanPoints.length]
+      return sum + point.x * next.y - next.x * point.y
+    }, 0)) / 2
+    if (area < 16) {
+      setRoomDrawMessage('Bentuk terlalu kecil atau tidak valid.')
+      return false
+    }
+    const room = {
+      id: makeId(),
+      points: cleanPoints,
+      label: 'Room ' + padNum(layout.rooms.length + 1),
+      openings: [],
+    }
+    updateLayout(previous => ({ ...previous, rooms: [...previous.rooms, room] }))
+    applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id })
+    onSelectedShotIdChange?.('')
+    setRoomDrawPoints([])
+    setPreviewPoint(null)
+    setRoomSnapGuides([])
+    setRoomDrawMessage('')
+    setRoomLengthInputOpen(false)
+    setTool('select')
+    return true
+  }
+
+  const addRoomDrawingPoint = point => {
+    setRoomDrawMessage('')
+    if (!roomDrawPoints.length) {
+      setRoomDrawPoints([point])
+      setPreviewPoint(point)
+      setRoomSnapGuides([])
+      return
+    }
+    const first = roomDrawPoints[0]
+    const rect = svgRef.current?.getBoundingClientRect()
+    const closeTolerance = 15 * (rect?.width ? viewBox.width / rect.width : 1)
+    if (Math.hypot(point.x - first.x, point.y - first.y) <= closeTolerance) {
+      finishRoomDrawing(roomDrawPoints)
+      return
+    }
+    const previous = roomDrawPoints[roomDrawPoints.length - 1]
+    const snapTolerance = 12 * viewBox.width / Math.max(1, svgRef.current?.getBoundingClientRect()?.width || canvasSize.width)
+    const anchors = [
+      ...layout.rooms.flatMap(room => getRoomPoints(room)),
+      ...(layout.walls || []).flatMap(wall => [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]),
+    ].filter(anchor => !(Math.abs(anchor.x - previous.x) < 0.01 && Math.abs(anchor.y - previous.y) < 0.01))
+    const snappedPoint = point.altKey ? point : snapRoomPoint(point, previous, [...roomDrawPoints.slice(0, -1), ...anchors], snapTolerance).point
+    if (Math.hypot(snappedPoint.x - previous.x, snappedPoint.y - previous.y) < 4) {
+      setRoomDrawMessage('Garis terlalu pendek.')
+      return
+    }
+    setRoomDrawPoints(points => [...points, snappedPoint])
+    setPreviewPoint(snappedPoint)
+  }
+
+  const confirmManualRoomLength = () => {
+    const meters = Number(roomLengthInput)
+    if (!Number.isFinite(meters) || meters <= 0 || !roomDrawPoints.length || !previewPoint) {
+      setRoomLengthInputOpen(false)
+      return
+    }
+    const origin = roomDrawPoints[roomDrawPoints.length - 1]
+    const dx = previewPoint.x - origin.x
+    const dy = previewPoint.y - origin.y
+    const angle = Number.isFinite(roomManualAngle) ? roomManualAngle : Math.atan2(dy, dx)
+    const distance = meters * 100
+    const nextPoint = { x: origin.x + Math.cos(angle) * distance, y: origin.y + Math.sin(angle) * distance }
+    setRoomDrawPoints(points => [...points, nextPoint])
+    setPreviewPoint(nextPoint)
+    setRoomLengthInputOpen(false)
+    setRoomLengthInput('')
+    setRoomManualAngle(null)
+  }
+
+  const getRoomAndWallSnapAnchors = () => [
+    ...layout.rooms.flatMap(room => getRoomPoints(room)),
+    ...(layout.walls || []).flatMap(wall => [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]),
+  ]
+
+  const snapPointToRoomAndWallGeometry = (point, origin = null) => {
+    const anchors = getRoomAndWallSnapAnchors()
+    const snapTolerance = 12 * viewBox.width / Math.max(1, svgRef.current?.getBoundingClientRect()?.width || canvasSize.width)
+    const segments = [
+      ...layout.rooms.flatMap(room => getRoomEdges(room).map(edge => ({ ...edge, sourceType: 'room', sourceId: room.id }))),
+      ...(layout.walls || []).map(wall => ({ ...wall, sourceType: 'wall', sourceId: wall.id })),
+    ]
+    const nearestSegment = segments
+      .map(segment => ({ ...projectPointToSegment(point, segment), segment }))
+      .filter(candidate => candidate.distance <= snapTolerance)
+      .sort((a, b) => a.distance - b.distance)[0]
+    // Snap to the actual line segment first. This allows a new wall to meet an
+    // existing Room boundary or Wall at any point, not just at a pre-existing
+    // vertex. Endpoints are still exact shared coordinates.
+    if (nearestSegment) {
+      const projected = nearestSegment.point
+      const guide = Math.abs(nearestSegment.segment.x2 - nearestSegment.segment.x1) >= Math.abs(nearestSegment.segment.y2 - nearestSegment.segment.y1)
+        ? [{ axis: 'horizontal', y: projected.y, x: projected.x }]
+        : [{ axis: 'vertical', x: projected.x, y: projected.y }]
+      return { point: { x: Math.round(projected.x), y: Math.round(projected.y) }, guides: guide, connection: { type: nearestSegment.segment.sourceType, id: nearestSegment.segment.sourceId, t: nearestSegment.t } }
+    }
+    if (!anchors.length) return { point, guides: [] }
+    // Preserve axis alignment snapping for endpoints that are not close to a
+    // segment. Existing corners and wall endpoints remain first-class anchors.
+    return origin
+      ? snapRoomPoint(point, origin, anchors, snapTolerance)
+      : snapRoomPoint(point, anchors[0], anchors.slice(1), snapTolerance)
+  }
+
   const handleCanvasPointerDownCapture = event => {
+    if (tool === 'wall' && event.button === 0 && !spaceHeld && !event.target?.closest?.('foreignObject')) {
+      // Capture before Room/object handlers so a wall can start directly on
+      // existing Room geometry instead of selecting the Room and aborting.
+      event.preventDefault()
+      event.stopPropagation()
+      const point = getPoint(event)
+      const snapped = snapPointToRoomAndWallGeometry(point)
+      setDrawStart(snapped.point)
+      setPreviewPoint(snapped.point)
+      setRoomSnapGuides(snapped.guides)
+      return
+    }
+    if (tool === 'room' && event.button === 0 && !spaceHeld && !event.target?.closest?.('foreignObject')) {
+      event.preventDefault()
+      event.stopPropagation()
+      addRoomDrawingPoint({ ...getPoint(event), altKey: event.altKey })
+      return
+    }
     // Path mode must intercept object pointer handlers: rooms and props can
     // visually cover the selected actor, but must never steal a waypoint click.
     if (tool === 'path' && event.button === 0) {
@@ -1106,6 +1667,7 @@ export default function Floorplan({
   }
 
   const handleCanvasPointerDown = event => {
+    if (tool === 'room') return
     if (tool === 'pan') {
       event.preventDefault()
       svgRef.current?.setPointerCapture?.(event.pointerId)
@@ -1182,8 +1744,36 @@ export default function Floorplan({
       })
       return
     }
+    if (tool === 'room' && roomDrawPoints.length) {
+      const origin = roomDrawPoints[roomDrawPoints.length - 1]
+      const snapTolerance = 9 * viewBox.width / Math.max(1, svgRef.current?.getBoundingClientRect()?.width || canvasSize.width)
+      const anchors = [
+        ...layout.rooms.flatMap(room => getRoomPoints(room)),
+        ...(layout.walls || []).flatMap(wall => [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]),
+      ].filter(anchor => !(Math.abs(anchor.x - origin.x) < 0.01 && Math.abs(anchor.y - origin.y) < 0.01))
+      if (roomLengthInputOpen || event.altKey) {
+        setPreviewPoint(point)
+        setRoomSnapGuides([])
+      } else {
+        const result = snapRoomPoint(point, origin, [...roomDrawPoints.slice(0, -1), ...anchors], snapTolerance)
+        setPreviewPoint(result.point)
+        setRoomSnapGuides(result.guides)
+      }
+      return
+    }
     if (drawStart) {
-      setPreviewPoint(point)
+      if (tool === 'wall') {
+        if (event.altKey) {
+          setPreviewPoint(point)
+          setRoomSnapGuides([])
+        } else {
+          const snapped = snapPointToRoomAndWallGeometry(point, drawStart)
+          setPreviewPoint(snapped.point)
+          setRoomSnapGuides(snapped.guides)
+        }
+      } else {
+        setPreviewPoint(point)
+      }
       return
     }
     if (!drag) return
@@ -1202,27 +1792,42 @@ export default function Floorplan({
         length = metrics.length || 1
         offset = ((point.x - host.x1) * metrics.ux + (point.y - host.y1) * metrics.uy) / length
       } else {
-        const edges = [
-          { side: 'top', x1: host.x, y1: host.y, x2: host.x + host.width, y2: host.y },
-          { side: 'right', x1: host.x + host.width, y1: host.y, x2: host.x + host.width, y2: host.y + host.height },
-          { side: 'bottom', x1: host.x, y1: host.y + host.height, x2: host.x + host.width, y2: host.y + host.height },
-          { side: 'left', x1: host.x, y1: host.y, x2: host.x, y2: host.y + host.height },
-        ]
-        const projectedEdges = edges.map(edge => {
-          const projection = getWallMetrics({ x1: edge.x1, y1: edge.y1, x2: edge.x2, y2: edge.y2 })
-          const edgeLength = projection.length || 1
-          const rawOffset = ((point.x - edge.x1) * projection.ux + (point.y - edge.y1) * projection.uy) / edgeLength
-          const clampedOffset = clamp(rawOffset, 0, 1)
-          const projectedX = edge.x1 + projection.ux * edgeLength * clampedOffset
-          const projectedY = edge.y1 + projection.uy * edgeLength * clampedOffset
-          return { ...edge, length: edgeLength, offset: rawOffset, distance: Math.hypot(point.x - projectedX, point.y - projectedY) }
-        })
-        const nearestEdge = projectedEdges.reduce((best, edge) => edge.distance < best.distance ? edge : best)
-        length = nearestEdge.length
-        offset = nearestEdge.offset
-        patch.side = nearestEdge.side
+        const isInternalOpening = opening.wallType === 'internal' && Number.isInteger(opening.internalWallIndex)
+        const internalWall = isInternalOpening
+          ? getRoomInternalWalls(host)[opening.internalWallIndex]
+          : null
+        if (isInternalOpening && !internalWall) {
+          // Never silently reattach an internal-wall opening to the room perimeter.
+          // A stale/missing wall should not make dragging teleport the opening outside.
+          return
+        }
+        if (internalWall) {
+          const metrics = getWallMetrics(internalWall)
+          length = metrics.length || 1
+          offset = ((point.x - internalWall.x1) * metrics.ux + (point.y - internalWall.y1) * metrics.uy) / length
+          patch.wallType = 'internal'
+          patch.internalWallIndex = opening.internalWallIndex
+          patch.edgeIndex = null
+        } else {
+          const edges = getRoomEdges(host)
+          const projectedEdges = edges.map(edge => {
+            const projection = getWallMetrics({ x1: edge.x1, y1: edge.y1, x2: edge.x2, y2: edge.y2 })
+            const edgeLength = projection.length || 1
+            const rawOffset = ((point.x - edge.x1) * projection.ux + (point.y - edge.y1) * projection.uy) / edgeLength
+            const clampedOffset = clamp(rawOffset, 0, 1)
+            const projectedX = edge.x1 + projection.ux * edgeLength * clampedOffset
+            const projectedY = edge.y1 + projection.uy * edgeLength * clampedOffset
+            return { ...edge, length: edgeLength, offset: rawOffset, distance: Math.hypot(point.x - projectedX, point.y - projectedY) }
+          })
+          const nearestEdge = projectedEdges.reduce((best, edge) => edge.distance < best.distance ? edge : best)
+          length = nearestEdge.length
+          offset = nearestEdge.offset
+          patch.wallType = 'perimeter'
+          patch.internalWallIndex = null
+          patch.edgeIndex = nearestEdge.edgeIndex
+        }
       }
-      const openingWidth = Math.min(Number(opening.width) || 48, length)
+      const openingWidth = Math.min(Number(opening.width ?? 48), length)
       const minimumOffset = Math.min(0.49, openingWidth / (2 * length))
       patch.offset = clamp(offset, minimumOffset, 1 - minimumOffset)
       updateLayout(previous => ({
@@ -1243,10 +1848,18 @@ export default function Floorplan({
       const endpointPatch = drag.endpoint === 'start'
         ? { x1: Math.round(point.x), y1: Math.round(point.y) }
         : { x2: Math.round(point.x), y2: Math.round(point.y) }
-      updateLayout(previous => ({
-        ...previous,
-        walls: previous.walls.map(wall => wall.id === drag.id ? { ...wall, ...endpointPatch } : wall),
-      }))
+      updateLayout(previous => {
+        const connected = updateWallEndpointGeometry(
+          previous.rooms || [],
+          previous.walls || [],
+          drag.id,
+          drag.endpoint,
+          drag.endpoint === 'start'
+            ? { x: endpointPatch.x1, y: endpointPatch.y1 }
+            : { x: endpointPatch.x2, y: endpointPatch.y2 },
+        )
+        return { ...previous, rooms: connected.rooms, walls: connected.walls }
+      })
       return
     }
 
@@ -1261,26 +1874,72 @@ export default function Floorplan({
           next[collection] = previous[collection].map(item => {
             const original = selectedById.get(item.id)
             if (!original) return item
-            if (collection === 'rooms') return {
-              ...item,
-              x: Math.round(clamp(original.x + dx, 0, MAP_WIDTH - item.width)),
-              y: Math.round(clamp(original.y + dy, 0, MAP_HEIGHT - item.height)),
-            }
+            if (collection === 'rooms') return { ...item, points: getRoomPoints(original).map(vertex => ({
+              x: Math.round(vertex.x + dx),
+              y: Math.round(vertex.y + dy),
+            })) }
             if (collection === 'walls') return {
               ...item,
-              x1: Math.round(clamp(original.x1 + dx, 0, MAP_WIDTH)),
-              y1: Math.round(clamp(original.y1 + dy, 0, MAP_HEIGHT)),
-              x2: Math.round(clamp(original.x2 + dx, 0, MAP_WIDTH)),
-              y2: Math.round(clamp(original.y2 + dy, 0, MAP_HEIGHT)),
+              x1: Math.round(original.x1 + dx),
+              y1: Math.round(original.y1 + dy),
+              x2: Math.round(original.x2 + dx),
+              y2: Math.round(original.y2 + dy),
             }
             return {
               ...item,
-              x: Math.round(clamp(original.x + dx, 0, MAP_WIDTH)),
-              y: Math.round(clamp(original.y + dy, 0, MAP_HEIGHT)),
+              x: Math.round(original.x + dx),
+              y: Math.round(original.y + dy),
             }
           })
         }
         return next
+      })
+      return
+    }
+
+    if (drag.mode === 'room-edge') {
+      const edge = getRoomEdges({ points: drag.originalPoints })[drag.edgeIndex]
+      if (!edge) return
+      const dx = point.x - drag.start.x
+      const dy = point.y - drag.start.y
+      const length = edge.length || 1
+      const nx = (edge.y2 - edge.y1) / length
+      const ny = -(edge.x2 - edge.x1) / length
+      const distance = dx * nx + dy * ny
+      const points = drag.originalPoints.map((vertex, index) => {
+        if (index === drag.edgeIndex || index === (drag.edgeIndex + 1) % drag.originalPoints.length) {
+          return { x: Math.round(vertex.x + nx * distance), y: Math.round(vertex.y + ny * distance) }
+        }
+        return vertex
+      })
+      updateLayout(previous => {
+        const connected = updateRoomPolygonGeometry(previous.rooms || [], previous.walls || [], drag.id, points)
+        return { ...previous, rooms: connected.rooms, walls: connected.walls }
+      })
+      return
+    }
+
+    if (drag.mode === 'room-vertex') {
+      const originalVertex = drag.originalPoints[drag.vertexIndex]
+      const snapTolerance = 9 * viewBox.width / Math.max(1, svgRef.current?.getBoundingClientRect()?.width || canvasSize.width)
+      const anchors = [
+        ...layout.rooms.flatMap(room => getRoomPoints(room).filter(vertex => !(room.id === drag.id && vertex === room.points?.[drag.vertexIndex]))),
+        ...(layout.walls || []).flatMap(wall => [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]),
+      ].filter(anchor => Math.hypot(anchor.x - originalVertex.x, anchor.y - originalVertex.y) > 0.01)
+      if (event.altKey) {
+        setRoomSnapGuides([])
+      } else {
+        const result = snapRoomPoint(point, originalVertex, anchors, snapTolerance)
+        point.x = result.point.x
+        point.y = result.point.y
+        setRoomSnapGuides(result.guides)
+      }
+      const nextPoints = drag.originalPoints.map((vertex, index) => index === drag.vertexIndex
+        ? { x: Math.round(point.x), y: Math.round(point.y) }
+        : vertex)
+      updateLayout(previous => {
+        const connected = updateRoomPolygonGeometry(previous.rooms || [], previous.walls || [], drag.id, nextPoints)
+        return { ...previous, rooms: connected.rooms, walls: connected.walls }
       })
       return
     }
@@ -1292,12 +1951,12 @@ export default function Floorplan({
       if (drag.type === 'room') {
         const nextWidth = Math.round(clamp(
           original.width + dx * drag.signX,          40,
-          drag.signX < 0 ? Math.min(MAP_WIDTH, original.x + original.width) : Math.max(40, MAP_WIDTH - original.x),
+          Number.MAX_SAFE_INTEGER,
         ))
         const nextHeight = Math.round(clamp(
           original.height + dy * drag.signY,
           40,
-          drag.signY < 0 ? Math.min(MAP_HEIGHT, original.y + original.height) : Math.max(40, MAP_HEIGHT - original.y),
+          Number.MAX_SAFE_INTEGER,
         ))
         const nextRoom = {
           ...original,
@@ -1324,8 +1983,8 @@ export default function Floorplan({
           ...original,
           width: nextWidth,
           height: nextHeight,
-          x: Math.round(clamp(original.x + shiftX * Math.cos(angle) - shiftY * Math.sin(angle), 0, MAP_WIDTH)),
-          y: Math.round(clamp(original.y + shiftX * Math.sin(angle) + shiftY * Math.cos(angle), 0, MAP_HEIGHT)),
+          x: Math.round(original.x + shiftX * Math.cos(angle) - shiftY * Math.sin(angle)),
+          y: Math.round(original.y + shiftX * Math.sin(angle) + shiftY * Math.cos(angle)),
         }
         updateLayout(previous => ({
           ...previous,
@@ -1337,8 +1996,8 @@ export default function Floorplan({
 
     if (drag.mode === 'waypoint') {
       const waypoint = {
-        x: Math.round(clamp(point.x, 0, MAP_WIDTH)),
-        y: Math.round(clamp(point.y, 0, MAP_HEIGHT)),
+        x: Math.round(point.x),
+        y: Math.round(point.y),
       }
       updateLayout(previous => ({
         ...previous,
@@ -1364,43 +2023,167 @@ export default function Floorplan({
       return
     }
 
-    const dx = point.x - drag.start.x
-    const dy = point.y - drag.start.y
-    updateLayout(previous => ({
+    let dx = point.x - drag.start.x
+    let dy = point.y - drag.start.y
+    if (drag.type === 'room' && drag.attachmentVector) {
+      const alongWall = dx * drag.attachmentVector.x + dy * drag.attachmentVector.y
+      dx = alongWall * drag.attachmentVector.x
+      dy = alongWall * drag.attachmentVector.y
+    } else if (drag.type === 'room' && !event.altKey) {
+      // Snap the entire Room as a rigid body, like Room drawing and opening
+      // placement: first align nearby parallel wall segments, then weld a
+      // nearby corner to the exact X/Y coordinates of another Room corner.
+      const rect = svgRef.current?.getBoundingClientRect()
+      const snapTolerance = 12 * viewBox.width / Math.max(1, rect?.width || canvasSize.width)
+      const movedPoints = getRoomPoints(drag.original).map(vertex => ({ x: vertex.x + dx, y: vertex.y + dy }))
+      const otherRooms = layout.rooms.filter(room => room.id !== drag.id)
+      const otherEdges = otherRooms.flatMap(room => getRoomEdges(room))
+      const edgeLength = edge => Math.hypot(edge.x2 - edge.x1, edge.y2 - edge.y1) || 1
+      let bestEdgeSnap = null
+      for (const movingEdge of getRoomEdges({ points: movedPoints })) {
+        const length = edgeLength(movingEdge)
+        const ux = (movingEdge.x2 - movingEdge.x1) / length
+        const uy = (movingEdge.y2 - movingEdge.y1) / length
+        for (const targetEdge of otherEdges) {
+          const targetLength = edgeLength(targetEdge)
+          const tx = (targetEdge.x2 - targetEdge.x1) / targetLength
+          const ty = (targetEdge.y2 - targetEdge.y1) / targetLength
+          if (Math.abs(ux * ty - uy * tx) > 0.035) continue
+          const nx = -uy
+          const ny = ux
+          const signedDistance = (targetEdge.x1 - movingEdge.x1) * nx + (targetEdge.y1 - movingEdge.y1) * ny
+          if (Math.abs(signedDistance) > snapTolerance) continue
+          const projectionStart = (targetEdge.x1 - movingEdge.x1) * ux + (targetEdge.y1 - movingEdge.y1) * uy
+          const projectionEnd = (targetEdge.x2 - movingEdge.x1) * ux + (targetEdge.y2 - movingEdge.y1) * uy
+          const overlap = Math.min(length, Math.max(projectionStart, projectionEnd)) - Math.max(0, Math.min(projectionStart, projectionEnd))
+          if (overlap < -snapTolerance) continue
+          if (!bestEdgeSnap || Math.abs(signedDistance) < Math.abs(bestEdgeSnap.distance)) bestEdgeSnap = { distance: signedDistance, nx, ny }
+        }
+      }
+      if (bestEdgeSnap) {
+        dx += bestEdgeSnap.nx * bestEdgeSnap.distance
+        dy += bestEdgeSnap.ny * bestEdgeSnap.distance
+      }
+
+      const snappedPoints = getRoomPoints(drag.original).map(vertex => ({ x: vertex.x + dx, y: vertex.y + dy }))
+      const anchors = [
+        ...otherRooms.flatMap(room => getRoomPoints(room)),
+        ...(layout.walls || []).flatMap(wall => [{ x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }]),
+      ]
+      let bestCorner = null
+      let bestX = null
+      let bestY = null
+      for (const vertex of snappedPoints) {
+        for (const anchor of anchors) {
+          const sx = anchor.x - vertex.x
+          const sy = anchor.y - vertex.y
+          if (Math.abs(sx) <= snapTolerance && Math.abs(sy) <= snapTolerance) {
+            const score = Math.hypot(sx, sy)
+            if (!bestCorner || score < bestCorner.score) bestCorner = { dx: sx, dy: sy, score, anchor }
+          }
+          if (Math.abs(sx) <= snapTolerance && (!bestX || Math.abs(sx) < Math.abs(bestX.delta))) bestX = { delta: sx, anchor }
+          if (Math.abs(sy) <= snapTolerance && (!bestY || Math.abs(sy) < Math.abs(bestY.delta))) bestY = { delta: sy, anchor }
+        }
+      }
+      if (bestCorner) {
+        dx += bestCorner.dx
+        dy += bestCorner.dy
+        setRoomSnapGuides([
+          { axis: 'vertical', x: bestCorner.anchor.x, y: bestCorner.anchor.y },
+          { axis: 'horizontal', x: bestCorner.anchor.x, y: bestCorner.anchor.y },
+        ])
+      } else {
+        if (bestX) dx += bestX.delta
+        if (bestY) dy += bestY.delta
+        const guides = []
+        if (bestX) guides.push({ axis: 'vertical', x: bestX.anchor.x, y: bestX.anchor.y })
+        if (bestY) guides.push({ axis: 'horizontal', x: bestY.anchor.x, y: bestY.anchor.y })
+        if (!guides.length && bestEdgeSnap) {
+          const point = movedPoints[0] || { x: 0, y: 0 }
+          guides.push({ axis: Math.abs(bestEdgeSnap.nx) > Math.abs(bestEdgeSnap.ny) ? 'vertical' : 'horizontal', x: point.x + dx, y: point.y + dy })
+        }
+        setRoomSnapGuides(guides)
+      }
+    } else if (drag.type === 'room' && event.altKey) {
+      setRoomSnapGuides([])
+    }
+    updateLayout(previous => {
+      if (drag.type === 'room') {
+        const movedPoints = getRoomPoints(drag.original).map(vertex => ({
+          x: Math.round(vertex.x + dx),
+          y: Math.round(vertex.y + dy),
+        }))
+        const connected = updateRoomPolygonGeometry(previous.rooms || [], previous.walls || [], drag.id, movedPoints)
+        return {
+          ...previous,
+          rooms: connected.rooms.map(item => item.id !== drag.id ? item : ({
+            ...item,
+            internalWalls: (drag.original.internalWalls || []).map(wall => ({
+              x1: Math.round(wall.x1 + dx), y1: Math.round(wall.y1 + dy),
+              x2: Math.round(wall.x2 + dx), y2: Math.round(wall.y2 + dy),
+            })),
+          })),
+          walls: connected.walls,
+        }
+      }
+      return {
       ...previous,
       [drag.type + 's']: previous[drag.type + 's'].map(item => {
         if (item.id !== drag.id) return item
         if (['actor', 'camera', 'light', 'door', 'window', 'prop'].includes(drag.type)) {
           return {
             ...item,
-            x: Math.round(clamp(drag.original.x + dx, 0, MAP_WIDTH)),
-            y: Math.round(clamp(drag.original.y + dy, 0, MAP_HEIGHT)),
+            x: Math.round(drag.original.x + dx),
+            y: Math.round(drag.original.y + dy),
           }
         }
         if (drag.type === 'room') {
           if (item.locked) return item
           return {
             ...item,
-            x: Math.round(clamp(drag.original.x + dx, 0, MAP_WIDTH - item.width)),
-            y: Math.round(clamp(drag.original.y + dy, 0, MAP_HEIGHT - item.height)),
+            points: getRoomPoints(drag.original).map(vertex => ({
+              x: Math.round(vertex.x + dx),
+              y: Math.round(vertex.y + dy),
+            })),
+            internalWalls: (drag.original.internalWalls || []).map(wall => ({
+              x1: Math.round(wall.x1 + dx), y1: Math.round(wall.y1 + dy),
+              x2: Math.round(wall.x2 + dx), y2: Math.round(wall.y2 + dy),
+            })),
           }
         }
         if (drag.type === 'wall') {
           return {
             ...item,
-            x1: Math.round(clamp(drag.original.x1 + dx, 0, MAP_WIDTH)),
-            y1: Math.round(clamp(drag.original.y1 + dy, 0, MAP_HEIGHT)),
-            x2: Math.round(clamp(drag.original.x2 + dx, 0, MAP_WIDTH)),
-            y2: Math.round(clamp(drag.original.y2 + dy, 0, MAP_HEIGHT)),
+            x1: Math.round(drag.original.x1 + dx),
+            y1: Math.round(drag.original.y1 + dy),
+            x2: Math.round(drag.original.x2 + dx),
+            y2: Math.round(drag.original.y2 + dy),
           }
         }
         return item
       }),
-    }))
+      }
+    })
   }
 
-  const handleCanvasPointerUp = () => {
+  const handleCanvasPointerUp = event => {
     const completedDrag = dragRef.current
+    // Release pointer capture before opening a dialog. Otherwise the pointer's
+    // click sequence can remain targeted at the SVG instead of the dialog button.
+    if (event?.pointerId != null && svgRef.current?.hasPointerCapture?.(event.pointerId)) {
+      svgRef.current.releasePointerCapture(event.pointerId)
+    }
+    if (completedDrag?.mode === 'move' && completedDrag.type === 'room') {
+      // Pointer-up can run with a stale React render closure after the final
+      // pointer-move update. Read the latest layout snapshot so the merge
+      // candidate is calculated from the Room's actual dropped position.
+      const currentLayout = layoutRef.current || layout
+      const movedRoom = currentLayout.rooms.find(room => room.id === completedDrag.id)
+      const candidate = movedRoom && findRoomMergeCandidate(movedRoom, currentLayout.rooms, 18)
+      const alreadyConnected = candidate && (movedRoom.connectedRoomIds || []).includes(candidate.targetRoomId)
+      if (candidate && !alreadyConnected) setRoomMergePrompt(candidate)
+    }
+    if (completedDrag?.mode === 'room-vertex' || (completedDrag?.mode === 'move' && completedDrag.type === 'room')) setRoomSnapGuides([])
     if (completedDrag?.mode === 'selection-box') {
       const end = completedDrag.current || completedDrag.start
       const bounds = {
@@ -1419,7 +2202,7 @@ export default function Floorplan({
       const hits = allObjects.filter(object => {
         const type = object.entityType
         const box = type === 'room'
-          ? { left: object.x, top: object.y, right: object.x + object.width, bottom: object.y + object.height }
+          ? (() => { const bounds = getRoomBounds(object); return { left: bounds.x, top: bounds.y, right: bounds.x + bounds.width, bottom: bounds.y + bounds.height } })()
           : type === 'wall'
             ? { left: Math.min(object.x1, object.x2), top: Math.min(object.y1, object.y2), right: Math.max(object.x1, object.x2), bottom: Math.max(object.y1, object.y2) }
             : {
@@ -1439,14 +2222,8 @@ export default function Floorplan({
       const width = Math.abs(previewPoint.x - drawStart.x)
       const height = Math.abs(previewPoint.y - drawStart.y)
       if (tool === 'room' && width >= 12 && height >= 12) {
-        const room = {
-          id: makeId(),
-          x: Math.round(Math.min(drawStart.x, previewPoint.x)),
-          y: Math.round(Math.min(drawStart.y, previewPoint.y)),
-          width: Math.round(width),
-          height: Math.round(height),
-          label: 'Room ' + padNum(layout.rooms.length + 1),
-        }
+        const room = createRoomPolygon(drawStart, previewPoint, makeId(), 'Room ' + padNum(layout.rooms.length + 1))
+        if (!room) return
         updateLayout(previous => ({ ...previous, rooms: [...previous.rooms, room] }))
         applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id })
         onSelectedShotIdChange?.('')
@@ -1459,7 +2236,10 @@ export default function Floorplan({
           thickness: 6,
           openings: [],
         }
-        updateLayout(previous => ({ ...previous, walls: [...previous.walls, wall] }))
+        updateLayout(previous => {
+          const connected = connectWallGeometry(previous.rooms || [], previous.walls || [], wall, makeId)
+          return { ...previous, rooms: connected.rooms, walls: connected.walls }
+        })
         applyEntitySelection([{ type: 'wall', id: wall.id }], { type: 'wall', id: wall.id })
         onSelectedShotIdChange?.('')
         setTool('select')
@@ -1467,7 +2247,8 @@ export default function Floorplan({
     }
     setDrawStart(null)
     setPreviewPoint(null)
-    if (completedDrag && ['move', 'multi-move', 'resize', 'wall-endpoint', 'waypoint', 'rotate', 'opening'].includes(completedDrag.mode)) {
+    if (tool === 'wall') setRoomSnapGuides([])
+    if (completedDrag && ['move', 'multi-move', 'resize', 'room-vertex', 'room-edge', 'wall-endpoint', 'waypoint', 'rotate', 'opening'].includes(completedDrag.mode)) {
       finishDragHistory()
     }
     dragRef.current = null
@@ -1590,9 +2371,44 @@ export default function Floorplan({
     }
   }, [isActive])
 
+  const deleteSelectedRoomVertex = () => {
+    if (!selectedRoomVertex) return false
+    const { roomId, vertexIndex } = selectedRoomVertex
+    const room = (layoutRef.current?.rooms || layout.rooms).find(item => item.id === roomId)
+    if (!room || room.locked) {
+      setSelectedRoomVertex(null)
+      return true
+    }
+    const points = getRoomPoints(room)
+    if (points.length <= 3) {
+      window.alert('Room harus memiliki minimal 3 titik sudut.')
+      return true
+    }
+    const nextPoints = points.filter((_, index) => index !== vertexIndex)
+    if (nextPoints.length < 3) return true
+    const area = Math.abs(nextPoints.reduce((sum, point, index) => {
+      const next = nextPoints[(index + 1) % nextPoints.length]
+      return sum + point.x * next.y - next.x * point.y
+    }, 0)) / 2
+    if (area < 16) {
+      window.alert('Titik ini tidak bisa dihapus karena bentuk Room akan menjadi tidak valid.')
+      return true
+    }
+    beginDragHistory()
+    updateLayout(previous => ({
+      ...previous,
+      rooms: previous.rooms.map(item => item.id === roomId ? { ...item, points: nextPoints } : item),
+    }))
+    finishDragHistory()
+    setSelectedRoomVertex(null)
+    applyEntitySelection([{ type: 'room', id: roomId }], { type: 'room', id: roomId })
+    return true
+  }
+
   useEffect(() => {
     if (!isActive) return undefined
-    const handleFloorplanShortcut = event => {
+
+  const handleFloorplanShortcut = event => {
       const target = event.target
       if (target instanceof HTMLElement && (
         target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
@@ -1613,7 +2429,10 @@ export default function Floorplan({
       }
       if (event.ctrlKey || event.metaKey) return
       if (['delete', 'backspace'].includes(key)) {
-        if (selectedWaypoint) {
+        if (selectedRoomVertex) {
+          event.preventDefault()
+          deleteSelectedRoomVertex()
+        } else if (selectedWaypoint) {
           event.preventDefault()
           deleteSelectedWaypoint()
         } else if (selectionRef.current.length > 1) {
@@ -1626,11 +2445,32 @@ export default function Floorplan({
         return
       }
       if (key === 'escape') {
+        if (tool === 'room' && roomDrawPoints.length) {
+          event.preventDefault()
+          setRoomDrawPoints([])
+          setPreviewPoint(null)
+          setRoomLengthInputOpen(false)
+          setRoomDrawMessage('')
+          return
+        }
         event.preventDefault()
         applyEntitySelection([])
         setSelectedWaypoint(null)
         onSelectedShotIdChange?.('')
         setTool('select')
+        return
+      }
+      if (tool === 'room' && roomDrawPoints.length && key === 'enter') {
+        event.preventDefault()
+        finishRoomDrawing(roomDrawPoints)
+        return
+      }
+      if (tool === 'room' && roomDrawPoints.length && key === 'tab') {
+        event.preventDefault()
+        const origin = roomDrawPoints[roomDrawPoints.length - 1]
+        setRoomManualAngle(Math.atan2(previewPoint.y - origin.y, previewPoint.x - origin.x))
+        setRoomLengthInputOpen(true)
+        setRoomLengthInput('')
         return
       }
       if (key === 'v') {
@@ -1652,7 +2492,7 @@ export default function Floorplan({
     }
     window.addEventListener('keydown', handleFloorplanShortcut)
     return () => window.removeEventListener('keydown', handleFloorplanShortcut)
-  }, [isActive, addObject, deleteSelected, deleteSelectedItems, deleteSelectedWaypoint, redoLayout, selected, selectedItems, selectedWaypoint, undoLayout])
+  }, [isActive, addObject, deleteSelected, deleteSelectedItems, deleteSelectedWaypoint, deleteSelectedRoomVertex, finishRoomDrawing, redoLayout, roomDrawPoints, selected, selectedItems, selectedRoomVertex, selectedWaypoint, tool, undoLayout])
 
   const clearLayout = () => {
     if (!window.confirm('Kosongkan room, wall, properti, aktor, kamera, dan lampu pada scene ini?')) return
@@ -1722,38 +2562,10 @@ export default function Floorplan({
           </button>
         </div>
         <span className="floorplan-tool-divider" />
-        {reusableRoomMode && (
-          <div className="floorplan-tool-group" role="group" aria-label="Room reusable">
-            <label className="floorplan-structure-label" htmlFor="reuse-room-select">Pakai Room</label>
-            <select
-              id="reuse-room-select"
-              className="floorplan-field"
-              value=""
-              onChange={event => {
-                const roomId = event.target.value
-                if (!roomId || !scene || (scene.roomIds || []).includes(roomId)) return
-                onChange?.(previous => previous.map(item => item.id === scene.id
-                  ? { ...item, roomIds: [...(item.roomIds || []), roomId] }
-                  : item))
-              }}
-              aria-label="Pakai Room yang sudah ada"
-            >
-              <option value="">Pakai Room yang sudah ada…</option>
-              {projectRooms.map(room => {
-                const alreadyUsed = (scene?.roomIds || []).includes(room.id)
-                const usedByOtherScenes = scenes.filter(item => (item.roomIds || []).includes(room.id) && item.id !== scene?.id).length
-                return (
-                  <option key={room.id} value={room.id} disabled={alreadyUsed}>
-                    {(room.label || 'Room tanpa nama')}{alreadyUsed ? ' — sudah dipakai di scene ini' : usedByOtherScenes ? ' — digunakan scene lain' : ''}
-                  </option>
-                )
-              })}
-            </select>
-          </div>
-        )}
         <div className="floorplan-structure-group" role="group" aria-label="Struktur">
           <span className="floorplan-structure-label">Struktur</span>
-          <button className={'floorplan-tool-button' + (tool === 'room' ? ' active' : '')} onClick={() => setTool('room')} title="Buat Room baru dengan drag" aria-label="Buat Room baru" aria-pressed={tool === 'room'}>
+          <button type="button" className={'floorplan-tool-button' + (showRoomDimensions ? ' active' : '')} onClick={() => setShowRoomDimensions(value => !value)} title={showRoomDimensions ? 'Sembunyikan dimensi Room' : 'Tampilkan dimensi Room'} aria-pressed={showRoomDimensions}><Ruler size={18} /><span>Dimensi</span></button>
+          <button className={'floorplan-tool-button' + (tool === 'room' ? ' active' : '')} onClick={() => setTool('room')} title="Gambar Room titik demi titik" aria-label="Gambar Room baru" aria-pressed={tool === 'room'}>
             <Square size={18} /><span>Ruang</span>
           </button>
           <button className={'floorplan-tool-button' + (tool === 'wall' ? ' active' : '')} onClick={() => setTool('wall')} title="Gambar dinding dengan menggeser kedua ujungnya" aria-label="Gambar dinding" aria-pressed={tool === 'wall'}>
@@ -1825,69 +2637,199 @@ export default function Floorplan({
                   <path d="M 50 0 L 0 0 0 50" fill="none" stroke="var(--border)" strokeWidth="0.8" strokeOpacity="0.5" />
                 </pattern>
               </defs>
-              <rect x={-MAP_WIDTH * 2} y={-MAP_HEIGHT * 2} width={MAP_WIDTH * 5} height={MAP_HEIGHT * 5} fill="var(--bg)" />
-              <rect x={-MAP_WIDTH * 2} y={-MAP_HEIGHT * 2} width={MAP_WIDTH * 5} height={MAP_HEIGHT * 5} fill="url(#floorplan-grid)" pointerEvents="none" />
-
+              <rect x={viewBox.x - viewBox.width * 2} y={viewBox.y - viewBox.height * 2} width={viewBox.width * 5} height={viewBox.height * 5} fill="var(--bg)" />
+              <rect x={viewBox.x - viewBox.width * 2} y={viewBox.y - viewBox.height * 2} width={viewBox.width * 5} height={viewBox.height * 5} fill="url(#floorplan-grid)" pointerEvents="none" />
               {layout.rooms.map(room => {
+                const points = getRoomPoints(room)
+                const pointString = points.map(point => point.x + ',' + point.y).join(' ')
                 const openings = room.openings || []
                 const active = selected?.type === 'room' && selected.id === room.id
                 const groupSelected = selectedItems.some(entry => entry.type === 'room' && entry.id === room.id)
-                const edgeDefs = [
-                  { side: 'top', x: room.x, y: room.y, length: room.width, horizontal: true },
-                  { side: 'right', x: room.x + room.width, y: room.y, length: room.height, horizontal: false },
-                  { side: 'bottom', x: room.x, y: room.y + room.height, length: room.width, horizontal: true },
-                  { side: 'left', x: room.x, y: room.y, length: room.height, horizontal: false },
-                ]
+                const bounds = getRoomBounds(room)
+                const edges = getRoomEdges(room)
+                const connectedRoomIds = new Set(Array.isArray(room.connectedRoomIds) ? room.connectedRoomIds : [])
+                const connectedRooms = layout.rooms.filter(candidate => connectedRoomIds.has(candidate.id))
+                const isSharedRoomEdge = edge => connectedRooms.some(other => getRoomEdges(other).some(otherEdge => {
+                  const dx = edge.x2 - edge.x1, dy = edge.y2 - edge.y1
+                  const otherDx = otherEdge.x2 - otherEdge.x1, otherDy = otherEdge.y2 - otherEdge.y1
+                  const length = Math.hypot(dx, dy) || 1
+                  const otherLength = Math.hypot(otherDx, otherDy) || 1
+                  if (Math.abs(dx * otherDy - dy * otherDx) / (length * otherLength) > 0.02) return false
+                  if (Math.abs(dx * (otherEdge.y1 - edge.y1) - dy * (otherEdge.x1 - edge.x1)) / length > 2) return false
+                  const ux = dx / length, uy = dy / length
+                  const project = point => (point.x - edge.x1) * ux + (point.y - edge.y1) * uy
+                  const start = Math.max(0, Math.min(project({ x: otherEdge.x1, y: otherEdge.y1 }), project({ x: otherEdge.x2, y: otherEdge.y2 })))
+                  const end = Math.min(length, Math.max(project({ x: otherEdge.x1, y: otherEdge.y1 }), project({ x: otherEdge.x2, y: otherEdge.y2 })))
+                  return end - start > 2
+                }))
+                const centroid = points.reduce((sum, point) => ({ x: sum.x + point.x / points.length, y: sum.y + point.y / points.length }), { x: 0, y: 0 })
                 return (
-                  <g key={room.id} data-floorplan-object="true" onPointerDown={event => beginObjectDrag('room', room, event)} onClick={event => event.stopPropagation()}>
-                    <rect
-                      x={room.x} y={room.y} width={room.width} height={room.height}
-                      fill={active ? 'var(--bg-hover)' : 'var(--bg-subtle)'}
-                      stroke="none"
-                    />
-                    {groupSelected && !active && <rect x={room.x} y={room.y} width={room.width} height={room.height} fill="none" stroke="var(--accent)" strokeWidth="2" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
-                    {edgeDefs.flatMap(edge => {
-                      const edgeOpenings = openings.filter(opening => (opening.side || 'bottom') === edge.side)
-                      return getOpeningSegments(edge.length, edgeOpenings).map((segment, index) => (
-                        <line
-                          key={edge.side + '-' + index}
-                          x1={edge.horizontal ? room.x + segment.start : edge.x}
-                          y1={edge.horizontal ? edge.y : room.y + segment.start}
-                          x2={edge.horizontal ? room.x + segment.end : edge.x}
-                          y2={edge.horizontal ? edge.y : room.y + segment.end}
-                          stroke={active ? 'var(--text)' : 'var(--border-strong)'}
-                          strokeWidth={active ? 3.5 : 2.5}
-                          vectorEffect="non-scaling-stroke"
-                          pointerEvents="none"
-                        />
-                      ))
+                  <g key={room.id} data-floorplan-object="true" onPointerEnter={() => setHoveredRoomEdge({ roomId: room.id, edgeIndex: null })} onPointerLeave={() => setHoveredRoomEdge(current => current?.roomId === room.id ? null : current)} onPointerDown={event => beginObjectDrag('room', room, event)} onClick={event => event.stopPropagation()}>
+                    <polygon points={pointString} fill={active ? 'var(--bg-hover)' : 'var(--bg-subtle)'} stroke="none" />
+                    {groupSelected && !active && <polygon points={pointString} fill="none" stroke="var(--accent)" strokeWidth="2" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
+                    {edges.map(edge => {
+                      const edgeOpenings = openings.filter(opening => opening.wallType !== 'internal' && !Number.isInteger(opening.internalWallIndex) && (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)) === edge.edgeIndex)
+                      return getOpeningSegments(edge.length, edgeOpenings).map((segment, index) => {
+                        const ux = (edge.x2 - edge.x1) / (edge.length || 1)
+                        const uy = (edge.y2 - edge.y1) / (edge.length || 1)
+                        return <line key={edge.edgeIndex + '-' + index} x1={edge.x1 + ux * segment.start} y1={edge.y1 + uy * segment.start} x2={edge.x1 + ux * segment.end} y2={edge.y1 + uy * segment.end} stroke={active ? 'var(--text)' : 'var(--border-strong)'} strokeWidth={active ? 3.5 : 2.5} vectorEffect="non-scaling-stroke" pointerEvents="none" />
+                      })
                     })}
-                    <text x={room.x + 12} y={room.y + 28} fill="var(--text)" fontSize="18" fontWeight="600" pointerEvents="none">
+                    {getRoomInternalWalls(room).map((wall, index) => {
+                      const metrics = getWallMetrics(wall)
+                      const wallOpenings = openings.filter(opening => opening.wallType === 'internal' && opening.internalWallIndex === index)
+                      return (
+                        <g key={`internal-wall-${index}`}>
+                          {getOpeningSegments(metrics.length, wallOpenings).map((segment, segmentIndex) => (
+                            <line key={segmentIndex}
+                              x1={wall.x1 + metrics.ux * segment.start} y1={wall.y1 + metrics.uy * segment.start}
+                              x2={wall.x1 + metrics.ux * segment.end} y2={wall.y1 + metrics.uy * segment.end}
+                              stroke={active ? 'var(--text)' : 'var(--border-strong)'} strokeWidth={active ? 3.5 : 2.5}
+                              vectorEffect="non-scaling-stroke" pointerEvents="none" />
+                          ))}
+                          {active && <line x1={wall.x1} y1={wall.y1} x2={wall.x2} y2={wall.y2}
+                            stroke="transparent" strokeWidth="14" vectorEffect="non-scaling-stroke" style={{ cursor: 'pointer' }}
+                            onPointerDown={event => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id })
+                              setSelected({ type: 'room', id: room.id })
+                              setSelectedRoomEdge({ roomId: room.id, internalWallIndex: index, edgeIndex: null })
+                              setTool('select')
+                            }}
+                            onClick={event => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              setSelectedRoomEdge({ roomId: room.id, internalWallIndex: index, edgeIndex: null })
+                            }} />}
+                        </g>
+                      )
+                    })}
+                    <text x={bounds.x + 8} y={bounds.y - 18} fill="var(--text)" fontSize="18" fontWeight="600" pointerEvents="none" paintOrder="stroke" stroke="var(--bg)" strokeWidth="3">
                       {room.label || 'Room'}
                     </text>
+                    {Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0 && (
+                      <text x={bounds.x + 8} y={bounds.y - 38} fill="var(--text-muted)" fontSize="12" pointerEvents="none" paintOrder="stroke" stroke="var(--bg)" strokeWidth="3">
+                        {'Tinggi ' + Number(room.ceilingHeight).toFixed(1) + ' m'}
+                      </text>
+                    )}
+                    {showRoomDimensions && (() => {
+                      const bounds = getRoomBounds(room)
+                      const dimensionLayouts = getRoomDimensionLayouts(room, edges)
+                      // Connected Rooms form one dimension group: compute a single outer
+                      // bounding box for their overall measurements, rather than drawing
+                      // each Room's total across the shared wall/openings.
+                      const connectedRoomGroup = (() => {
+                        const byId = new Map(layout.rooms.map(candidate => [candidate.id, candidate]))
+                        const visited = new Set([room.id])
+                        const queue = [room.id]
+                        while (queue.length) {
+                          const current = byId.get(queue.shift())
+                          ;(current?.connectedRoomIds || []).forEach(id => {
+                            if (byId.has(id) && !visited.has(id)) {
+                              visited.add(id)
+                              queue.push(id)
+                            }
+                          })
+                        }
+                        return [...visited].map(id => byId.get(id)).filter(Boolean)
+                      })()
+                      const connectedGroupPoints = connectedRoomGroup.flatMap(getRoomPoints)
+                      const connectedBounds = connectedGroupPoints.length
+                        ? {
+                            x: Math.min(...connectedGroupPoints.map(point => point.x)),
+                            y: Math.min(...connectedGroupPoints.map(point => point.y)),
+                            width: Math.max(...connectedGroupPoints.map(point => point.x)) - Math.min(...connectedGroupPoints.map(point => point.x)),
+                            height: Math.max(...connectedGroupPoints.map(point => point.y)) - Math.min(...connectedGroupPoints.map(point => point.y)),
+                          }
+                        : bounds
+                      const hasConnectedRooms = connectedRoomGroup.length > 1
+                      const isDimensionGroupActive = active && hasConnectedRooms
+                      const isTotalDimensionOwner = !hasConnectedRooms || room.id === [...connectedRoomGroup].map(item => item.id).sort()[0]
+                      const totalBounds = bounds
+                      const groupTotalBounds = hasConnectedRooms ? connectedBounds : null
+                      const visibleDimensionLayouts = dimensionLayouts
+                      const maxHorizontalLevel = Math.max(0, ...dimensionLayouts.filter(item => item.sideKey.startsWith('h-')).map(item => item.dimension.level))
+                      const maxVerticalLevel = Math.max(0, ...dimensionLayouts.filter(item => item.sideKey.startsWith('v-')).map(item => item.dimension.level))
+                      // A connected group must reserve space for every segment lane across all member Rooms.
+                      // Overall dimensions sit outside the furthest segment lane, without changing measured values.
+                      const groupDimensionLayouts = connectedRoomGroup.flatMap(candidate => getRoomDimensionLayouts(candidate, getRoomEdges(candidate)))
+                      const groupMaxHorizontalLevel = Math.max(0, ...groupDimensionLayouts.filter(item => item.sideKey.startsWith('h-')).map(item => item.dimension.level))
+                      const groupMaxVerticalLevel = Math.max(0, ...groupDimensionLayouts.filter(item => item.sideKey.startsWith('v-')).map(item => item.dimension.level))
+                      const showIndividualTotals = !hasConnectedRooms
+                      // Always show overall length and width for standalone rooms,
+                      // even when the total equals one full wall. Totals are useful metadata.
+                      const showHorizontalTotal = showIndividualTotals
+                      const showVerticalTotal = showIndividualTotals
+                      const horizontalTotalY = totalBounds.y - 112 - maxHorizontalLevel * 30
+                      const verticalTotalX = totalBounds.x + totalBounds.width + 112 + maxVerticalLevel * 30
+                      const groupHorizontalTotalY = groupTotalBounds ? groupTotalBounds.y - 160 - groupMaxHorizontalLevel * 30 : 0
+                      const groupVerticalTotalX = groupTotalBounds ? groupTotalBounds.x + groupTotalBounds.width + 160 + groupMaxVerticalLevel * 30 : 0
+                      // If a full-height outer wall differs from group bounds only by a tiny alignment sliver,
+                      // use the wall's actual span for the total dimension instead of reporting the sliver.
+                      const groupFullHeightEdge = groupTotalBounds && groupDimensionLayouts
+                        .filter(item => Math.abs(item.edge.x2 - item.edge.x1) < 1 && Math.abs(item.edge.length - groupTotalBounds.height) <= 5)
+                        .sort((a, b) => b.edge.length - a.edge.length)[0]?.edge
+                      const groupVerticalStartY = groupFullHeightEdge ? Math.min(groupFullHeightEdge.y1, groupFullHeightEdge.y2) : groupTotalBounds?.y
+                      const groupVerticalEndY = groupFullHeightEdge ? Math.max(groupFullHeightEdge.y1, groupFullHeightEdge.y2) : (groupTotalBounds ? groupTotalBounds.y + groupTotalBounds.height : 0)
+                      const groupVerticalMeasuredHeight = groupVerticalEndY - groupVerticalStartY
+                      return <g pointerEvents="none" opacity={active ? 1 : 0.58}>
+                        {(active || hoveredRoomEdge?.roomId === room.id) && visibleDimensionLayouts.map(({ edge, dimension: d }) => {
+                          const label = (edge.length / 100).toFixed(2) + ' m'
+                          return <g key={'dimension-' + edge.edgeIndex}>
+                            <line x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2} stroke="var(--text-muted)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                            <path d={'M ' + d.x1 + ' ' + d.y1 + ' L ' + (d.x1 + (d.y2 - d.y1) * 0.012) + ' ' + (d.y1 - (d.x2 - d.x1) * 0.012) + ' L ' + (d.x1 + (d.x2 - d.x1) * 0.025) + ' ' + (d.y1 + (d.y2 - d.y1) * 0.025) + ' Z'} fill="var(--text-muted)" />
+                            <path d={'M ' + d.x2 + ' ' + d.y2 + ' L ' + (d.x2 - (d.y2 - d.y1) * 0.012) + ' ' + (d.y2 + (d.x2 - d.x1) * 0.012) + ' L ' + (d.x2 - (d.x2 - d.x1) * 0.025) + ' ' + (d.y2 - (d.y2 - d.y1) * 0.025) + ' Z'} fill="var(--text-muted)" />
+                            <text x={d.mx} y={d.my - 5} textAnchor="middle" fontSize="11" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{label}</text>
+                          </g>
+                        })}
+                        {showHorizontalTotal && <>
+                          <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
+                            <line x1={totalBounds.x} y1={horizontalTotalY} x2={totalBounds.x + totalBounds.width} y2={horizontalTotalY} />
+                            <line x1={totalBounds.x} y1={horizontalTotalY - 6} x2={totalBounds.x} y2={horizontalTotalY + 6} />
+                            <line x1={totalBounds.x + totalBounds.width} y1={horizontalTotalY - 6} x2={totalBounds.x + totalBounds.width} y2={horizontalTotalY + 6} />
+                          </g>
+                          <text x={totalBounds.x + totalBounds.width / 2} y={horizontalTotalY - 8} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{(totalBounds.width / 100).toFixed(2) + ' m total'}</text>
+                        </>}
+                        {hasConnectedRooms && isTotalDimensionOwner && groupTotalBounds && <>
+                          <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
+                            <line x1={groupTotalBounds.x} y1={groupHorizontalTotalY} x2={groupTotalBounds.x + groupTotalBounds.width} y2={groupHorizontalTotalY} />
+                            <line x1={groupTotalBounds.x} y1={groupHorizontalTotalY - 6} x2={groupTotalBounds.x} y2={groupHorizontalTotalY + 6} />
+                            <line x1={groupTotalBounds.x + groupTotalBounds.width} y1={groupHorizontalTotalY - 6} x2={groupTotalBounds.x + groupTotalBounds.width} y2={groupHorizontalTotalY + 6} />
+                            <line x1={groupVerticalTotalX} y1={groupVerticalStartY} x2={groupVerticalTotalX} y2={groupVerticalEndY} />
+                            <line x1={groupVerticalTotalX - 6} y1={groupVerticalStartY} x2={groupVerticalTotalX + 6} y2={groupVerticalStartY} />
+                            <line x1={groupVerticalTotalX - 6} y1={groupVerticalEndY} x2={groupVerticalTotalX + 6} y2={groupVerticalEndY} />
+                          </g>
+                          <text x={groupTotalBounds.x + groupTotalBounds.width / 2} y={groupHorizontalTotalY - 8} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{(groupTotalBounds.width / 100).toFixed(2) + ' m total gabungan'}</text>
+                          <text x={groupVerticalTotalX + 12} y={groupVerticalStartY + groupVerticalMeasuredHeight / 2} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke" transform={'rotate(90 ' + (groupVerticalTotalX + 12) + ' ' + (groupVerticalStartY + groupVerticalMeasuredHeight / 2) + ')'}>{(groupVerticalMeasuredHeight / 100).toFixed(2) + ' m total gabungan'}</text>
+                        </>}
+                        {showVerticalTotal && <>
+                          <g stroke="var(--text-muted)" strokeWidth="1" fill="none" vectorEffect="non-scaling-stroke">
+                            <line x1={verticalTotalX} y1={totalBounds.y} x2={verticalTotalX} y2={totalBounds.y + totalBounds.height} />
+                            <line x1={verticalTotalX - 6} y1={totalBounds.y} x2={verticalTotalX + 6} y2={totalBounds.y} />
+                            <line x1={verticalTotalX - 6} y1={totalBounds.y + totalBounds.height} x2={verticalTotalX + 6} y2={totalBounds.y + totalBounds.height} />
+                          </g>
+                          <text x={verticalTotalX + 12} y={totalBounds.y + totalBounds.height / 2} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke" transform={'rotate(90 ' + (verticalTotalX + 12) + ' ' + (totalBounds.y + totalBounds.height / 2) + ')'}>{(totalBounds.height / 100).toFixed(2) + ' m total'}</text>
+                        </>}
+                      </g>
+                    })()}
+                    {active && edges.map(edge => <line key={'edge-hit-' + edge.edgeIndex} x1={edge.x1} y1={edge.y1} x2={edge.x2} y2={edge.y2} stroke="transparent" strokeWidth="14" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerEnter={() => setHoveredRoomEdge(current => current?.roomId === room.id ? current : current)} onClick={event => { event.preventDefault(); event.stopPropagation(); setHoveredRoomEdge({ roomId: room.id, edgeIndex: edge.edgeIndex }); applyEntitySelection([{ type: 'room', id: room.id }], { type: 'room', id: room.id }); setSelected({ type: 'room', id: room.id }) }} onPointerDown={event => { if (event.detail > 1) addRoomVertexOnEdge(room, edge.edgeIndex, event); else beginRoomEdgeDrag(room, edge.edgeIndex, event) }} onDoubleClick={event => addRoomVertexOnEdge(room, edge.edgeIndex, event)} />)}
+                    {active && points.map((point, index) => (
+                      <circle key={'vertex-' + index} cx={point.x} cy={point.y} r="6" fill="var(--bg)" stroke="var(--accent)" strokeWidth="2.5" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerDown={event => beginRoomVertexDrag(room, index, event)} onDoubleClick={event => { event.preventDefault(); event.stopPropagation(); setRoomVertexPrompt({ roomId: room.id, vertexIndex: index, point: { ...point } }) }} />
+                    ))}
+                    {active && edges.map(edge => <circle key={'edge-' + edge.edgeIndex} cx={(edge.x1 + edge.x2) / 2} cy={(edge.y1 + edge.y2) / 2} r="3.5" fill="var(--text-muted)" stroke="var(--bg)" strokeWidth="1" vectorEffect="non-scaling-stroke" pointerEvents="none" />)}
                     {openings.map(opening => {
                       const placement = getRoomOpeningPlacement(room, opening)
-                      const openingWidth = Math.min(Number(opening.width) || 48, placement.length)
+                      const openingWidth = Math.min(Number(opening.width ?? 48), placement.length)
                       return (
-                        <g
-                          key={opening.id}
-                          transform={'translate(' + placement.x + ' ' + placement.y + ') rotate(' + placement.angle + ')'}
-                          data-floorplan-object="true"
-                          style={{ cursor: 'grab' }}
-                          onPointerDown={event => beginOpeningDrag('room', room, opening, event)}
-                          onClick={event => event.stopPropagation()}
-                        >
-                          <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type === 'door' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">
-                            {opening.type === 'door' ? 'Pintu' : 'Jendela'}
-                          </text>
-
+                        <g key={opening.id} transform={'translate(' + placement.x + ' ' + placement.y + ') rotate(' + placement.angle + ')'} data-floorplan-object="true" style={{ cursor: 'grab' }} onPointerDownCapture={event => beginOpeningDrag('room', room, opening, event)} onClick={event => event.stopPropagation()}>
+                          <rect x={-(Math.min(Number(opening.width ?? 48), placement.length) / 2) - 8} y="-16" width={Math.min(Number(opening.width ?? 48), placement.length) + 16} height="32" fill="transparent" pointerEvents="all" />
+                          <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type !== 'window' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">{openingLabel(opening)}</text>
+                          
                           {opening.type === 'door' ? (
-                            <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
-                              <path d={'M ' + (-openingWidth / 2) + ' 0 V ' + (-openingWidth)} />
-                              <path d={'M ' + (-openingWidth / 2) + ' ' + (-openingWidth) + ' A ' + openingWidth + ' ' + openingWidth + ' 0 0 1 ' + (openingWidth / 2) + ' 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
-                            </g>
-                          ) : (
-                            <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+                            <DoorSwingSymbol opening={opening} width={openingWidth} />
+                          ) : opening.type === 'doorway' ? null : (
+                             <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
                               <path d={'M ' + (-openingWidth / 2) + ' -4 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 0 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 4 H ' + (openingWidth / 2)} />
                               <path d={'M ' + (-openingWidth / 2) + ' -7 V 7 M ' + (openingWidth / 2) + ' -7 V 7'} />
                             </g>
@@ -1895,22 +2837,6 @@ export default function Floorplan({
                         </g>
                       )
                     })}
-                    {active && RESIZE_HANDLES.map(handle => (
-                      <rect
-                        key={handle.key}
-                        x={(handle.sx < 0 ? room.x : room.x + room.width) - 5}
-                        y={(handle.sy < 0 ? room.y : room.y + room.height) - 5}
-                        width="10"
-                        height="10"
-                        rx="1.5"
-                        fill="var(--bg)"
-                        stroke="var(--text)"
-                        strokeWidth="1.8"
-                        vectorEffect="non-scaling-stroke"
-                        style={{ cursor: handle.cursor }}
-                        onPointerDown={event => beginResize('room', room, handle.sx, handle.sy, event)}
-                      />
-                    ))}
                   </g>
                 )
               })}
@@ -1922,8 +2848,14 @@ export default function Floorplan({
                 const active = selected?.type === 'wall' && selected.id === wall.id
                 const groupSelected = selectedItems.some(entry => entry.type === 'wall' && entry.id === wall.id)
                 const wallAngle = metrics.angle
+                const dimensionOffset = Math.max(22, (Number(wall.thickness) || 6) + 16)
+                const dimensionX1 = wall.x1 - metrics.uy * dimensionOffset
+                const dimensionY1 = wall.y1 + metrics.ux * dimensionOffset
+                const dimensionX2 = wall.x2 - metrics.uy * dimensionOffset
+                const dimensionY2 = wall.y2 + metrics.ux * dimensionOffset
+                const showWallDimension = showRoomDimensions && (active || hoveredRoomEdge?.wallId === wall.id)
                 return (
-                  <g key={wall.id} data-floorplan-object="true" onPointerDown={event => beginObjectDrag('wall', wall, event)} onClick={event => event.stopPropagation()}>
+                  <g key={wall.id} data-floorplan-object="true" onPointerEnter={() => setHoveredRoomEdge({ wallId: wall.id })} onPointerLeave={() => setHoveredRoomEdge(current => current?.wallId === wall.id ? null : current)} onPointerDown={event => beginObjectDrag('wall', wall, event)} onClick={event => event.stopPropagation()}>
                     {getOpeningSegments(length, openings).map((segment, index) => (
                       <line
                         key={'wall-segment-' + index}
@@ -1941,32 +2873,39 @@ export default function Floorplan({
                       stroke="transparent" strokeWidth="20" vectorEffect="non-scaling-stroke" />
                     {openings.map(opening => {
                       const center = clamp(opening.offset, 0, 1) * length
-                      const openingWidth = Math.min(Number(opening.width) || 48, length)
+                      const openingWidth = Math.min(Number(opening.width ?? 48), length)
                       return (
                         <g
                           key={opening.id}
                           transform={'translate(' + (wall.x1 + metrics.ux * center) + ' ' + (wall.y1 + metrics.uy * center) + ') rotate(' + wallAngle + ')'}
                           data-floorplan-object="true"
                           style={{ cursor: 'grab' }}
-                          onPointerDown={event => beginOpeningDrag('wall', wall, opening, event)}
+                          onPointerDownCapture={event => beginOpeningDrag('wall', wall, opening, event)}
                           onClick={event => event.stopPropagation()}
                         >
-                          <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type === 'door' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">
-                            {opening.type === 'door' ? 'Pintu' : 'Jendela'}
+                          <rect x={-(openingWidth / 2) - 8} y="-16" width={openingWidth + 16} height="32" fill="transparent" pointerEvents="all" />
+                          <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type !== 'window' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">
+                            {openingLabel(opening)}
                            </text>
+                           {opening.type === 'door' && <text x="0" y="25" textAnchor="middle" fontSize="9" fontWeight="600" fill="#fbbf24" stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">{'Daun pintu ' + (Number(opening.width ?? 48) / 100).toFixed(2) + ' m'}</text>}
                            {opening.type === 'door' ? (
-                            <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
-                              <path d={'M ' + (-openingWidth / 2) + ' 0 V ' + (-openingWidth)} />
-                              <path d={'M ' + (-openingWidth / 2) + ' ' + (-openingWidth) + ' A ' + openingWidth + ' ' + openingWidth + ' 0 0 1 ' + (openingWidth / 2) + ' 0'} strokeDasharray="4 3" strokeOpacity="0.7" />
-                            </g>
-                          ) : (
-                            <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+                            <DoorSwingSymbol opening={opening} width={openingWidth} />
+                          ) : opening.type === 'doorway' ? null : (
+                             <g fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" vectorEffect="non-scaling-stroke">
                               <path d={'M ' + (-openingWidth / 2) + ' -4 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 0 H ' + (openingWidth / 2) + ' M ' + (-openingWidth / 2) + ' 4 H ' + (openingWidth / 2)} />
                               <path d={'M ' + (-openingWidth / 2) + ' -7 V 7 M ' + (openingWidth / 2) + ' -7 V 7'} />
                             </g>
                           )}
                         </g>
                       )                    })}
+                    {showWallDimension && (
+                      <g pointerEvents="none">
+                        <line x1={dimensionX1} y1={dimensionY1} x2={dimensionX2} y2={dimensionY2} stroke="var(--text-muted)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                        <line x1={dimensionX1 - metrics.ux * 5} y1={dimensionY1 - metrics.uy * 5} x2={dimensionX1 + metrics.ux * 5} y2={dimensionY1 + metrics.uy * 5} stroke="var(--text-muted)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                        <line x1={dimensionX2 - metrics.ux * 5} y1={dimensionY2 - metrics.uy * 5} x2={dimensionX2 + metrics.ux * 5} y2={dimensionY2 + metrics.uy * 5} stroke="var(--text-muted)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+                        <text x={(dimensionX1 + dimensionX2) / 2} y={(dimensionY1 + dimensionY2) / 2 - 6} textAnchor="middle" fontSize="12" fill="var(--text)" stroke="var(--bg)" strokeWidth="5" paintOrder="stroke">{formatMeters(length)}</text>
+                      </g>
+                    )}
                     {active && (
                       <>
                         <circle cx={wall.x1} cy={wall.y1} r="6" fill="var(--bg)" stroke="var(--text)" strokeWidth="2" vectorEffect="non-scaling-stroke" style={{ cursor: 'move' }} onPointerDown={event => beginWallEndpointDrag(wall, 'start', event)} />
@@ -2276,14 +3215,30 @@ export default function Floorplan({
                 )
               })}
 
-              {drawStart && previewPoint && tool === 'room' && (
-                <rect
-                  x={Math.min(drawStart.x, previewPoint.x)} y={Math.min(drawStart.y, previewPoint.y)}
-                  width={Math.abs(previewPoint.x - drawStart.x)} height={Math.abs(previewPoint.y - drawStart.y)}
-                  fill="var(--bg-hover)" stroke="var(--text-muted)" strokeWidth="2" strokeDasharray="6 4"
-                  vectorEffect="non-scaling-stroke" pointerEvents="none"
-                />
+              {tool === 'room' && roomDrawPoints.length > 0 && previewPoint && (() => {
+                const points = [...roomDrawPoints, previewPoint]
+                const last = roomDrawPoints[roomDrawPoints.length - 1]
+                const length = Math.hypot(previewPoint.x - last.x, previewPoint.y - last.y)
+                const pointString = points.map(point => point.x + ',' + point.y).join(' ')
+                const closeTolerance = 15 * viewBox.width / Math.max(1, canvasSize.width)
+                const close = Math.hypot(previewPoint.x - roomDrawPoints[0].x, previewPoint.y - roomDrawPoints[0].y) <= closeTolerance
+                return <g pointerEvents="none">
+                  {roomSnapGuides.map((guide, index) => <line key={'snap-guide-' + index}
+                    x1={guide.axis === 'horizontal' ? viewBox.x : guide.x}
+                    y1={guide.axis === 'vertical' ? viewBox.y : guide.y}
+                    x2={guide.axis === 'horizontal' ? viewBox.x + viewBox.width : guide.x}
+                    y2={guide.axis === 'vertical' ? viewBox.y + viewBox.height : guide.y}
+                    stroke="var(--accent)" strokeWidth="1" strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />)}
+                  <polyline points={pointString} fill={roomDrawPoints.length >= 2 ? 'var(--bg-hover)' : 'none'} fillOpacity="0.45" stroke="var(--text-muted)" strokeWidth="2" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" /><circle cx={roomDrawPoints[0].x} cy={roomDrawPoints[0].y} r={close ? 9 : 5} fill={close ? 'var(--accent)' : 'var(--bg)'} stroke="var(--accent)" strokeWidth="2" vectorEffect="non-scaling-stroke" /><text x={(last.x + previewPoint.x) / 2 + 6} y={(last.y + previewPoint.y) / 2 - 8} fontSize="13" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke">{(length / 100).toFixed(2) + ' m'}</text></g>
+              })()}
+              {tool === 'room' && roomLengthInputOpen && previewPoint && (
+                <foreignObject x={previewPoint.x + 10} y={previewPoint.y + 10} width="150" height="48" style={{ overflow: 'visible', pointerEvents: 'all' }}>
+                  <div xmlns="http://www.w3.org/1999/xhtml" style={{ background: 'var(--bg)', border: '1px solid var(--border-strong)', borderRadius: '6px', padding: '5px', color: 'var(--text)', pointerEvents: 'all' }} onPointerDown={event => event.stopPropagation()}>
+                    <input autoFocus aria-label="Panjang garis dalam meter" type="number" min="0.01" step="0.01" value={roomLengthInput} onChange={event => setRoomLengthInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); confirmManualRoomLength() } if (event.key === 'Escape') { event.preventDefault(); setRoomLengthInputOpen(false) } }} style={{ width: '100%', background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '4px', padding: '4px' }} />
+                  </div>
+                </foreignObject>
               )}
+              {roomDrawMessage && tool === 'room' && <text x={viewBox.x + 16} y={viewBox.y + 28} fill="var(--text)" fontSize="13" pointerEvents="none">{roomDrawMessage}</text>}
               {drawStart && previewPoint && tool === 'wall' && (
                 <line x1={drawStart.x} y1={drawStart.y} x2={previewPoint.x} y2={previewPoint.y}
                   stroke="var(--text)" strokeWidth="3" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />
@@ -2303,6 +3258,14 @@ export default function Floorplan({
                   pointerEvents="none"
                 />
               )}
+              <g pointerEvents="none">
+                {roomSnapGuides.map((guide, index) => <line key={'snap-guide-active-' + index}
+                  x1={guide.axis === 'horizontal' ? viewBox.x : guide.x}
+                  y1={guide.axis === 'vertical' ? viewBox.y : guide.y}
+                  x2={guide.axis === 'horizontal' ? viewBox.x + viewBox.width : guide.x}
+                  y2={guide.axis === 'vertical' ? viewBox.y + viewBox.height : guide.y}
+                  stroke="var(--accent)" strokeWidth="1.5" strokeDasharray="5 4" vectorEffect="non-scaling-stroke" />)}
+              </g>
             </svg>
             <div className="floorplan-view-controls" role="group" aria-label="Kontrol tampilan denah">
               <button type="button" className="floorplan-view-control-button" onClick={() => zoomCanvas(1.25)} disabled={viewBox.width >= MAP_WIDTH * 2.5} title="Perkecil tampilan" aria-label="Perkecil tampilan"><Minus size={16} /></button>
@@ -2315,7 +3278,7 @@ export default function Floorplan({
           </div>
         </div>
 
-        <aside className="floorplan-inspector">
+        <aside className="floorplan-inspector" onWheel={event => event.stopPropagation()} style={{ overscrollBehavior: 'contain' }}>
           {selectedEntity && selectedType ? (
             <>
               <div className="floorplan-inspector-head">
@@ -2535,91 +3498,184 @@ export default function Floorplan({
 
               {selectedType === 'room' && (
                 <>
-                  {reusableRoomMode && (scenes.filter(item => (item.roomIds || []).includes(selectedEntity.id)).length > 1) && (
-                    <section className="floorplan-inspector-section" role="status">
-                      <strong>Room digunakan bersama</strong>
-                      <p>Perubahan geometri Room ini akan memengaruhi {scenes.filter(item => (item.roomIds || []).includes(selectedEntity.id)).length} Scene yang menggunakannya.</p>
+                  {selectedEntity.mergeParts?.target && selectedEntity.mergeParts?.moving && (
+                    <section className="floorplan-inspector-section">
+                      <div className="floorplan-section-title">Ruangan gabungan</div>
+                      <p className="floorplan-field-note">Pisahkan kembali Room ini menjadi {selectedEntity.mergeParts.target.label || 'Room'} dan {selectedEntity.mergeParts.moving.label || 'Room'}. Bentuk dan posisi sebelum penggabungan akan dipulihkan.</p>
+                      <button type="button" className="floorplan-opening-add" onClick={() => unmergeRoom(selectedEntity)} disabled={Boolean(selectedEntity.locked)}>Lepas ruangan</button>
                     </section>
                   )}
                   <section className="floorplan-inspector-section">
                     <label htmlFor="room-label">Nama ruang</label>
                     <input id="room-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
                   </section>
+                  {Array.isArray(selectedEntity.connectedRoomIds) && selectedEntity.connectedRoomIds.some(id => layout.rooms.some(room => room.id === id)) && (
+                    <section className="floorplan-inspector-section">
+                      <div className="floorplan-section-title">Sambungan Room</div>
+                      <p className="floorplan-field-note">Room ini terhubung dengan {selectedEntity.connectedRoomIds.filter(id => layout.rooms.some(room => room.id === id)).map(id => layout.rooms.find(room => room.id === id)?.label || 'Room').join(', ')}.</p>
+                      <button type="button" className="floorplan-opening-add" onClick={() => {
+                        const connectedIds = new Set(selectedEntity.connectedRoomIds || [])
+                        updateLayout(previous => ({
+                          ...previous,
+                          rooms: previous.rooms.map(room => {
+                            if (room.id === selectedEntity.id) {
+                              const next = { ...room }
+                              delete next.connectedRoomIds
+                              return next
+                            }
+                            if (!connectedIds.has(room.id)) return room
+                            return { ...room, connectedRoomIds: (room.connectedRoomIds || []).filter(id => id !== selectedEntity.id) }
+                          }),
+                        }))
+                      }} disabled={Boolean(selectedEntity.locked)}>
+                        Lepaskan sambungan Room
+                      </button>
+                    </section>
+                  )}
                   <section className="floorplan-inspector-section">
-                    <div className="floorplan-section-title">Dimensi (meter)</div>
-                    <div className="floorplan-opening-actions">
+                    <div className="floorplan-section-title">Ukuran ruangan</div>
+                    <p className="floorplan-field-note">Atur ukuran keseluruhan denah secara presisi. Bentuk polygon dipertahankan; titik-titik pada sumbu terkait akan diskalakan.</p>
+                    <div className="floorplan-dimension-grid">
                       <div className="floorplan-dimension-input">
-                        <label htmlFor="room-width">Panjang (m)</label>
-                        <input
-                          id="room-width"
-                          className="floorplan-field"
-                          type="number"
-                          min="0.40"
-                          max="10.00"
-                          step="0.01"
-                          value={(Number(selectedEntity.width || 100) / 100).toFixed(2)}
-                          disabled={Boolean(selectedEntity.locked)}
-                          onChange={event => {
-                            const meters = Number(event.target.value)
-                            if (!Number.isFinite(meters) || meters < 0.4 || meters > 10) return
-                            const width = Math.round(meters * 100)
-                            updateSelected({
-                              width,
-                              x: Math.min(Number(selectedEntity.x) || 0, MAP_WIDTH - width),
-                            })
-                          }}
-                        />
+                        <label htmlFor="room-length">Panjang (m)</label>
+                        <input id="room-length" className="floorplan-field" type="number" min="0.01" max="10" step="0.01" value={(getRoomBounds(selectedEntity).width / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                          const meters = Number(event.target.value)
+                          if (Number.isFinite(meters) && meters >= 0.01 && meters <= 10) {
+                            const resized = resizeRoomBounds(selectedEntity, 'length', meters * 100)
+                            updateLayout(previous => ({ ...previous, rooms: previous.rooms.map(room => room.id === selectedEntity.id ? resized : room) }))
+                          }
+                        }} />
                       </div>
                       <div className="floorplan-dimension-input">
-                        <label htmlFor="room-height">Lebar (m)</label>
-                        <input
-                          id="room-height"
-                          className="floorplan-field"
-                          type="number"
-                          min="0.40"
-                          max="6.50"
-                          step="0.01"
-                          value={(Number(selectedEntity.height || 80) / 100).toFixed(2)}
-                          disabled={Boolean(selectedEntity.locked)}
-                          onChange={event => {
-                            const meters = Number(event.target.value)
-                            if (!Number.isFinite(meters) || meters < 0.4 || meters > 6.5) return
-                            const height = Math.round(meters * 100)
-                            updateSelected({
-                              height,
-                              y: Math.min(Number(selectedEntity.y) || 0, MAP_HEIGHT - height),
-                            })
-                          }}
-                        />
+                        <label htmlFor="room-width">Lebar (m)</label>
+                        <input id="room-width" className="floorplan-field" type="number" min="0.01" max="6.5" step="0.01" value={(getRoomBounds(selectedEntity).height / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                          const meters = Number(event.target.value)
+                          if (Number.isFinite(meters) && meters >= 0.01 && meters <= 6.5) {
+                            const resized = resizeRoomBounds(selectedEntity, 'width', meters * 100)
+                            updateLayout(previous => ({ ...previous, rooms: previous.rooms.map(room => room.id === selectedEntity.id ? resized : room) }))
+                          }
+                        }} />
                       </div>
                     </div>
-                    <p className="floorplan-field-note">Masukkan ukuran dalam meter. Panjang 0,40–10 m, lebar 0,40–6,50 m.</p>
+                    <p className="floorplan-field-note">{getRoomPoints(selectedEntity).length} titik · panjang/lebar mengikuti bounding box polygon.</p>
+                    <div className="floorplan-opening-actions">
+                      <button type="button" disabled={Boolean(selectedEntity.locked) || selectedRoomEdge?.roomId !== selectedEntity.id} onClick={() => addRoomVertexAtEdgeMidpoint(selectedEntity)}>Tambah titik pada sisi terpilih</button>
+                      <button type="button" disabled={Boolean(selectedEntity.locked) || selectedRoomVertex?.roomId !== selectedEntity.id} onClick={deleteSelectedRoomVertex}>Hapus titik terpilih</button>
+                    </div>
+                    <p className="floorplan-field-note">Klik atau geser sisi dinding untuk memilihnya, lalu tekan Tambah titik. Pilih titik kuning untuk menghapusnya dengan tombol Hapus titik terpilih atau tekan Delete.</p>
+                  </section>
+                  <section className="floorplan-inspector-section">
+                    <label htmlFor="room-ceiling-height">Tinggi ruangan (m)</label>
+                    <input id="room-ceiling-height" className="floorplan-field" type="number" min="1" max="10" step="0.1" placeholder="Belum diisi" value={Number.isFinite(Number(selectedEntity.ceilingHeight)) && Number(selectedEntity.ceilingHeight) > 0 ? selectedEntity.ceilingHeight : ''} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                      const value = event.target.value
+                      if (value === '') {
+                        updateLayout(previous => ({ ...previous, rooms: previous.rooms.map(room => {
+                          if (room.id !== selectedEntity.id) return room
+                          const next = { ...room }
+                          delete next.ceilingHeight
+                          return next
+                        }) }))
+                      } else {
+                        const meters = Number(value)
+                        if (Number.isFinite(meters) && meters >= 1 && meters <= 10) updateSelected({ ceilingHeight: meters })
+                      }
+                    }} />
+                    <p className="floorplan-field-note">Room hasil migrasi tidak diberi tinggi otomatis. Isi manual jika sudah diketahui.</p>
                   </section>
                   <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Bukaan</div>
                     <div className="floorplan-opening-actions">
                       <button className="floorplan-opening-add" onClick={() => addOpening('door')}><FloorplanObjectIcon type="door" size={18} /> Tambah pintu</button>
+                       <button className="floorplan-opening-add" onClick={() => addOpening('doorway')}><FloorplanObjectIcon type="doorway" size={18} /> Tambah pintu tanpa daun</button>
                       <button className="floorplan-opening-add" onClick={() => addOpening('window')}><FloorplanObjectIcon type="window" size={18} /> Tambah jendela</button>
                     </div>
                     {(selectedEntity.openings || []).map(opening => (
                       <div className="floorplan-opening-row" key={opening.id}>
-                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Pintu' : 'Jendela'}</span>
+                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{openingLabel(opening)}</span>
                         <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} disabled={Boolean(selectedEntity.locked)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
                         <div className="floorplan-opening-actions">
+                          {(opening.type === 'door' || opening.type === 'doorway') && <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-leaf-mode'}>Model pintu</label>
+                            <select id={opening.id + '-leaf-mode'} className="floorplan-field" value={opening.type === 'door' ? 'leaf' : 'no-leaf'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { type: event.target.value === 'leaf' ? 'door' : 'doorway' })}>
+                              <option value="leaf">Pintu berdaun</option>
+                              <option value="no-leaf">Pintu tanpa daun</option>
+                            </select>
+                          </div>}
                           <div className="floorplan-dimension-input">
-                            <label htmlFor={opening.id + '-side'}>Sisi dinding</label>
-                            <select id={opening.id + '-side'} className="floorplan-field" value={ROOM_SIDES.some(side => side.value === opening.side) ? opening.side : 'bottom'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { side: event.target.value })}>
-                              {ROOM_SIDES.map(side => <option key={side.value} value={side.value}>{({ top: 'Atas', right: 'Kanan', bottom: 'Bawah', left: 'Kiri' })[side.value]}</option>)}
+                            <label htmlFor={opening.id + '-edge'}>Dinding pemasangan</label>
+                            <select id={opening.id + '-edge'} className="floorplan-field" value={opening.wallType === 'internal' && Number.isInteger(opening.internalWallIndex) ? 'internal:' + opening.internalWallIndex : 'edge:' + (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : 0)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
+                              const [kind, rawIndex] = event.target.value.split(':')
+                              const index = Number(rawIndex)
+                              updateOpening(opening.id, kind === 'internal'
+                                ? { wallType: 'internal', internalWallIndex: index, edgeIndex: null }
+                                : { wallType: 'perimeter', internalWallIndex: null, edgeIndex: index })
+                            }}>
+                              {getRoomEdges(selectedEntity).map(edge => <option key={'edge-' + edge.edgeIndex} value={'edge:' + edge.edgeIndex}>Dinding luar {edge.edgeIndex + 1}</option>)}
+                              {getRoomInternalWalls(selectedEntity).map((wall, index) => <option key={'internal-' + index} value={'internal:' + index}>Dinding sambungan {index + 1}</option>)}
                             </select>
                           </div>
                           <div className="floorplan-dimension-input">
                             <label htmlFor={opening.id + '-width'}>Lebar (m)</label>
-                            <input id={opening.id + '-width'} className="floorplan-field" type="number" min="0.30" max="5.00" step="0.01" value={(Number(opening.width || 48) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
-                              const meters = Number(event.target.value)
-                              if (!Number.isFinite(meters) || meters < 0.3 || meters > 5) return
-                              updateOpening(opening.id, { width: Math.round(meters * 100) })
+                            <input id={opening.id + '-width'} className="floorplan-field" type="number" min="0" max="5.00" step="0.01" value={(Number(opening.width ?? 48) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onFocus={event => event.currentTarget.select()} onChange={event => {
+                              const raw = event.target.value
+                              if (raw.trim() === '') {
+                                updateOpening(opening.id, { width: 0 })
+                                return
+                              }
+                              const meters = Number(raw)
+                              if (!Number.isFinite(meters)) return
+                              updateOpening(opening.id, { width: Math.round(clamp(meters, 0, 5) * 100) })
                             }} />
                           </div>
+                          <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-height'}>Tinggi (m)</label>
+                            <input id={opening.id + '-height'} className="floorplan-field" type="number" min="0" max="4.00" step="0.01" value={(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onFocus={event => event.currentTarget.select()} onChange={event => {
+                              const raw = event.target.value
+                              if (raw.trim() === '') {
+                                updateOpening(opening.id, { height: 0 })
+                                return
+                              }
+                              const meters = Number(raw)
+                              if (!Number.isFinite(meters)) return
+                              updateOpening(opening.id, { height: Math.round(clamp(meters, 0, 4) * 100) })
+                            }} />
+                          </div>
+                          {opening.type === 'doorway' && <>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-label'}>Nama pintu</label>
+                              <input id={opening.id + '-label'} className="floorplan-field" type="text" maxLength={80} value={opening.label || 'Pintu Tanpa Daun'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { label: event.target.value })} />
+                            </div>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-swing'}>Arah buka</label>
+                              <select id={opening.id + '-swing'} className="floorplan-field" value={opening.swingDirection === 'out' ? 'out' : 'in'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { swingDirection: event.target.value })}>
+                                <option value="in">Ke dalam</option>
+                                <option value="out">Ke luar</option>
+                              </select>
+                            </div>
+                          </>}
+                          {opening.type === 'door' && <>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-swing'}>Arah buka</label>
+                              <select id={opening.id + '-swing'} className="floorplan-field" value={opening.swingDirection === 'out' ? 'out' : 'in'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { swingDirection: event.target.value })}>
+                                <option value="in">Ke dalam</option>
+                                <option value="out">Ke luar</option>
+                              </select>
+                            </div>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-door-type'}>Jenis pintu</label>
+                              <select id={opening.id + '-door-type'} className="floorplan-field" value={opening.doorType === 'double' ? 'double' : 'single'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { doorType: event.target.value })}>
+                                <option value="single">Single</option>
+                                <option value="double">Double</option>
+                              </select>
+                            </div>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-hinge-side'}>Engsel di sisi</label>
+                              <select id={opening.id + '-hinge-side'} className="floorplan-field" value={opening.hingeSide === 'right' ? 'right' : 'left'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { hingeSide: event.target.value })}>
+                                <option value="left">Kiri</option>
+                                <option value="right">Kanan</option>
+                              </select>
+                            </div>
+                          </>}
                           <div className="floorplan-dimension-input">
                             <label htmlFor={opening.id + '-offset'}>Posisi (%)</label>
                             <input id={opening.id + '-offset'} className="floorplan-field" type="number" min="5" max="95" step="1" value={Math.round((Number(opening.offset) || 0.5) * 100)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
@@ -2640,30 +3696,118 @@ export default function Floorplan({
                 <>
                   <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Dimensi</div>
-                    <div className="floorplan-dimension-summary">
-                      <div><span>Panjang</span><strong>{formatMeters(getWallMetrics(selectedEntity).length)}</strong></div>
-                      <div><span>Lebar</span><strong>{formatMeters(Number(selectedEntity.thickness) || 6)}</strong></div>
+                    <div className="floorplan-dimension-grid">
+                      <div className="floorplan-dimension-input">
+                        <label htmlFor="wall-length">Panjang (m)</label>
+                        <input id="wall-length" className="floorplan-field" type="number" min="0.01" max="20" step="0.01" value={(getWallMetrics(selectedEntity).length / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onFocus={event => event.currentTarget.select()} onChange={event => {
+                          const meters = Number(event.target.value)
+                          if (!Number.isFinite(meters) || meters < 0.01 || meters > 20) return
+                          const current = getWallMetrics(selectedEntity)
+                          const length = meters * 100
+                          updateLayout(previous => ({
+                            ...previous,
+                            walls: previous.walls.map(wall => wall.id === selectedEntity.id
+                              ? { ...wall, x2: wall.x1 + current.ux * length, y2: wall.y1 + current.uy * length }
+                              : wall),
+                          }))
+                        }} />
+                      </div>
+                      <div className="floorplan-dimension-input">
+                        <label htmlFor="wall-thickness">Lebar / tebal (m)</label>
+                        <input id="wall-thickness" className="floorplan-field" type="number" min="0.01" max="1" step="0.01" value={((Number(selectedEntity.thickness) || 6) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onFocus={event => event.currentTarget.select()} onChange={event => {
+                          const meters = Number(event.target.value)
+                          if (!Number.isFinite(meters) || meters < 0.01 || meters > 1) return
+                          updateLayout(previous => ({
+                            ...previous,
+                            walls: previous.walls.map(wall => wall.id === selectedEntity.id
+                              ? { ...wall, thickness: Math.round(meters * 100) }
+                              : wall),
+                          }))
+                        }} />
+                      </div>
                     </div>
                   </section>
                   <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Bukaan</div>
                     <div className="floorplan-opening-actions">
                       <button className="floorplan-opening-add" onClick={() => addOpening('door')}><FloorplanObjectIcon type="door" size={18} /> Tambah pintu</button>
+                       <button className="floorplan-opening-add" onClick={() => addOpening('doorway')}><FloorplanObjectIcon type="doorway" size={18} /> Tambah pintu tanpa daun</button>
                       <button className="floorplan-opening-add" onClick={() => addOpening('window')}><FloorplanObjectIcon type="window" size={18} /> Tambah jendela</button>
                     </div>
                     {(selectedEntity.openings || []).map(opening => (
                       <div className="floorplan-opening-row" key={opening.id}>
-                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{opening.type === 'door' ? 'Pintu' : 'Jendela'}</span>
+                        <span className="floorplan-opening-kind"><FloorplanObjectIcon type={opening.type} size={18} />{openingLabel(opening)}</span>
                         <button className="floorplan-icon-button" onClick={() => removeOpening(opening.id)} disabled={Boolean(selectedEntity.locked)} title="Hapus bukaan" aria-label="Hapus bukaan"><X size={15} /></button>
                         <div className="floorplan-opening-actions">
+                          {(opening.type === 'door' || opening.type === 'doorway') && <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-leaf-mode'}>Model pintu</label>
+                            <select id={opening.id + '-leaf-mode'} className="floorplan-field" value={opening.type === 'door' ? 'leaf' : 'no-leaf'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { type: event.target.value === 'leaf' ? 'door' : 'doorway' })}>
+                              <option value="leaf">Pintu berdaun</option>
+                              <option value="no-leaf">Pintu tanpa daun</option>
+                            </select>
+                          </div>}
                           <div className="floorplan-dimension-input">
                             <label htmlFor={opening.id + '-width'}>Lebar (m)</label>
-                            <input id={opening.id + '-width'} className="floorplan-field" type="number" min="0.30" max="5.00" step="0.01" value={(Number(opening.width || 48) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
-                              const meters = Number(event.target.value)
-                              if (!Number.isFinite(meters) || meters < 0.3 || meters > 5) return
-                              updateOpening(opening.id, { width: Math.round(meters * 100) })
+                            <input id={opening.id + '-width'} className="floorplan-field" type="number" min="0" max="5.00" step="0.01" value={(Number(opening.width ?? 48) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onFocus={event => event.currentTarget.select()} onChange={event => {
+                              const raw = event.target.value
+                              if (raw.trim() === '') {
+                                updateOpening(opening.id, { width: 0 })
+                                return
+                              }
+                              const meters = Number(raw)
+                              if (!Number.isFinite(meters)) return
+                              updateOpening(opening.id, { width: Math.round(clamp(meters, 0, 5) * 100) })
                             }} />
                           </div>
+                          <div className="floorplan-dimension-input">
+                            <label htmlFor={opening.id + '-height'}>Tinggi (m)</label>
+                            <input id={opening.id + '-height'} className="floorplan-field" type="number" min="0" max="4.00" step="0.01" value={(Number(opening.height ?? (opening.type === 'door' ? 210 : 120)) / 100).toFixed(2)} disabled={Boolean(selectedEntity.locked)} onFocus={event => event.currentTarget.select()} onChange={event => {
+                              const raw = event.target.value
+                              if (raw.trim() === '') {
+                                updateOpening(opening.id, { height: 0 })
+                                return
+                              }
+                              const meters = Number(raw)
+                              if (!Number.isFinite(meters)) return
+                              updateOpening(opening.id, { height: Math.round(clamp(meters, 0, 4) * 100) })
+                            }} />
+                          </div>
+                          {opening.type === 'doorway' && <>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-label'}>Nama pintu</label>
+                              <input id={opening.id + '-label'} className="floorplan-field" type="text" maxLength={80} value={opening.label || 'Pintu Tanpa Daun'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { label: event.target.value })} />
+                            </div>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-swing'}>Arah buka</label>
+                              <select id={opening.id + '-swing'} className="floorplan-field" value={opening.swingDirection === 'out' ? 'out' : 'in'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { swingDirection: event.target.value })}>
+                                <option value="in">Ke dalam</option>
+                                <option value="out">Ke luar</option>
+                              </select>
+                            </div>
+                          </>}
+                          {opening.type === 'door' && <>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-swing'}>Arah buka</label>
+                              <select id={opening.id + '-swing'} className="floorplan-field" value={opening.swingDirection === 'out' ? 'out' : 'in'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { swingDirection: event.target.value })}>
+                                <option value="in">Ke dalam</option>
+                                <option value="out">Ke luar</option>
+                              </select>
+                            </div>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-door-type'}>Jenis pintu</label>
+                              <select id={opening.id + '-door-type'} className="floorplan-field" value={opening.doorType === 'double' ? 'double' : 'single'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { doorType: event.target.value })}>
+                                <option value="single">Single</option>
+                                <option value="double">Double</option>
+                              </select>
+                            </div>
+                            <div className="floorplan-dimension-input">
+                              <label htmlFor={opening.id + '-hinge-side'}>Engsel di sisi</label>
+                              <select id={opening.id + '-hinge-side'} className="floorplan-field" value={opening.hingeSide === 'right' ? 'right' : 'left'} disabled={Boolean(selectedEntity.locked)} onChange={event => updateOpening(opening.id, { hingeSide: event.target.value })}>
+                                <option value="left">Kiri</option>
+                                <option value="right">Kanan</option>
+                              </select>
+                            </div>
+                          </>}
                           <div className="floorplan-dimension-input">
                             <label htmlFor={opening.id + '-offset'}>Posisi (%)</label>
                             <input id={opening.id + '-offset'} className="floorplan-field" type="number" min="5" max="95" step="1" value={Math.round((Number(opening.offset) || 0.5) * 100)} disabled={Boolean(selectedEntity.locked)} onChange={event => {
@@ -2754,6 +3898,31 @@ export default function Floorplan({
           )}
         </aside>
       </div>
+      {roomMergePrompt && (
+        <div className="floorplan-dialog-backdrop" role="presentation" onPointerDown={event => { if (event.target === event.currentTarget) setRoomMergePrompt(null) }}>
+          <section className="floorplan-dialog" role="dialog" aria-modal="true" aria-labelledby="room-merge-title" onPointerDown={event => event.stopPropagation()} onClick={event => event.stopPropagation()}>
+            <h3 id="room-merge-title">Gabungkan kedua Room?</h3>
+            <p>Dua Room akan ditandai sebagai area yang tersambung. Bentuk dan nama masing-masing Room, semua dinding, pintu, dan jendela tetap dipertahankan.</p>
+            {roomMergePrompt.error && <p role="alert">{roomMergePrompt.error}</p>}
+            <div className="floorplan-dialog-actions">
+              <button type="button" onClick={() => setRoomMergePrompt(null)}>Batal</button>
+              <button type="button" onClick={confirmRoomMerge}>Sambungkan Room</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {roomVertexPrompt && (
+        <div className="floorplan-dialog-backdrop" role="presentation" onPointerDown={event => { if (event.target === event.currentTarget) setRoomVertexPrompt(null) }}>
+          <section className="floorplan-dialog" role="dialog" aria-modal="true" aria-labelledby="room-vertex-title">
+            <h3 id="room-vertex-title">Titik Room</h3>
+            <p>Mau membuat Room baru yang dimulai dari titik ini?</p>
+            <div className="floorplan-dialog-actions">
+              <button type="button" onClick={() => setRoomVertexPrompt(null)}>Batal</button>
+              <button type="button" onClick={beginRoomFromVertex}>Buat Room baru</button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }

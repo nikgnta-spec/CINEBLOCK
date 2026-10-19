@@ -81,6 +81,9 @@ a { color: inherit; text-decoration: none; }
 .tab.active { color: var(--text); font-weight: 600; border-bottom-color: var(--accent); background: color-mix(in srgb, var(--accent-bg) 55%, transparent); }
 
 .content { flex: 1; min-height: 0; min-width: 0; overflow: auto; }
+.content:has(.floorplan-tab-panel) { display: flex; flex-direction: column; overflow: hidden; }
+.floorplan-tab-panel { flex: 1 1 auto; min-height: 0; min-width: 0; overflow: hidden; }
+.floorplan-tab-panel > .floorplan-workspace { flex: 1 1 auto; min-height: 0; height: 100%; }
 
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; padding: 6px 12px; border-radius: var(--radius); font-size: 13px; font-weight: 600; transition: background 0.12s, color 0.12s, border-color 0.12s; white-space: nowrap; }
 .btn-primary { background: var(--accent); color: var(--accent-fg); border: 1px solid var(--accent); box-shadow: 0 1px 0 rgb(255 255 255 / 12%) inset; }
@@ -471,6 +474,8 @@ button:focus-visible,
   overflow: hidden;
 }
 .floorplan-canvas-column {
+  position: relative;
+  z-index: 0;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -503,11 +508,15 @@ button:focus-visible,
 .floorplan-canvas.can-select { cursor: default; }
 .floorplan-canvas.can-draw { cursor: crosshair; }
 .floorplan-inspector {
+  /* Keep the properties panel above any canvas overflow in hit-testing too. */
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   border-left: 1px solid var(--border);
   background: var(--bg);
 }
@@ -931,7 +940,22 @@ button:focus-visible,
   .print-scene-meta { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px; color: #4b5563; font-size: 8pt; }
   .print-scene-meta span { padding: 3px 7px; border: 1px solid #d1d5db; border-radius: 20px; }
   .print-plan-svg { display: block; width: 100%; height: auto; max-height: 218mm; border: 1px solid #d1d5db; background: #fff; }
-  .print-plan-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 8px 0 0; color: #4b5563; font-size: 7pt; }
+  .print-plan-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 7px 14px;
+    padding: 10px 0 0;
+    color: #374151;
+    font-size: 9pt;
+    line-height: 1.4;
+    break-inside: avoid;
+  }
+  .print-plan-legend span {
+    display: inline-block;
+    white-space: nowrap;
+    font-weight: 500;
+  }
   .print-muted { color: #6b7280; font-size: 8pt; }
   .print-report-footer { margin-top: 12px; padding-top: 6px; color: #6b7280; border-top: 1px solid #d1d5db; font-size: 7pt; }
 
@@ -1903,3 +1927,43 @@ button:focus-visible,
 .cloud-access-member strong { font-size: 12px; overflow-wrap: anywhere; }
 .cloud-access-member span { font-size: 11px; color: var(--muted, #aaa); }
 .cloud-access-manager .cloud-muted { margin: 0; font-size: 12px; line-height: 1.45; }
+
+
+.floorplan-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgb(0 0 0 / 58%);
+}
+.floorplan-dialog {
+  width: min(420px, 100%);
+  padding: 22px;
+  border: 1px solid var(--border, #343a40);
+  border-radius: 12px;
+  background: var(--panel, #171a1f);
+  color: var(--text, #f3f4f6);
+  box-shadow: 0 18px 60px rgb(0 0 0 / 35%);
+}
+.floorplan-dialog h3 { margin: 0 0 10px; font-size: 17px; }
+.floorplan-dialog p { margin: 0 0 18px; line-height: 1.5; color: var(--text-muted, #a7adb7); }
+.floorplan-dialog p[role="alert"] { color: #fca5a5; }
+.floorplan-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.floorplan-dialog-actions button {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid var(--border, #343a40);
+  border-radius: 7px;
+  background: var(--surface, #22262d);
+  color: var(--text, #f3f4f6);
+  cursor: pointer;
+}
+.floorplan-dialog-actions button:last-child {
+  background: var(--accent, #f59e0b);
+  border-color: var(--accent, #f59e0b);
+  color: #111827;
+  font-weight: 650;
+}
