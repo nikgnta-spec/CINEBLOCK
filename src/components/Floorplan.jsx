@@ -724,14 +724,26 @@ export default function Floorplan({
     const stored = floorplans?.[scene.id] || EMPTY_LAYOUT
     const currentLayout = { ...stored, rooms: layoutRef.current?.rooms || [] }
     const nextLayout = updater(currentLayout)
-    // Persist a private Room collection for this Scene; never write edits back to
-    // the project-level reusable collection.
-    onFloorplansChange(previous => ({
-      ...previous,
-      [scene.id]: reusableRoomMode
-        ? { ...nextLayout, roomIsolationVersion: 1 }
-        : nextLayout,
-    }))
+    if (reusableRoomMode) {
+      const previousRoomIds = new Set((scene.roomIds || []))
+      const nextRoomIds = new Set((nextLayout.rooms || []).map(room => room.id))
+      onProjectRoomsChange?.(previous => {
+        const current = Array.isArray(previous) ? previous : []
+        const byId = new Map(current.map(room => [room.id, room]))
+        ;(nextLayout.rooms || []).forEach(room => byId.set(room.id, room))
+        return [...byId.values()]
+      })
+      onChange?.(previous => previous.map(item => item.id !== scene.id ? item : {
+        ...item,
+        roomIds: [...new Set([...(item.roomIds || []).filter(id => !previousRoomIds.has(id)), ...nextRoomIds])],
+      }))
+      onFloorplansChange(previous => ({
+        ...previous,
+        [scene.id]: { ...nextLayout, rooms: [], roomIsolationVersion: undefined },
+      }))
+      return
+    }
+    onFloorplansChange(previous => ({ ...previous, [scene.id]: nextLayout }))
   }
 
   const applyEntitySelection = (items, primary = null) => {
@@ -976,7 +988,7 @@ export default function Floorplan({
     const pointerX = rect && Number.isFinite(clientX) ? clamp((clientX - rect.left) / rect.width, 0, 1) : 0.5
     const pointerY = rect && Number.isFinite(clientY) ? clamp((clientY - rect.top) / rect.height, 0, 1) : 0.5
     setViewBox(current => {
-      const width = clamp(current.width * factor, 80, MAP_WIDTH * 2.5)
+      const width = current.width * factor
       const height = width / (MAP_WIDTH / MAP_HEIGHT)
       const anchorX = current.x + pointerX * current.width
       const anchorY = current.y + pointerY * current.height
@@ -2568,6 +2580,30 @@ export default function Floorplan({
           <button className={'floorplan-tool-button' + (tool === 'room' ? ' active' : '')} onClick={() => setTool('room')} title="Gambar Room titik demi titik" aria-label="Gambar Room baru" aria-pressed={tool === 'room'}>
             <Square size={18} /><span>Ruang</span>
           </button>
+          {reusableRoomMode && projectRooms.some(room => !(scene?.roomIds || []).includes(room.id)) && (
+            <label className="floorplan-reuse-room-control">
+              <span>Gunakan Room</span>
+              <select
+                aria-label="Gunakan Room yang sudah dibuat"
+                value=""
+                onChange={event => {
+                  const roomId = event.target.value
+                  if (!roomId || !scene) return
+                  onChange?.(previous => previous.map(item => item.id === scene.id
+                    ? { ...item, roomIds: [...new Set([...(item.roomIds || []), roomId])] }
+                    : item))
+                  setSelected({ type: 'room', id: roomId })
+                  setTool('select')
+                  event.target.value = ''
+                }}
+              >
+                <option value="">Pilih Room tersimpan…</option>
+                {projectRooms.filter(room => !(scene?.roomIds || []).includes(room.id)).map(room => (
+                  <option key={room.id} value={room.id}>{room.label || 'Room'}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <button className={'floorplan-tool-button' + (tool === 'wall' ? ' active' : '')} onClick={() => setTool('wall')} title="Gambar dinding dengan menggeser kedua ujungnya" aria-label="Gambar dinding" aria-pressed={tool === 'wall'}>
             <Minus size={19} /><span>Dinding</span>
           </button>
@@ -2957,9 +2993,10 @@ export default function Floorplan({
                 const panLeft = type === 'camera' && shotMovements.includes('Pan Left')
                 const panRight = type === 'camera' && shotMovements.includes('Pan Right')
                 const panBoth = type === 'camera' && shotMovements.includes('Pan') && !panLeft && !panRight
+                const movementWaypoints = showPath ? (object.path || []) : []
                 const points = [
                   { x: object.x, y: object.y },
-                  ...(showPath ? (object.path || []) : []),
+                  ...movementWaypoints,
                 ]
                 const pointString = points.map(point => point.x + ',' + point.y).join(' ')
                 const handleBaseAngle = type === 'actor' ? -90 : type === 'light' ? 90 : 0
@@ -2973,7 +3010,81 @@ export default function Floorplan({
                     {points.length > 1 && (
                       <polyline points={pointString} fill="none" stroke={active ? 'var(--text)' : 'var(--text-muted)'} strokeOpacity={active ? 0.95 : 0.3} strokeWidth={active ? 3 : 2} strokeDasharray={active ? '9 6' : '5 9'} markerEnd="url(#floorplan-arrow)" vectorEffect="non-scaling-stroke" pointerEvents="none" />
                     )}
+                    {movementWaypoints.length > 0 && (() => {
+                      const endpoint = movementWaypoints[movementWaypoints.length - 1]
+                      const endpointName = type === 'actor'
+                        ? (object.label || 'Actor')
+                        : type === 'camera' || type === 'light'
+                          ? objectName(type, object)
+                          : type === 'prop'
+                            ? (object.propType || 'Prop')
+                            : object.label || (type === 'door' ? 'Door' : type === 'window' ? 'Window' : type)
+                      return (
+                        <g
+                          key="movement-path-end-object"
+                          data-floorplan-path-end-object="true"
+                          transform={'translate(' + endpoint.x + ' ' + endpoint.y + ')'}
+                          pointerEvents="all"
+                          opacity={active ? 1 : 0.72}
+                          style={{ cursor: object.locked ? 'default' : 'grab' }}
+                          onPointerDown={event => beginWaypointDrag(type, object, movementWaypoints.length - 1, event)}
+                          onClick={event => event.stopPropagation()}
+                        >
+                          {type === 'actor' ? (
+                            <g transform={'rotate(' + (object.angle || 0) + ') scale(0.28)'} fill="#C084FC" fillOpacity="0.12" stroke={getObjectColor(type, object)} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+                              <path d="M-22 -6 C-30 -10 -37 -6 -40 2 C-43 12 -36 22 -27 23 C-21 31 -10 34 0 34 C10 34 21 31 27 23 C36 22 43 12 40 2 C37 -6 30 -10 22 -6" />
+                              <path d="M0 -31 C-17 -31 -22 -17 -21 -6 C-20 5 -15 13 -8 15 C-5 16 -4 20 0 21 C4 20 5 16 8 15 C15 13 20 5 21 -6 C22 -17 17 -31 0 -31 Z" />
+                              <path d="M-18 0 C-12 -5 -7 6 0 6 C7 6 12 -5 18 0" />
+                              <path d="M-25 12 C-28 15 -28 19 -25 23 M25 12 C28 15 28 19 25 23" />
+                            </g>
+                          ) : type === 'camera' ? (
+                            <g transform={'rotate(' + (object.angle || 0) + ') scale(0.42)'} fill="var(--bg)" stroke={getObjectColor(type, object)} strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+                              <path d="M9 -9 L33 -20 L33 20 L9 9 Z" />
+                              <rect x="-29" y="-15" width="40" height="30" rx="6" />
+                            </g>
+                          ) : type === 'light' ? (
+                            <g transform={'rotate(' + (90 + (object.angle || 0)) + ') scale(0.48)'} fill="var(--bg)" stroke={getObjectColor(type, object)} strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+                              <path d="M-13 -8 L-8 -11 L3 -11 L11 -7 L11 7 L3 11 L-8 11 L-13 8 Z" />
+                              <path d="M-13 -5 L-18 -9 M-13 5 L-18 9" fill="none" strokeLinecap="round" />
+                              <circle cx="7" cy="0" r="4.2" fill="var(--text)" stroke="none" />
+                              <path d="M-2 -6 L-2 6" strokeOpacity="0.65" fill="none" />
+                            </g>
+                          ) : type === 'prop' ? (
+                            <g transform={'rotate(' + (object.angle || 0) + ')'} fill="var(--bg-subtle)" stroke="var(--text)" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+                              <rect x={-object.width / 2} y={-object.height / 2} width={object.width} height={object.height} rx={object.propType === 'Sofa' ? 8 : 2} />
+                              {object.propType === 'Chair' ? (
+                                <path d={'M ' + (-object.width * 0.32) + ' ' + (-object.height * 0.25) + ' H ' + (object.width * 0.32) + ' V ' + (object.height * 0.28)} fill="none" />
+                              ) : object.propType === 'Bed' ? (
+                                <path d={'M ' + (-object.width / 2 + 4) + ' ' + (-object.height / 2 + 9) + ' H ' + (object.width / 2 - 4)} fill="none" />
+                              ) : null}
+                            </g>
+                          ) : (
+                            <FloorplanObjectIcon type={type} size={22} />
+                          )}
+                          <text
+                            x="0"
+                            y={type === 'actor' ? 40 : type === 'camera' ? 46 : type === 'light' ? 35 : type === 'prop' ? Math.max(22, Number(object.height) / 2 + 15) : 30}
+                            textAnchor="middle"
+                            fontSize={type === 'actor' || type === 'camera' ? 15 : 13}
+                            fontWeight={type === 'camera' ? 600 : 500}
+                            fill="var(--text)"
+                            stroke="var(--bg)"
+                            strokeWidth="4"
+                            paintOrder="stroke"
+                          >
+                            {endpointName}
+                          </text>
+                        </g>
+                      )
+                    })()}
                     {(showPath ? (object.path || []) : []).map((point, index) => {
+                      // The start is represented by the original object icon and the final
+                      // waypoint is represented by the matching endpoint icon+label above.
+                      // Do not paint a waypoint handle over either object's face/center.
+                      if (
+                        index === movementWaypoints.length - 1
+                        || Math.hypot(point.x - object.x, point.y - object.y) < 0.5
+                      ) return null
                       const pointSelected = selectedWaypoint?.type === type
                         && selectedWaypoint.id === object.id
                         && selectedWaypoint.index === index

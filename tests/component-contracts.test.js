@@ -62,3 +62,39 @@ test('autosave is paused after an external-tab save conflict is detected', async
   assert.match(source, /if \(!hydrated \|\| !activeProjectId \|\| externalSaveDetectedRef\.current\) return undefined/)
   assert.match(source, /if \(externalSaveDetectedRef\.current\) return/)
 })
+
+
+test('movement path endpoints render the same object icon and name without a backing circle', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  const endpoint = source.slice(source.indexOf('data-floorplan-path-end-object="true"'), source.indexOf('{(showPath ? (object.path || []) : []).map'))
+  assert.match(source, /data-floorplan-path-end-object="true"/)
+  assert.match(source, /const movementWaypoints = showPath \? \(object\.path \|\| \[\]\) : \[\]/)
+  assert.match(source, /const endpointName = type === 'actor'/)
+  assert.match(endpoint, /\{endpointName\}/)
+  assert.match(endpoint, /type === 'actor' \? \(/)
+  assert.match(endpoint, /type === 'camera' \? \(/)
+  assert.match(endpoint, /type === 'light' \? \(/)
+  assert.doesNotMatch(endpoint, /<circle r="15"/)
+  assert.match(source, /index === movementWaypoints\.length - 1/)
+  assert.match(endpoint, /pointerEvents="all"/)
+  assert.match(endpoint, /beginWaypointDrag\(type, object, movementWaypoints\.length - 1, event\)/)
+})
+
+test('reusable Rooms can be added to another Scene and edits update the Project Room collection', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /Gunakan Room yang sudah dibuat/)
+  assert.match(source, /roomIds: \[\.\.\.new Set\(\[\.\.\.\(item\.roomIds \|\| \[\]\), roomId\]\)\]/)
+  assert.match(source, /onProjectRoomsChange\?\.\(previous =>/)
+  assert.match(source, /byId\.set\(room\.id, room\)/)
+})
+
+
+test('Floorplan zoom has no hard minimum or maximum viewBox width', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  const start = source.indexOf('const zoomCanvas =')
+  const end = source.indexOf('const handleCanvasWheel =', start)
+  const zoomCanvas = source.slice(start, end)
+  assert.match(zoomCanvas, /const width = current\.width \* factor/)
+  assert.doesNotMatch(zoomCanvas, /clamp\(current\.width \* factor/)
+  assert.doesNotMatch(zoomCanvas, /MAP_WIDTH \* 2\.5/)
+})

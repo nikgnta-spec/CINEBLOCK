@@ -428,6 +428,37 @@ button:focus-visible,
   white-space: nowrap;
 }
 .floorplan-structure-group .floorplan-tool-button { padding-inline: 9px; }
+
+/* Keep the reusable Room picker compact and make native option text readable
+   in Chromium/Windows popups, which otherwise may use a white menu surface. */
+.floorplan-reuse-room-control {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.floorplan-reuse-room-control select {
+  width: 158px;
+  max-width: 158px;
+  min-width: 0;
+  height: 32px;
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 11px;
+  text-overflow: ellipsis;
+}
+.floorplan-reuse-room-control option {
+  color: #111827;
+  background-color: #ffffff;
+}
 .floorplan-tool-button {
   display: inline-flex;
   align-items: center;
