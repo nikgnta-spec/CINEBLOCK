@@ -26,6 +26,7 @@ export default function CloudSyncDialog({
   onConnect,
   onCreateShareLink,
   onCopyShareLink,
+  onRetrySync,
   onLoadRemote,
   onOverwriteRemote,
   conflictRemote,
@@ -89,6 +90,11 @@ export default function CloudSyncDialog({
                     )}
                     <small>Kirim tautan ini ke HP untuk membuka proyek yang sama. Siapa pun yang memiliki tautan editor dapat mengubah proyek.</small>
                   </div>
+                )}
+                {(cloudStatus === 'offline' || cloudStatus === 'error') && cloudRole !== 'viewer' && (
+                  <button className="btn btn-secondary" type="button" onClick={onRetrySync} disabled={busy}>
+                    <RefreshCw size={14} /> Coba sinkronkan ulang
+                  </button>
                 )}
                 {cloudRole !== 'owner' && <p className="cloud-sync-helper">Perangkat ini tersambung melalui tautan berbagi. Minta pemilik membuat tautan baru jika akses perlu dibagikan ke perangkat lain.</p>}
               </div>

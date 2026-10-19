@@ -796,6 +796,8 @@ export default function App() {
                 map[activeProjectId] = cloudProjectRef.current
                 writeCloudProjectMap(map)
                 cloudDirtyRef.current = false
+                cloudConflictRef.current = null
+                setCloudConflict(null)
                 setCloudRevision(result.project.revision)
                 setCloudStatus('synced')
               }
@@ -1057,7 +1059,8 @@ export default function App() {
     if (!cloudProjectId || cloudRole !== 'owner') return
     setCloudError('')
     try {
-      await ensureCloudSession(displayName)
+      const session = await ensureCloudSession(displayName)
+      setDisplayName(session.displayName)
       const link = await createCloudShareLink(cloudProjectId, 'editor')
       setShareUrl(link.url)
     } catch (error) {
@@ -1069,9 +1072,51 @@ export default function App() {
     if (!shareUrl) return
     try {
       await navigator.clipboard.writeText(shareUrl)
-      setCloudError('Tautan berhasil disalin. Kirim ke HP untuk membuka proyek yang sama.')
+      setCloudError('')
+      window.alert('Tautan berhasil disalin. Kirim tautan ini ke HP untuk membuka proyek yang sama.')
     } catch {
       setCloudError('Salin tautan secara manual dari kolom tautan berbagi.')
+    }
+  }
+
+  const handleRetryCloudSync = async () => {
+    if (!cloudProjectId || cloudRole === 'viewer') return
+    setCloudStatus('syncing')
+    setCloudError('')
+    try {
+      const latest = await fetchCloudProject(cloudProjectId)
+      const mapEntry = readCloudProjectMap()[cloudProjectId]
+      if (latest.revision > cloudRevisionRef.current && (cloudDirtyRef.current || mapEntry?.pending)) {
+        cloudConflictRef.current = latest
+        setCloudConflict(latest)
+        setCloudStatus('conflict')
+        return
+      }
+      if (latest.revision > cloudRevisionRef.current) {
+        applyCloudRecord(latest, cloudRole || 'editor', false)
+        return
+      }
+      const snapshot = { ...snapshotCurrentProject(), id: cloudProjectId }
+      const result = await saveCloudProject(cloudProjectId, snapshot, latest.revision)
+      if (result.conflict) {
+        cloudConflictRef.current = result.project
+        setCloudConflict(result.project)
+        setCloudStatus('conflict')
+        return
+      }
+      const nextMap = readCloudProjectMap()
+      nextMap[cloudProjectId] = { id: cloudProjectId, role: cloudRole || 'editor', revision: result.project.revision, pending: false }
+      writeCloudProjectMap(nextMap)
+      cloudProjectRef.current = nextMap[cloudProjectId]
+      cloudRevisionRef.current = result.project.revision
+      cloudDirtyRef.current = false
+      cloudConflictRef.current = null
+      setCloudConflict(null)
+      setCloudRevision(result.project.revision)
+      setCloudStatus('synced')
+    } catch (error) {
+      setCloudError(error.message || 'Sinkronisasi ulang gagal.')
+      setCloudStatus(navigator.onLine ? 'error' : 'offline')
     }
   }
 
@@ -1474,6 +1519,7 @@ export default function App() {
         onConnect={handleConnectCloud}
         onCreateShareLink={handleCreateShareLink}
         onCopyShareLink={handleCopyShareLink}
+        onRetrySync={handleRetryCloudSync}
         onLoadRemote={handleLoadRemoteConflict}
         onOverwriteRemote={handleOverwriteRemoteConflict}
         conflictRemote={cloudConflict}

