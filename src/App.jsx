@@ -1549,6 +1549,9 @@ export default function App() {
         onConnect={handleConnectCloud}
         onCreateShareLink={handleCreateShareLink}
         onCopyShareLink={handleCopyShareLink}
+        shareLinkToOpen={shareLinkToOpen}
+        onShareLinkToOpenChange={setShareLinkToOpen}
+        onOpenExistingCloudLink={handleOpenExistingCloudLink}
         onRetrySync={handleRetryCloudSync}
         onLoadRemote={handleLoadRemoteConflict}
         onOverwriteRemote={handleOverwriteRemoteConflict}
