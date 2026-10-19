@@ -3494,57 +3494,67 @@ export default function Floorplan({
                   {selectedShot ? (
                     <>
                       <section className="floorplan-inspector-section floorplan-camera-fields">
-                        <label htmlFor="camera-subject">Subjek</label>
-                        <input
-                          id="camera-subject"
-                          className="floorplan-field"
-                          value={selectedShot.subject || ''}
-                          maxLength={1000}
-                          onChange={event => updateLinkedShot('subject', event.target.value)}
-                          placeholder="Subjek shot"
-                        />
-                        <label htmlFor="camera-body">Kamera</label>
-                        <input
-                          id="camera-body"
-                          className="floorplan-field"
-                          value={selectedShot.camera || ''}
-                          maxLength={200}
-                          onChange={event => updateLinkedShot('camera', event.target.value)}
-                          placeholder="Body kamera"
-                        />
-                        <label htmlFor="camera-shot-size">Ukuran shot</label>
-                        <select
-                          id="camera-shot-size"
-                          className="floorplan-field"
-                          value={selectedShot.size || ''}
-                          onChange={event => updateLinkedShot('size', event.target.value)}
-                        >
-                          <option value="">Pilih ukuran shot</option>
-                          {SHOT_SIZES.map(option => <option key={option} value={option}>{option}</option>)}
-                        </select>
-                        <label htmlFor="camera-angle">Angle</label>
-                        <select
-                          id="camera-angle"
-                          className="floorplan-field"
-                          value={selectedShot.angle || ''}
-                          onChange={event => updateLinkedShot('angle', event.target.value)}
-                        >
-                          <option value="">Pilih angle</option>
-                          {SHOT_ANGLES.map(option => <option key={option} value={option}>{option}</option>)}
-                        </select>
-                        <label htmlFor="camera-lens">Lens</label>
-                        <input
-                          id="camera-lens"
-                          className="floorplan-field"
-                          list="floorplan-lens-options"
-                          value={selectedShot.lens || ''}
-                          maxLength={100}
-                          onChange={event => updateLinkedShot('lens', event.target.value)}
-                          placeholder="Pilih atau ketik panjang fokus"
-                        />
-                        <datalist id="floorplan-lens-options">
-                          {SHOT_LENSES.map(option => <option key={option} value={option} />)}
-                        </datalist>
+                        <div className="floorplan-camera-field">
+                          <label htmlFor="camera-subject">Subjek</label>
+                          <input
+                            id="camera-subject"
+                            className="floorplan-field"
+                            value={selectedShot.subject || ''}
+                            maxLength={1000}
+                            onChange={event => updateLinkedShot('subject', event.target.value)}
+                            placeholder="Subjek shot"
+                          />
+                        </div>
+                        <div className="floorplan-camera-field">
+                          <label htmlFor="camera-body">Kamera</label>
+                          <input
+                            id="camera-body"
+                            className="floorplan-field"
+                            value={selectedShot.camera || ''}
+                            maxLength={200}
+                            onChange={event => updateLinkedShot('camera', event.target.value)}
+                            placeholder="Body kamera"
+                          />
+                        </div>
+                        <div className="floorplan-camera-field">
+                          <label htmlFor="camera-shot-size">Ukuran shot</label>
+                          <select
+                            id="camera-shot-size"
+                            className="floorplan-field"
+                            value={selectedShot.size || ''}
+                            onChange={event => updateLinkedShot('size', event.target.value)}
+                          >
+                            <option value="">Pilih ukuran shot</option>
+                            {SHOT_SIZES.map(option => <option key={option} value={option}>{option}</option>)}
+                          </select>
+                        </div>
+                        <div className="floorplan-camera-field">
+                          <label htmlFor="camera-angle">Angle</label>
+                          <select
+                            id="camera-angle"
+                            className="floorplan-field"
+                            value={selectedShot.angle || ''}
+                            onChange={event => updateLinkedShot('angle', event.target.value)}
+                          >
+                            <option value="">Pilih angle</option>
+                            {SHOT_ANGLES.map(option => <option key={option} value={option}>{option}</option>)}
+                          </select>
+                        </div>
+                        <div className="floorplan-camera-field floorplan-camera-field-wide">
+                          <label htmlFor="camera-lens">Lens</label>
+                          <input
+                            id="camera-lens"
+                            className="floorplan-field"
+                            list="floorplan-lens-options"
+                            value={selectedShot.lens || ''}
+                            maxLength={100}
+                            onChange={event => updateLinkedShot('lens', event.target.value)}
+                            placeholder="Pilih atau ketik panjang fokus"
+                          />
+                          <datalist id="floorplan-lens-options">
+                            {SHOT_LENSES.map(option => <option key={option} value={option} />)}
+                          </datalist>
+                        </div>
                       </section>
 
                       <section className="floorplan-inspector-section">
