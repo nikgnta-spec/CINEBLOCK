@@ -3075,9 +3075,13 @@ export default function Floorplan({
                       )
                     })()}
                     {(showPath ? (object.path || []) : []).map((point, index) => {
-                      // The object's own icon already represents a waypoint at its origin.
-                      // Avoid drawing a filled waypoint handle over the icon's face/center.
-                      if (Math.hypot(point.x - object.x, point.y - object.y) < 0.5) return null
+                      // The start is represented by the original object icon and the final
+                      // waypoint is represented by the matching endpoint icon+label above.
+                      // Do not paint a waypoint handle over either object's face/center.
+                      if (
+                        index === movementWaypoints.length - 1
+                        || Math.hypot(point.x - object.x, point.y - object.y) < 0.5
+                      ) return null
                       const pointSelected = selectedWaypoint?.type === type
                         && selectedWaypoint.id === object.id
                         && selectedWaypoint.index === index

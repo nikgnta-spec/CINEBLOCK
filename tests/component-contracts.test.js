@@ -75,6 +75,7 @@ test('movement path endpoints render the same object icon and name without a bac
   assert.match(endpoint, /type === 'camera' \? \(/)
   assert.match(endpoint, /type === 'light' \? \(/)
   assert.doesNotMatch(endpoint, /<circle r="15"/)
+  assert.match(source, /index === movementWaypoints\.length - 1/)
 })
 
 test('reusable Rooms can be added to another Scene and edits update the Project Room collection', async () => {
