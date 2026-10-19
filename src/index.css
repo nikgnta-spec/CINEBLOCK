@@ -2794,3 +2794,97 @@ button:focus-visible,
   .floorplan-inspector-head { padding: 6px 10px !important; }
   .floorplan-inspector-section { padding: 8px 10px !important; }
 }
+
+
+/* Camera / linked Shot List inspector polish: consistent field rhythm and chips. */
+.floorplan-inspector-section.floorplan-camera-fields {
+  gap: 7px;
+  padding: 14px 16px 16px;
+}
+.floorplan-inspector-section.floorplan-camera-fields > label {
+  display: block;
+  margin: 3px 0 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.015em;
+}
+.floorplan-inspector-section.floorplan-camera-fields > label:first-child {
+  margin-top: 0;
+}
+.floorplan-inspector-section.floorplan-camera-fields > .floorplan-field {
+  height: 38px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.floorplan-inspector-section:has(> .floorplan-shot-chips) {
+  gap: 9px;
+  padding: 13px 16px 15px;
+}
+.floorplan-inspector-section:has(> .floorplan-shot-chips) > label {
+  margin: 0 0 1px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0.025em;
+}
+.floorplan-shot-chips {
+  display: flex;
+  align-items: center;
+  align-content: flex-start;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+}
+.floorplan-shot-chip {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 27px;
+  max-width: 100%;
+  padding: 4px 6px 4px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg-subtle);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.floorplan-shot-chip button {
+  width: 19px;
+  height: 19px;
+  min-width: 19px;
+  min-height: 19px;
+  padding: 0;
+  border-radius: 4px;
+}
+.floorplan-shot-chip button:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.floorplan-inspector-section:has(> .floorplan-shot-chips) > .floorplan-field {
+  height: 38px;
+  min-height: 38px;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+@media (max-width: 680px) {
+  .floorplan-inspector-section.floorplan-camera-fields,
+  .floorplan-inspector-section:has(> .floorplan-shot-chips) {
+    padding: 11px 12px 13px;
+    gap: 7px;
+  }
+  .floorplan-inspector-section.floorplan-camera-fields > .floorplan-field,
+  .floorplan-inspector-section:has(> .floorplan-shot-chips) > .floorplan-field {
+    height: 38px;
+    min-height: 38px;
+  }
+  .floorplan-shot-chips { gap: 5px; }
+  .floorplan-shot-chip { min-height: 26px; font-size: 11px; }
+}
