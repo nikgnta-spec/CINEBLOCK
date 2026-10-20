@@ -1023,7 +1023,7 @@ export default function Floorplan({
 
     event.preventDefault()
     event.stopPropagation()
-    zoomCanvas(event.deltaY < 0 ? 0.9 : 1.1, event.clientX, event.clientY)
+    zoomCanvas(event.deltaY < 0 ? 0.87 : 1.13, event.clientX, event.clientY)
   }
 
   useEffect(() => {
@@ -1056,7 +1056,7 @@ export default function Floorplan({
     const centerY = (first.clientY + second.clientY) / 2
     const distance = Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY)
     if (distance > 0 && pinchRef.current.distance > 0) {
-      zoomCanvas(pinchRef.current.distance / distance, centerX, centerY)
+      zoomCanvas(1 + ((pinchRef.current.distance / distance) - 1) * 1.3, centerX, centerY)
     }
     pinchRef.current = { distance, centerX, centerY }
   }
@@ -1742,8 +1742,8 @@ export default function Floorplan({
     if (drag?.mode === 'pan') {
       const rect = svgRef.current?.getBoundingClientRect()
       if (!rect || !rect.width || !rect.height) return
-      const dx = ((event.clientX - drag.startClientX) / rect.width) * drag.viewBox.width
-      const dy = ((event.clientY - drag.startClientY) / rect.height) * drag.viewBox.height
+      const dx = ((event.clientX - drag.startClientX) / rect.width) * drag.viewBox.width * 1.3
+      const dy = ((event.clientY - drag.startClientY) / rect.height) * drag.viewBox.height * 1.3
       setViewBox({
         ...drag.viewBox,
         x: drag.viewBox.x - dx,
