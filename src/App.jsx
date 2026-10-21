@@ -1273,7 +1273,11 @@ export default function App() {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '') || 'cineblock'
-    link.download = `${projectSlug}-${new Date().toISOString().slice(0, 10)}.json`
+    const now = new Date()
+    const dd = String(now.getDate()).padStart(2, '0')
+    const mm = String(now.getMonth() + 1).padStart(2, '0')
+    const yy = String(now.getFullYear()).slice(-2)
+    link.download = `${projectSlug}-${dd}-${mm}-${yy}.json`
     document.body.appendChild(link)
     link.click()
     link.remove()
