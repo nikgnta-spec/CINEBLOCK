@@ -356,6 +356,22 @@ const CATEGORY_COLORS = {
   door: '#94A3B8',
   window: '#94A3B8',
 }
+// Spectrum palette offered for actor and camera (incl. FOV cone) colors, so
+// multiple actors/cameras in the same scene can be told apart at a glance.
+const OBJECT_COLOR_PALETTE = [
+  '#F87171', // red
+  '#FB923C', // orange
+  '#FBBF24', // amber
+  '#A3E635', // lime
+  '#4ADE80', // green
+  '#34D399', // emerald
+  '#2DD4BF', // teal
+  '#22D3EE', // cyan
+  '#60A5FA', // blue
+  '#818CF8', // indigo
+  '#C084FC', // purple
+  '#F472B6', // pink
+]
 const stableColorIndex = id => {
   const text = String(id || 'default')
   let hash = 0
@@ -373,13 +389,34 @@ const getLightConeColors = light => {
   const color = LIGHT_COLOR_PALETTES[family][stableColorIndex(light?.id)]
   return { fill: color, stroke: color }
 }
-const getCameraFovColor = camera => CAMERA_FOV_COLORS[stableColorIndex(camera?.id)]
+const getCameraFovColor = camera => camera?.color || CAMERA_FOV_COLORS[stableColorIndex(camera?.id)]
 const getObjectColor = (type, object) => (
-  type === 'light' ? getLightConeColors(object).stroke : CATEGORY_COLORS[type] || '#94A3B8'
+  type === 'light' ? getLightConeColors(object).stroke
+    : (type === 'actor' || type === 'camera') && object?.color ? object.color
+      : CATEGORY_COLORS[type] || '#94A3B8'
 )
 const makeId = () => crypto.randomUUID()
 const padNum = number => String(number).padStart(2, '0')
 const normalizeAngle = angle => ((angle % 360) + 360) % 360
+
+function ColorSwatchPicker({ value, onChange, label }) {
+  return (
+    <div className="floorplan-color-swatches" role="group" aria-label={label}>
+      {OBJECT_COLOR_PALETTE.map(color => (
+        <button
+          key={color}
+          type="button"
+          className={'floorplan-color-swatch' + (value === color ? ' active' : '')}
+          style={{ backgroundColor: color }}
+          onClick={() => onChange(color)}
+          aria-pressed={value === color}
+          aria-label={color}
+          title={color}
+        />
+      ))}
+    </div>
+  )
+}
 
 function FloorplanObjectIcon({ type, size = 20 }) {
   return (
@@ -3070,7 +3107,7 @@ export default function Floorplan({
                           onClick={event => event.stopPropagation()}
                         >
                           {type === 'actor' ? (
-                            <g transform={'rotate(' + (object.angle || 0) + ') scale(0.28)'} fill="#C084FC" fillOpacity="0.12" stroke={getObjectColor(type, object)} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+                            <g transform={'rotate(' + (object.angle || 0) + ') scale(0.28)'} fill={getObjectColor(type, object)} fillOpacity="0.12" stroke={getObjectColor(type, object)} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
                               <path d="M-22 -6 C-30 -10 -37 -6 -40 2 C-43 12 -36 22 -27 23 C-21 31 -10 34 0 34 C10 34 21 31 27 23 C36 22 43 12 40 2 C37 -6 30 -10 22 -6" />
                               <path d="M0 -31 C-17 -31 -22 -17 -21 -6 C-20 5 -15 13 -8 15 C-5 16 -4 20 0 21 C4 20 5 16 8 15 C15 13 20 5 21 -6 C22 -17 17 -31 0 -31 Z" />
                               <path d="M-18 0 C-12 -5 -7 6 0 6 C7 6 12 -5 18 0" />
@@ -3277,7 +3314,7 @@ export default function Floorplan({
                       )}
                       {type === 'actor' && (
                         <g transform={'rotate(' + (object.angle || 0) + ') scale(0.28)'} pointerEvents="none">
-                          <g fill="#C084FC" fillOpacity="0.12" stroke={getObjectColor(type, object)} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+                          <g fill={getObjectColor(type, object)} fillOpacity="0.12" stroke={getObjectColor(type, object)} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
                             <path d="M-22 -6 C-30 -10 -37 -6 -40 2 C-43 12 -36 22 -27 23 C-21 31 -10 34 0 34 C10 34 21 31 27 23 C36 22 43 12 40 2 C37 -6 30 -10 22 -6" />
                             <path d="M0 -31 C-17 -31 -22 -17 -21 -6 C-20 5 -15 13 -8 15 C-5 16 -4 20 0 21 C4 20 5 16 8 15 C15 13 20 5 21 -6 C22 -17 17 -31 0 -31 Z" />
                             <path d="M-18 0 C-12 -5 -7 6 0 6 C7 6 12 -5 18 0" />
@@ -3492,6 +3529,14 @@ export default function Floorplan({
                     <input id="actor-name" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
                   </section>
                   <section className="floorplan-inspector-section">
+                    <div className="floorplan-section-title">Warna</div>
+                    <ColorSwatchPicker
+                      label="Warna aktor"
+                      value={selectedEntity.color || CATEGORY_COLORS.actor}
+                      onChange={color => updateSelected({ color })}
+                    />
+                  </section>
+                  <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Jalur gerak</div>
                     <button className={'floorplan-path-button' + (tool === 'path' ? ' active' : '')} onClick={() => setTool(tool === 'path' ? 'select' : 'path')}>
                       <Route size={17} /> {tool === 'path' ? 'Selesai menggambar' : 'Gambar jalur'} <span>{selectedPath.length}</span>
@@ -3522,6 +3567,14 @@ export default function Floorplan({
                       {scene.shots.filter(shot => !layout.cameras.some(camera => camera.id !== selectedEntity.id && camera.shotId === shot.id)).map(shot => (                        <option key={shot.id} value={shot.id}>{shot.num} — {shot.subject || 'Untitled shot'}</option>
                       ))}
                     </select>
+                  </section>
+                  <section className="floorplan-inspector-section">
+                    <div className="floorplan-section-title">Warna kamera & FOV</div>
+                    <ColorSwatchPicker
+                      label="Warna kamera"
+                      value={selectedEntity.color || CATEGORY_COLORS.camera}
+                      onChange={color => updateSelected({ color })}
+                    />
                   </section>
                   {selectedShot ? (
                     <>
