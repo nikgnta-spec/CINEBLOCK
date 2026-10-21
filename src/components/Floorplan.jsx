@@ -2849,7 +2849,7 @@ export default function Floorplan({
                       const groupVerticalEndY = groupFullHeightEdge ? Math.max(groupFullHeightEdge.y1, groupFullHeightEdge.y2) : (groupTotalBounds ? groupTotalBounds.y + groupTotalBounds.height : 0)
                       const groupVerticalMeasuredHeight = groupVerticalEndY - groupVerticalStartY
                       return <g pointerEvents="none" opacity={active ? 1 : 0.58}>
-                        {(active || hoveredRoomEdge?.roomId === room.id) && visibleDimensionLayouts.map(({ edge, dimension: d }) => {
+                        {visibleDimensionLayouts.map(({ edge, dimension: d }) => {
                           const label = (edge.length / 100).toFixed(2) + ' m'
                           return <g key={'dimension-' + edge.edgeIndex}>
                             <line x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2} stroke="var(--text-muted)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
