@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Undo2, Redo2, Lock, Unlock, Ruler,
+  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Undo2, Redo2, Lock, Unlock, Ruler, Tag,
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
 import { projectPointToSegment, snapRoomPoint } from '../utils/roomSnapping'
@@ -603,6 +603,7 @@ export default function Floorplan({
   const [roomManualAngle, setRoomManualAngle] = useState(null)
   const [roomDrawMessage, setRoomDrawMessage] = useState('')
   const [showRoomDimensions, setShowRoomDimensions] = useState(true)
+  const [showActorLabels, setShowActorLabels] = useState(true)
   const [hoveredRoomEdge, setHoveredRoomEdge] = useState(null)
   const [selectedRoomEdge, setSelectedRoomEdge] = useState(null)
   const [previewPoint, setPreviewPoint] = useState(null)
@@ -2653,6 +2654,7 @@ export default function Floorplan({
         <div className="floorplan-structure-group" role="group" aria-label="Struktur">
           <span className="floorplan-structure-label">Struktur</span>
           <button type="button" className={'floorplan-tool-button' + (showRoomDimensions ? ' active' : '')} onClick={() => setShowRoomDimensions(value => !value)} title={showRoomDimensions ? 'Sembunyikan dimensi Room' : 'Tampilkan dimensi Room'} aria-pressed={showRoomDimensions}><Ruler size={18} /><span>Dimensi</span></button>
+          <button type="button" className={'floorplan-tool-button' + (showActorLabels ? ' active' : '')} onClick={() => setShowActorLabels(value => !value)} title={showActorLabels ? 'Sembunyikan nama aktor' : 'Tampilkan nama aktor'} aria-pressed={showActorLabels}><Tag size={18} /><span>Nama aktor</span></button>
           <button className={'floorplan-tool-button' + (tool === 'room' ? ' active' : '')} onClick={() => setTool('room')} title="Gambar Room titik demi titik" aria-label="Gambar Room baru" aria-pressed={tool === 'room'}>
             <Square size={18} /><span>Ruang</span>
           </button>
@@ -3321,7 +3323,7 @@ export default function Floorplan({
                             <path d="M-25 12 C-28 15 -28 19 -25 23 M25 12 C28 15 28 19 25 23" />                          </g>
                         </g>
                       )}
-                      {type === 'actor' && (
+                      {type === 'actor' && showActorLabels && (
                         <text
                           x="0"
                           y="40"
