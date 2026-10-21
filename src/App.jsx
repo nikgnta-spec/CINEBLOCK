@@ -1269,7 +1269,11 @@ export default function App() {
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `cineblock-backup-${new Date().toISOString().slice(0, 10)}.json`
+    const projectSlug = project.title.trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'cineblock'
+    link.download = `${projectSlug}-${new Date().toISOString().slice(0, 10)}.json`
     document.body.appendChild(link)
     link.click()
     link.remove()
