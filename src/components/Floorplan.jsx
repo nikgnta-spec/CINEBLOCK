@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Undo2, Redo2, Lock, Unlock, Ruler, Tag, RotateCcw, RotateCw,
+  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Undo2, Redo2, Lock, Unlock, Ruler, Tag, RotateCcw, RotateCw, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
 import { projectPointToSegment, snapRoomPoint } from '../utils/roomSnapping'
@@ -605,6 +605,7 @@ export default function Floorplan({
   const [roomDrawMessage, setRoomDrawMessage] = useState('')
   const [showRoomDimensions, setShowRoomDimensions] = useState(true)
   const [showObjectLabels, setShowObjectLabels] = useState(true)
+  const [shotFocusMode, setShotFocusMode] = useState(false)
   const [hoveredRoomEdge, setHoveredRoomEdge] = useState(null)
   const [selectedRoomEdge, setSelectedRoomEdge] = useState(null)
   const [previewPoint, setPreviewPoint] = useState(null)
@@ -625,6 +626,14 @@ export default function Floorplan({
   const autoCreatedShotsByCameraRef = useRef(new Map())
 
   const scene = scenes.find(item => item.id === activeSceneId) || scenes[0]
+  const selectedSceneShotIndex = scene?.shots.findIndex(shot => shot.id === selectedShotId) ?? -1
+  const activeFloorplanShotIndex = selectedSceneShotIndex >= 0 ? selectedSceneShotIndex : 0
+  const activeFloorplanShot = scene?.shots[activeFloorplanShotIndex] || null
+  const moveFloorplanShot = offset => {
+    if (!scene?.shots?.length) return
+    const nextIndex = Math.max(0, Math.min(scene.shots.length - 1, activeFloorplanShotIndex + offset))
+    onSelectedShotIdChange?.(scene.shots[nextIndex].id)
+  }
   const storedLayout = scene ? (floorplans?.[scene.id] || EMPTY_LAYOUT) : EMPTY_LAYOUT
   const reusableRoomMode = Array.isArray(projectRooms)
   const layout = scene
@@ -2719,6 +2728,21 @@ export default function Floorplan({
             <FloorplanObjectIcon type="light" size={22} /><span>Lampu</span><kbd className="floorplan-shortcut-key">L</kbd>
           </button>
         </div>
+        {scene?.shots?.length > 0 && <>
+          <span className="floorplan-tool-divider" />
+          <div className="floorplan-shot-navigation" role="group" aria-label="Navigasi shot Floorplan">
+            <button type="button" className="floorplan-shot-step" onClick={() => moveFloorplanShot(-1)} disabled={activeFloorplanShotIndex === 0} aria-label="Shot sebelumnya di Floorplan" title="Shot sebelumnya"><ChevronLeft size={16} /></button>
+            <label className="floorplan-shot-picker">
+              <span>Shot</span>
+              <select aria-label="Pilih shot untuk Floorplan" value={activeFloorplanShot?.id || ''} onChange={event => onSelectedShotIdChange?.(event.target.value)}>
+                {scene.shots.map(shot => <option key={shot.id} value={shot.id}>{shot.num} — {shot.subject || 'Subjek belum diisi'}</option>)}
+              </select>
+            </label>
+            <span className="floorplan-shot-position">{activeFloorplanShotIndex + 1}/{scene.shots.length}</span>
+            <button type="button" className="floorplan-shot-step" onClick={() => moveFloorplanShot(1)} disabled={activeFloorplanShotIndex >= scene.shots.length - 1} aria-label="Shot berikutnya di Floorplan" title="Shot berikutnya"><ChevronRight size={16} /></button>
+            <button type="button" className={'floorplan-shot-focus' + (shotFocusMode ? ' active' : '')} onClick={() => { if (!shotFocusMode && activeFloorplanShot) onSelectedShotIdChange?.(activeFloorplanShot.id); setShotFocusMode(value => !value) }} aria-pressed={shotFocusMode} title="Fokus pada kamera shot terpilih">{shotFocusMode ? 'Fokus aktif' : 'Fokus shot'}</button>
+          </div>
+        </>}
         <span className="floorplan-tool-spacer" />
         {selectedItems.length > 1 && (
           <div className="floorplan-selection-actions" role="group" aria-label="Aksi beberapa objek terpilih">
@@ -3074,7 +3098,7 @@ export default function Floorplan({
               {[
                 ...layout.props.map(item => ({ ...item, _kind: 'prop' })),
                 ...layout.actors.map(item => ({ ...item, _kind: 'actor' })),
-                ...layout.cameras.map(item => ({ ...item, _kind: 'camera' })),
+                ...layout.cameras.filter(item => !shotFocusMode || !activeFloorplanShot || item.shotId === activeFloorplanShot.id).map(item => ({ ...item, _kind: 'camera' })),
                 ...layout.lights.map(item => ({ ...item, _kind: 'light' })),
               ].map(object => {
                 const type = object._kind

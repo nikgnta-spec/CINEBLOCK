@@ -178,3 +178,13 @@ test('movement path endpoint labels follow the object-label visibility setting',
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /\{showObjectLabels && endpointName\}/)
 })
+
+test('Floorplan can navigate individual shots and focus linked cameras', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /Navigasi shot Floorplan/)
+  assert.match(source, /Pilih shot untuk Floorplan/)
+  assert.match(source, /moveFloorplanShot\(-1\)/)
+  assert.match(source, /moveFloorplanShot\(1\)/)
+  assert.match(source, /Fokus shot/)
+  assert.match(source, /layout\.cameras\.filter\(item => !shotFocusMode \|\| !activeFloorplanShot \|\| item\.shotId === activeFloorplanShot\.id\)/)
+})

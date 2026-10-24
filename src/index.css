@@ -3182,3 +3182,14 @@ button:focus-visible,
 .floorplan-selection-rotate:hover { border-color:var(--accent); color:var(--accent); }
 @media (max-width:900px) { .shot-presentation-card { grid-template-columns:minmax(0,1fr); } .shot-presentation-visual { min-height:240px; } .shot-presentation-image-button, .shot-presentation-placeholder { min-height:260px; } }
 @media (max-width:680px) { .shot-presentation { padding:10px; } .shot-presentation-header .btn { min-height:36px; padding-inline:8px; } .shot-presentation-copy { padding:16px; } .shot-presentation-card { min-height:0; } .shot-presentation-strip button { flex-basis:150px; } }
+.floorplan-shot-navigation { display:flex; align-items:center; gap:5px; flex:0 1 auto; min-width:0; padding:3px 5px; border:1px solid var(--accent-border); border-radius:8px; background:var(--accent-bg); color:var(--text); }
+.floorplan-shot-step { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; flex:0 0 28px; border:1px solid transparent; border-radius:5px; color:var(--text); background:transparent; }
+.floorplan-shot-step:not(:disabled):hover { border-color:var(--border-strong); background:var(--bg); }
+.floorplan-shot-step:disabled { opacity:.35; cursor:not-allowed; }
+.floorplan-shot-picker { display:flex; align-items:center; gap:5px; min-width:0; color:var(--text-muted); font-size:11px; font-weight:700; }
+.floorplan-shot-picker select { width:min(205px,19vw); min-width:90px; height:28px; padding:3px 6px; border:1px solid var(--border); border-radius:5px; color:var(--text); background:var(--bg); font:inherit; font-weight:550; }
+.floorplan-shot-position { flex:0 0 auto; color:var(--text-muted); font-size:10px; font-variant-numeric:tabular-nums; }
+.floorplan-shot-focus { flex:0 0 auto; min-height:28px; padding:4px 7px; border:1px solid var(--border); border-radius:5px; color:var(--text); background:var(--bg); font-size:10px; font-weight:650; white-space:nowrap; }
+.floorplan-shot-focus.active { color:var(--accent); border-color:var(--accent); background:var(--bg); }
+@media (max-width:1024px) { .floorplan-shot-navigation { order:3; max-width:100%; } .floorplan-shot-picker select { width:min(240px,35vw); } }
+@media (max-width:680px) { .floorplan-shot-navigation { flex:1 1 100%; justify-content:center; } .floorplan-shot-picker { flex:1; } .floorplan-shot-picker select { width:100%; } }
