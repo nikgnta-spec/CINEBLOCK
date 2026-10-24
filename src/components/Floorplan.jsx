@@ -7,6 +7,7 @@ import { projectPointToSegment, snapRoomPoint } from '../utils/roomSnapping'
 import { createRoomPolygon, connectWallGeometry, updateRoomPolygonGeometry, updateWallEndpointGeometry } from '../utils/floorplanGeometry'
 import { findRoomMergeCandidate, mergeAdjacentRoomPolygons, snapRoomToEdge } from '../utils/roomMerge'
 import { rotateObjectGroup } from '../utils/objectTransforms'
+import { removeReusableRoomRecords, removeReusableRoomReferences } from '../utils/reusableRooms'
 import {
   SIZES as SHOT_SIZES,
   ANGLES as SHOT_ANGLES,
@@ -623,6 +624,7 @@ export default function Floorplan({
   // Track shots created as a side effect of adding a camera so Undo/Redo can
   // reverse and restore that paired change together with the floorplan layout.
   const autoCreatedShotsByCameraRef = useRef(new Map())
+  const deletedReusableRoomSceneRefsRef = useRef(new Map())
 
   const scene = scenes.find(item => item.id === activeSceneId) || scenes[0]
   const selectedSceneShotIndex = scene?.shots.findIndex(shot => shot.id === selectedShotId) ?? -1
@@ -807,6 +809,32 @@ export default function Floorplan({
     onFloorplansChange(previous => ({ ...previous, [scene.id]: nextLayout }))
   }
 
+  const deleteReusableRooms = roomIds => {
+    if (!reusableRoomMode || !roomIds?.size) return
+    roomIds.forEach(id => {
+      deletedReusableRoomSceneRefsRef.current.set(id, scenes
+        .filter(item => item.roomIds?.includes(id))
+        .map(item => item.id))
+    })
+    onProjectRoomsChange?.(previous => removeReusableRoomRecords(previous, roomIds))
+    onChange?.(previous => removeReusableRoomReferences(previous, roomIds))
+  }
+
+  const restoreReusableRooms = roomIds => {
+    if (!reusableRoomMode || !roomIds?.size) return
+    const references = new Map([...roomIds]
+      .map(id => [id, deletedReusableRoomSceneRefsRef.current.get(id) || []])
+      .filter(([, sceneIds]) => sceneIds.length > 0))
+    if (!references.size) return
+    onChange?.(previous => previous.map(item => {
+      const restoredIds = [...references]
+        .filter(([, sceneIds]) => sceneIds.includes(item.id))
+        .map(([id]) => id)
+      if (!restoredIds.length) return item
+      return { ...item, roomIds: [...new Set([...(item.roomIds || []), ...restoredIds])] }
+    }))
+  }
+
   const applyEntitySelection = (items, primary = null) => {
     const unique = []
     items.forEach(item => {
@@ -893,7 +921,10 @@ export default function Floorplan({
       }))
     }
 
+    const currentRoomIds = new Set(current.rooms.map(room => room.id))
+    const restoredRoomIds = new Set(previous.rooms.filter(room => !currentRoomIds.has(room.id)).map(room => room.id))
     updateLayout(() => cloneLayoutSnapshot(previous))
+    restoreReusableRooms(restoredRoomIds)
     applyEntitySelection([])
     onSelectedShotIdChange?.('')
   }
@@ -940,7 +971,10 @@ export default function Floorplan({
       }))
     }
 
+    const nextRoomIds = new Set(next.rooms.map(room => room.id))
+    const removedRoomIds = new Set(current.rooms.filter(room => !nextRoomIds.has(room.id)).map(room => room.id))
     updateLayout(() => cloneLayoutSnapshot(next))
+    deleteReusableRooms(removedRoomIds)
     applyEntitySelection([])
     onSelectedShotIdChange?.('')
   }
@@ -966,7 +1000,14 @@ export default function Floorplan({
   const deleteSelectedItems = () => {
     const selection = [...selectionRef.current]
     if (selection.length < 2) return
-    if (!window.confirm(`Hapus ${selection.length} objek yang dipilih dari denah? Tindakan ini tidak dapat dibatalkan.`)) return
+    const selectedRoomIds = new Set(selection.filter(item => item.type === 'room').map(item => item.id))
+    const sharedRoomCount = reusableRoomMode
+      ? [...selectedRoomIds].filter(id => scenes.some(item => item.id !== scene.id && item.roomIds?.includes(id))).length
+      : 0
+    const roomRemovalNote = sharedRoomCount
+      ? ` ${sharedRoomCount} Room tersimpan juga akan dihapus dari scene lain yang menggunakannya.`
+      : ''
+    if (!window.confirm(`Hapus ${selection.length} objek yang dipilih dari denah? Tindakan ini tidak dapat dibatalkan.${roomRemovalNote}`)) return
     const selectedCameraIds = new Set(selection.filter(item => item.type === 'camera').map(item => item.id))
     const removedCameras = layout.cameras.filter(camera => selectedCameraIds.has(camera.id))
     const removedShots = removedCameras
@@ -1001,6 +1042,7 @@ export default function Floorplan({
       }
       return next
     })
+    deleteReusableRooms(selectedRoomIds)
     applyEntitySelection([])
     onSelectedShotIdChange?.('')
     setTool('select')
@@ -1290,6 +1332,7 @@ export default function Floorplan({
           { ...parts.moving },
         ),
     }))
+    deleteReusableRooms(new Set([room.id]))
     applyEntitySelection([{ type: 'room', id: parts.target.id }], { type: 'room', id: parts.target.id })
     setSelectedRoomEdge(null)
     setSelectedRoomVertex(null)
@@ -2370,6 +2413,11 @@ export default function Floorplan({
   const deleteSelected = () => {
     if (!selected) return
 
+    if (selected.type === 'room' && reusableRoomMode) {
+      const usedByOtherScenes = scenes.filter(item => item.id !== scene.id && item.roomIds?.includes(selected.id)).length
+      if (usedByOtherScenes && !window.confirm(`Room ini juga digunakan di ${usedByOtherScenes} scene lain. Hapus Room tersimpan dan lepaskan dari semua scene? Tindakan ini tidak dapat dibatalkan.`)) return
+    }
+
     // A camera marker represents the shot linked to it. Remove that linked
     // shot when deleting the camera, including shots created before this
     // component session (the in-memory auto-created-shot map is not persistent).
@@ -2400,6 +2448,7 @@ export default function Floorplan({
       ...previous,
       [selected.type + 's']: previous[selected.type + 's'].filter(item => item.id !== selected.id),
     }))
+    if (selected.type === 'room') deleteReusableRooms(new Set([selected.id]))
     applyEntitySelection([])
     onSelectedShotIdChange?.('')
     setTool('select')
@@ -2561,8 +2610,16 @@ export default function Floorplan({
   }, [isActive, addObject, allObjects, deleteSelected, deleteSelectedItems, deleteSelectedWaypoint, deleteSelectedRoomVertex, finishRoomDrawing, redoLayout, roomDrawPoints, selectAllObjects, selected, selectedItems, selectedRoomVertex, selectedWaypoint, tool, undoLayout])
 
   const clearLayout = () => {
-    if (!window.confirm('Kosongkan room, wall, properti, aktor, kamera, dan lampu pada scene ini?')) return
+    const roomIds = new Set(layout.rooms.map(room => room.id))
+    const sharedRoomCount = reusableRoomMode
+      ? [...roomIds].filter(id => scenes.some(item => item.id !== scene.id && item.roomIds?.includes(id))).length
+      : 0
+    const roomRemovalNote = sharedRoomCount
+      ? ` ${sharedRoomCount} Room tersimpan juga akan dihapus dari scene lain yang menggunakannya.`
+      : ''
+    if (!window.confirm(`Kosongkan room, wall, properti, aktor, kamera, dan lampu pada scene ini?${roomRemovalNote}`)) return
     updateLayout(() => ({ ...EMPTY_LAYOUT }))
+    deleteReusableRooms(roomIds)
     applyEntitySelection([])
     onSelectedShotIdChange?.('')
     setSelectedWaypoint(null)
