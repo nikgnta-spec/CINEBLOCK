@@ -252,12 +252,38 @@ function normalizeRoomPolygon(room, index = 0) {
     delete next.side
     return next
   })
+  const internalWalls = Array.isArray(room.internalWalls)
+    ? room.internalWalls.filter(wall => wall && typeof wall === 'object').slice(0, 50).map(wall => ({
+      ...wall,
+      id: typeof wall.id === 'string' && wall.id ? wall.id : crypto.randomUUID(),
+      x1: Number(wall.x1) || 0,
+      y1: Number(wall.y1) || 0,
+      x2: Number(wall.x2) || 0,
+      y2: Number(wall.y2) || 0,
+      thickness: Math.max(2, Math.min(20, Number(wall.thickness) || 6)),
+    }))
+    : undefined
+  const connectedRoomIds = Array.isArray(room.connectedRoomIds)
+    ? room.connectedRoomIds.filter(id => typeof id === 'string' && id)
+    : undefined
+  const mergeParts = room.mergeParts && typeof room.mergeParts === 'object'
+    && room.mergeParts.target && typeof room.mergeParts.target === 'object'
+    && room.mergeParts.moving && typeof room.mergeParts.moving === 'object'
+    ? {
+      target: normalizeRoomPolygon(room.mergeParts.target, index),
+      moving: normalizeRoomPolygon(room.mergeParts.moving, index),
+    }
+    : undefined
   return {
     id: typeof room.id === 'string' && room.id ? room.id : crypto.randomUUID(),
     points,
     label: typeof room.label === 'string' ? room.label : 'Room ' + String(index + 1).padStart(2, '0'),
     ...(Number.isFinite(Number(room.ceilingHeight)) && Number(room.ceilingHeight) > 0
       ? { ceilingHeight: Number(room.ceilingHeight) } : {}),
+    ...(room.locked ? { locked: true } : {}),
+    ...(internalWalls?.length ? { internalWalls } : {}),
+    ...(connectedRoomIds?.length ? { connectedRoomIds } : {}),
+    ...(mergeParts?.target && mergeParts?.moving ? { mergeParts } : {}),
     openings,
   }
 }
@@ -309,6 +335,7 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
         x2: coords(item.x2, 1000),
         y2: coords(item.y2, 650),
         thickness: Math.max(2, Math.min(20, Number(item.thickness) || 6)),
+        ...(item.locked ? { locked: true } : {}),
         openings: normalizeOpenings(item.openings),
       })),
       doors: (Array.isArray(raw.doors) ? raw.doors : []).filter(item => item && typeof item === 'object').slice(0, 200).map((item, index) => ({
@@ -338,6 +365,9 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
         height: Math.max(8, Math.min(200, Number(item.height) || 36)),
         propType: safeLabel(item.propType, 'Custom'),
         label: safeLabel(item.label, 'Prop ' + String(index + 1).padStart(2, '0')),
+        ...(typeof item.customPropType === 'string' && item.customPropType
+          ? { customPropType: item.customPropType.slice(0, 80) } : {}),
+        ...(item.locked ? { locked: true } : {}),
       })),
       actors: (Array.isArray(raw.actors) ? raw.actors : []).filter(item => item && typeof item === 'object').slice(0, 200).map((item, index) => ({
         id: safeId(item),
@@ -347,6 +377,7 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
         label: safeLabel(item.label, 'Actor ' + String(index + 1).padStart(2, '0')),
         movement: safeLabel(item.movement, 'Blocking'),
         ...(safeColor(item.color) ? { color: safeColor(item.color) } : {}),
+        ...(item.locked ? { locked: true } : {}),
         path: (Array.isArray(item.path) ? item.path : []).slice(0, 100).map(point => ({
           x: coords(point?.x, 1000),
           y: coords(point?.y, 650),
@@ -364,6 +395,7 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
           label: safeLabel(item.label, 'Camera ' + String(index + 1).padStart(2, '0')),
           movement: safeLabel(item.movement, 'Static'),
           ...(safeColor(item.color) ? { color: safeColor(item.color) } : {}),
+          ...(item.locked ? { locked: true } : {}),
           path: (Array.isArray(item.path) ? item.path : []).slice(0, 100).map(point => ({
             x: coords(point?.x, 1000),
             y: coords(point?.y, 650),
@@ -377,6 +409,7 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
         lightType: safeLabel(item.lightType || item.type, 'Key'),
         label: safeLabel(item.label, 'Light ' + String(index + 1)),
         movement: safeLabel(item.movement, 'Static'),
+        ...(item.locked ? { locked: true } : {}),
         path: (Array.isArray(item.path) ? item.path : []).slice(0, 100).map(point => ({
           x: coords(point?.x, 1000),
           y: coords(point?.y, 650),

@@ -798,3 +798,29 @@ test('wall normalization retains a T-junction as a shared endpoint without stack
   assert.ok(walls.some(wall => wall.x1 === 50 && wall.x2 === 100 && wall.y1 === 0 && wall.y2 === 0))
   assert.ok(walls.some(wall => wall.x1 === 50 && wall.y1 === 0 && wall.x2 === 50 && wall.y2 === 40))
 })
+
+test('save/reload normalizers preserve doorway type, actor/camera color, lock state, and room-merge metadata', async () => {
+  const source = await readSource('../src/App.jsx')
+
+  // A no-leaf doorway must not be forced back into a leafed door on every save/reload.
+  assert.match(source, /next\.type = \['window', 'doorway'\]\.includes\(next\.type\) \? next\.type : 'door'/)
+
+  // Actor/camera color pickers must round-trip through the save normalizer.
+  assert.match(source, /const safeColor = value => typeof value === 'string' && \/\^#\[0-9a-fA-F\]\{6\}\$\/\.test\(value\)/)
+  assert.match(source, /safeColor\(item\.color\) \? \{ color: safeColor\(item\.color\) \} : \{\}/)
+
+  // The universal lock toggle (room/wall/prop/actor/camera/light) must survive normalization,
+  // not just gate interactions in memory.
+  const lockedPreserved = source.match(/\.\.\.\(item\.locked \? \{ locked: true \} : \{\}\)/g) || []
+  assert.ok(lockedPreserved.length >= 5, 'expected locked to be preserved for wall/prop/actor/camera/light')
+  assert.match(source, /\.\.\.\(room\.locked \? \{ locked: true \} : \{\}\)/)
+
+  // Room-merge metadata (connected rooms, merge history, internal divider walls) must not be
+  // silently dropped by normalizeRoomPolygon, which reconstructs the room object by hand.
+  assert.match(source, /internalWalls\?\.length \? \{ internalWalls \} : \{\}/)
+  assert.match(source, /connectedRoomIds\?\.length \? \{ connectedRoomIds \} : \{\}/)
+  assert.match(source, /mergeParts\?\.target && mergeParts\?\.moving \? \{ mergeParts \} : \{\}/)
+
+  // Custom prop type text must survive alongside the propType dropdown value.
+  assert.match(source, /customPropType: item\.customPropType\.slice\(0, 80\)/)
+})
