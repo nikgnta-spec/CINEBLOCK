@@ -641,12 +641,6 @@ button:focus-visible,
   color: var(--text-muted);
 }
 .floorplan-shot-chip button:hover { color: var(--danger); }
-.floorplan-field-note {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
 .floorplan-unlinked { padding: 12px; border-radius: 6px; background: var(--bg-subtle); color: var(--text-muted); font-size: 13px; }
 .floorplan-path-button {
   display: flex;
@@ -758,7 +752,6 @@ button:focus-visible,
 }
 .floorplan-opening-row .floorplan-field { min-width: 0; flex: 1; padding: 7px 8px; font-size: 12px; }
 .floorplan-opening-row .floorplan-icon-button { width: 32px; height: 32px; flex-basis: 32px; }
-.floorplan-opening-hint { flex: 1; min-width: 0; color: var(--text-muted); font-size: 11px; text-align: right; }
 .floorplan-coordinates input {
   width: 100%;
   min-width: 0;
@@ -2208,9 +2201,6 @@ button:focus-visible,
   opacity: 0.62;
   cursor: not-allowed;
 }
-.floorplan-inspector-section .floorplan-field-note {
-  line-height: 1.5;
-}
 .floorplan-color-swatches {
   display: flex;
   flex-wrap: wrap;
@@ -2943,13 +2933,6 @@ button:focus-visible,
   min-height: 38px;
   padding: 8px 10px;
   font-size: 13px;
-}
-.floorplan-opening-row .floorplan-opening-hint {
-  grid-column: 1 / -1;
-  margin-top: 0;
-  padding: 1px 0 0;
-  text-align: center;
-  line-height: 1.4;
 }
 @media (max-width: 340px) {
   .floorplan-opening-row .floorplan-opening-actions {
