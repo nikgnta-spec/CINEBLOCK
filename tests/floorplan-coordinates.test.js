@@ -35,3 +35,11 @@ test('opening a scene does not automatically move saved actor, camera, or light 
   assert.doesNotMatch(source, /One-time repair of obvious old auto-placement collisions/)
   assert.match(source, /initialLayoutFitRef/)
 })
+
+test('Floorplan keeps marquee selection and exposes Select All by button and keyboard shortcut', async () => {
+  const source = await readFile(new URL('../src/components/Floorplan.jsx', import.meta.url), 'utf8')
+
+  assert.match(source, /mode: 'selection-box'/)
+  assert.match(source, /if \(\(event\.ctrlKey \|\| event\.metaKey\) && key === 'a'\)/)
+  assert.match(source, /onClick=\{selectAllObjects\}[^>]*title="Pilih semua objek di scene ini"/)
+})

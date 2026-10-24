@@ -822,6 +822,11 @@ export default function Floorplan({
     setSelectedWaypoint(null)
   }
 
+  const selectAllObjects = () => {
+    const items = allObjects.map(object => ({ type: object.entityType, id: object.id }))
+    applyEntitySelection(items, items[items.length - 1] || null)
+  }
+
   const beginDragHistory = () => {
     dragHistoryBeforeRef.current = cloneLayoutSnapshot(layoutRef.current)
   }
@@ -2473,6 +2478,11 @@ export default function Floorplan({
       if (event.altKey || event.defaultPrevented) return
 
       const key = event.key.toLowerCase()
+      if ((event.ctrlKey || event.metaKey) && key === 'a') {
+        event.preventDefault()
+        selectAllObjects()
+        return
+      }
       if ((event.ctrlKey || event.metaKey) && key === 'z') {
         event.preventDefault()
         if (event.shiftKey) redoLayout()
@@ -2549,7 +2559,7 @@ export default function Floorplan({
     }
     window.addEventListener('keydown', handleFloorplanShortcut)
     return () => window.removeEventListener('keydown', handleFloorplanShortcut)
-  }, [isActive, addObject, deleteSelected, deleteSelectedItems, deleteSelectedWaypoint, deleteSelectedRoomVertex, finishRoomDrawing, redoLayout, roomDrawPoints, selected, selectedItems, selectedRoomVertex, selectedWaypoint, tool, undoLayout])
+  }, [isActive, addObject, allObjects, deleteSelected, deleteSelectedItems, deleteSelectedWaypoint, deleteSelectedRoomVertex, finishRoomDrawing, redoLayout, roomDrawPoints, selectAllObjects, selected, selectedItems, selectedRoomVertex, selectedWaypoint, tool, undoLayout])
 
   const clearLayout = () => {
     if (!window.confirm('Kosongkan room, wall, properti, aktor, kamera, dan lampu pada scene ini?')) return
@@ -2702,6 +2712,11 @@ export default function Floorplan({
           </button>
         </div>
         <span className="floorplan-tool-spacer" />
+        {allObjects.length > 1 && (
+          <button type="button" className="floorplan-tool-button" onClick={selectAllObjects} title="Pilih semua objek di scene ini" aria-label="Pilih semua objek">
+            <MousePointer2 size={17} /><span>Pilih semua</span>
+          </button>
+        )}
         {selectedItems.length > 1 && (
           <div className="floorplan-selection-actions" role="group" aria-label="Aksi beberapa objek terpilih">
             <span>{selectedItems.length} objek dipilih</span>
