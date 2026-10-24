@@ -1,7 +1,8 @@
-import { useId, useRef } from 'react'
-import { Plus, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { Plus, X, ChevronLeft, ChevronRight, ZoomIn, Trash2 } from 'lucide-react'
 
 const MAX_VISUAL_REFERENCE_SIZE_BYTES = 8 * 1024 * 1024
+const MAX_VISUAL_REFERENCE_COUNT = 24
 
 function readAsDataUrl(fileOrBlob) {
   return new Promise((resolve, reject) => {
@@ -44,6 +45,17 @@ async function makePersistentImage(file) {
 export default function ProjectInfo({ project, onChange }) {
   const set = (key, val) => onChange(p => ({ ...p, [key]: val }))
   const fileRefs = useRef([])
+  const [expandedRefIndex, setExpandedRefIndex] = useState(null)
+  const expandedRef = Number.isInteger(expandedRefIndex) ? project.visualRefs?.[expandedRefIndex] : null
+
+  useEffect(() => {
+    if (!expandedRef) return undefined
+    const closeOnEscape = event => {
+      if (event.key === 'Escape') setExpandedRefIndex(null)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [expandedRef])
 
   const handleRefImg = async (idx, e) => {
     const input = e.target
@@ -69,6 +81,7 @@ export default function ProjectInfo({ project, onChange }) {
   }
 
   const removeRef = (idx) => {
+    if (expandedRefIndex === idx) setExpandedRefIndex(null)
     onChange(p => {
       const refs = [...p.visualRefs]
       const labels = [...(p.visualRefLabels || Array(6).fill(''))]
@@ -97,7 +110,15 @@ export default function ProjectInfo({ project, onChange }) {
       ;[labels[idx], labels[targetIndex]] = [labels[targetIndex], labels[idx]]
       return { ...p, visualRefs: refs, visualRefLabels: labels }
     })
+    if (expandedRefIndex === idx) setExpandedRefIndex(targetIndex)
+    else if (expandedRefIndex === targetIndex) setExpandedRefIndex(idx)
   }
+
+  const addVisualRefSlot = () => onChange(p => ({
+    ...p,
+    visualRefs: [...(p.visualRefs || []), null],
+    visualRefLabels: [...(p.visualRefLabels || []), ''],
+  }))
 
   return (
     <div className="project-info">
@@ -166,7 +187,10 @@ export default function ProjectInfo({ project, onChange }) {
             >
               {ref ? (
                 <>
-                  <img src={ref} alt={project.visualRefLabels?.[i] || `Referensi ${i + 1}`} />
+                  <button type="button" className="visual-ref-preview" onClick={() => setExpandedRefIndex(i)} aria-label={`Perbesar referensi visual ${i + 1}`} title="Perbesar gambar">
+                    <img src={ref} alt={project.visualRefLabels?.[i] || `Referensi ${i + 1}`} />
+                    <span><ZoomIn size={17} /> Perbesar</span>
+                  </button>
                   <button
                     className="visual-ref-remove"
                     onClick={e => { e.stopPropagation(); removeRef(i) }}
@@ -225,6 +249,26 @@ export default function ProjectInfo({ project, onChange }) {
           </div>
         ))}
       </div>
+      {project.visualRefs.length < MAX_VISUAL_REFERENCE_COUNT && project.visualRefs.every(Boolean) && (
+        <button type="button" className="visual-ref-add-more" onClick={addVisualRefSlot}>
+          <Plus size={15} /> Tambah referensi visual
+        </button>
+      )}
+      {expandedRef && (
+        <div className="visual-ref-preview-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setExpandedRefIndex(null) }}>
+          <section className="visual-ref-preview-dialog" role="dialog" aria-modal="true" aria-label={project.visualRefLabels?.[expandedRefIndex] || `Referensi visual ${expandedRefIndex + 1}`}>
+            <header>
+              <div><span>REFERENSI VISUAL</span><h2>{project.visualRefLabels?.[expandedRefIndex] || `Referensi ${expandedRefIndex + 1}`}</h2></div>
+              <button type="button" className="visual-ref-preview-close" onClick={() => setExpandedRefIndex(null)} aria-label="Tutup preview gambar"><X size={18} /></button>
+            </header>
+            <img src={expandedRef} alt={project.visualRefLabels?.[expandedRefIndex] || `Referensi ${expandedRefIndex + 1}`} />
+            <footer>
+              <button type="button" className="visual-ref-preview-delete" onClick={() => removeRef(expandedRefIndex)}><Trash2 size={14} /> Hapus gambar</button>
+              <button type="button" className="btn btn-secondary" onClick={() => setExpandedRefIndex(null)}>Tutup preview</button>
+            </footer>
+          </section>
+        </div>
+      )}
     </div>
   )
 }
