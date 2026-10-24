@@ -589,7 +589,6 @@ export default function Floorplan({
 }) {
   const svgRef = useRef(null)
   const dragRef = useRef(null)
-  const normalizedSceneLayoutsRef = useRef(new Set())
   const [tool, setTool] = useState('select')
   const [selected, setSelected] = useState(null)
   const [selectedItems, setSelectedItems] = useState([])
@@ -614,6 +613,7 @@ export default function Floorplan({
   const [roomVertexPrompt, setRoomVertexPrompt] = useState(null)
   const [selectedRoomVertex, setSelectedRoomVertex] = useState(null)
   const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: MAP_WIDTH, height: MAP_HEIGHT })
+  const initialLayoutFitRef = useRef(false)
   const [historyRevision, setHistoryRevision] = useState(0)
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 520 })
   const selectionRef = useRef([])
@@ -644,6 +644,20 @@ export default function Floorplan({
         : (storedLayout.rooms || []) }
     : EMPTY_LAYOUT
   layoutRef.current = layout
+
+  useEffect(() => {
+    if (initialLayoutFitRef.current || !scene) return
+    const hasObjects = ['rooms', 'walls', 'props', 'actors', 'cameras', 'lights']
+      .some(collection => (layout[collection] || []).length > 0)
+    if (!hasObjects) return
+
+    initialLayoutFitRef.current = true
+    const fitted = getFittedViewBox(layout)
+    const extendsPastInitialCanvas = fitted.x < 0 || fitted.y < 0
+      || fitted.x + fitted.width > MAP_WIDTH || fitted.y + fitted.height > MAP_HEIGHT
+    if (extendsPastInitialCanvas) setViewBox(fitted)
+  }, [scene?.id, layout])
+
   const allObjects = [
     ...layout.rooms.map(item => ({ ...item, entityType: 'room' })),
     ...layout.walls.map(item => ({ ...item, entityType: 'wall' })),
@@ -994,48 +1008,6 @@ export default function Floorplan({
     if (exists) return
     applyEntitySelection([...current, { type, id }], { type, id })
   }
-
-  useEffect(() => {
-    if (!scene || normalizedSceneLayoutsRef.current.has(scene.id)) return
-    normalizedSceneLayoutsRef.current.add(scene.id)
-
-    const ordered = [
-      ...layout.actors.map(item => ({ ...item, type: 'actor' })),
-      ...layout.cameras.map(item => ({ ...item, type: 'camera' })),
-      ...layout.lights.map(item => ({ ...item, type: 'light' })),
-    ]
-    const accepted = []
-    const patches = { actors: {}, cameras: {}, lights: {} }
-    let didMove = false
-
-    for (const item of ordered) {
-      if (markerPositionIsClear(item, accepted)) {
-        accepted.push(item)
-        continue
-      }
-      const currentLayout = {
-        actors: accepted.filter(value => value.type === 'actor'),
-        cameras: accepted.filter(value => value.type === 'camera'),
-        lights: accepted.filter(value => value.type === 'light'),
-      }
-      const position = findAvailablePosition(currentLayout, accepted)
-      const movedItem = { ...item, ...position }
-      accepted.push(movedItem)
-      patches[item.type + 's'][item.id] = position
-      didMove = true
-    }
-
-    if (didMove) {
-      updateLayout(previous => ({
-        ...previous,
-        actors: previous.actors.map(item => patches.actors[item.id] ? { ...item, ...patches.actors[item.id] } : item),
-        cameras: previous.cameras.map(item => patches.cameras[item.id] ? { ...item, ...patches.cameras[item.id] } : item),
-        lights: previous.lights.map(item => patches.lights[item.id] ? { ...item, ...patches.lights[item.id] } : item),
-      }))
-    }
-  // One-time repair of obvious old auto-placement collisions when entering a scene.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene?.id, layout])
 
   const getPoint = event => {
     const rect = svgRef.current?.getBoundingClientRect()

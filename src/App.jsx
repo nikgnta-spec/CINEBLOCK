@@ -6,6 +6,7 @@ import Floorplan from './components/Floorplan'
 import PrintReport from './components/PrintReport'
 import { Download, Upload, Plus, Trash2, X, FileText, PanelsTopLeft, RectangleHorizontal, RectangleVertical, MoreHorizontal, Sun, Moon, Cloud } from 'lucide-react'
 import { loadAppState, saveAppState, saveAppStateOnExit, subscribeToExternalSave } from './storage'
+import { normalizeFloorplanAngle, normalizeFloorplanCoordinate } from './utils/floorplanCoordinates'
 import CloudSyncDialog from './components/CloudSyncDialog'
 import {
   createCloudProject,
@@ -218,23 +219,21 @@ function upsertProject(projects, record) {
   return projects.map(item => item.id === record.id ? record : item)
 }
 
-function normalizeFloorplanCoordinate(value, max) {
-  const number = Number(value)
-  return Number.isFinite(number) ? Math.max(0, Math.min(max, number)) : 0
-}
-
 // Convert legacy rectangular Rooms in memory. Keep ceilingHeight absent for
 // migrated Rooms so existing projects are never silently assigned a height.
 function normalizeRoomPolygon(room, index = 0) {
   if (!room || typeof room !== 'object') return null
   const legacyRectangle = !Array.isArray(room.points) || room.points.length < 3
-  const x = normalizeFloorplanCoordinate(room.x, 1000)
-  const y = normalizeFloorplanCoordinate(room.y, 650)
+  const x = normalizeFloorplanCoordinate(room.x)
+  const y = normalizeFloorplanCoordinate(room.y)
   const width = Math.max(12, Math.min(1000, Number(room.width) || 100))
   const height = Math.max(12, Math.min(650, Number(room.height) || 80))
   const points = legacyRectangle
     ? [{ x, y }, { x: x + width, y }, { x: x + width, y: y + height }, { x, y: y + height }]
-    : room.points.slice(0, 500).map(point => ({ x: Number(point.x) || 0, y: Number(point.y) || 0 }))
+    : room.points.slice(0, 500).map(point => ({
+      x: normalizeFloorplanCoordinate(point?.x),
+      y: normalizeFloorplanCoordinate(point?.y),
+    }))
   const oldSideToEdge = { top: 0, right: 1, bottom: 2, left: 3 }
   const openings = (Array.isArray(room.openings) ? room.openings : []).map(opening => {
     const next = opening && typeof opening === 'object' ? { ...opening } : {}
@@ -256,10 +255,10 @@ function normalizeRoomPolygon(room, index = 0) {
     ? room.internalWalls.filter(wall => wall && typeof wall === 'object').slice(0, 50).map(wall => ({
       ...wall,
       id: typeof wall.id === 'string' && wall.id ? wall.id : crypto.randomUUID(),
-      x1: Number(wall.x1) || 0,
-      y1: Number(wall.y1) || 0,
-      x2: Number(wall.x2) || 0,
-      y2: Number(wall.y2) || 0,
+      x1: normalizeFloorplanCoordinate(wall.x1),
+      y1: normalizeFloorplanCoordinate(wall.y1),
+      x2: normalizeFloorplanCoordinate(wall.x2),
+      y2: normalizeFloorplanCoordinate(wall.y2),
       thickness: Math.max(2, Math.min(20, Number(wall.thickness) || 6)),
     }))
     : undefined
@@ -300,7 +299,7 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
     const validShotIds = new Set((scene.shots || []).map(shot => shot.id))
     const safeId = item => typeof item?.id === 'string' && item.id ? item.id.slice(0, 100) : crypto.randomUUID()
     const safeLabel = (value, fallback) => typeof value === 'string' ? value.slice(0, 80) : fallback
-    const coords = (value, max) => normalizeFloorplanCoordinate(value, max)
+    const coords = value => normalizeFloorplanCoordinate(value)
     const safeColor = value => typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value : undefined
     const normalizeOpenings = (openings, allowSide = false) => (Array.isArray(openings) ? openings : [])
       .filter(opening => opening && typeof opening === 'object')
@@ -330,37 +329,37 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
         .map((item, index) => normalizeRoomPolygon(item, index)).filter(Boolean),
       walls: (Array.isArray(raw.walls) ? raw.walls : []).filter(item => item && typeof item === 'object').slice(0, 500).map(item => ({
         id: safeId(item),
-        x1: coords(item.x1, 1000),
-        y1: coords(item.y1, 650),
-        x2: coords(item.x2, 1000),
-        y2: coords(item.y2, 650),
+        x1: coords(item.x1),
+        y1: coords(item.y1),
+        x2: coords(item.x2),
+        y2: coords(item.y2),
         thickness: Math.max(2, Math.min(20, Number(item.thickness) || 6)),
         ...(item.locked ? { locked: true } : {}),
         openings: normalizeOpenings(item.openings),
       })),
       doors: (Array.isArray(raw.doors) ? raw.doors : []).filter(item => item && typeof item === 'object').slice(0, 200).map((item, index) => ({
         id: safeId(item),
-        x: coords(item.x, 1000),
-        y: coords(item.y, 650),
-        angle: coords(item.angle, 360),
+        x: coords(item.x),
+        y: coords(item.y),
+        angle: normalizeFloorplanAngle(item.angle),
         width: Math.max(12, Math.min(300, Number(item.width) || 52)),
         height: Math.max(8, Math.min(200, Number(item.height) || 12)),
         label: safeLabel(item.label, 'Door ' + String(index + 1).padStart(2, '0')),
       })),
       windows: (Array.isArray(raw.windows) ? raw.windows : []).filter(item => item && typeof item === 'object').slice(0, 200).map((item, index) => ({
         id: safeId(item),
-        x: coords(item.x, 1000),
-        y: coords(item.y, 650),
-        angle: coords(item.angle, 360),
+        x: coords(item.x),
+        y: coords(item.y),
+        angle: normalizeFloorplanAngle(item.angle),
         width: Math.max(12, Math.min(300, Number(item.width) || 64)),
         height: Math.max(8, Math.min(200, Number(item.height) || 10)),
         label: safeLabel(item.label, 'Window ' + String(index + 1).padStart(2, '0')),
       })),
       props: (Array.isArray(raw.props) ? raw.props : []).filter(item => item && typeof item === 'object').slice(0, 300).map((item, index) => ({
         id: safeId(item),
-        x: coords(item.x, 1000),
-        y: coords(item.y, 650),
-        angle: coords(item.angle, 360),
+        x: coords(item.x),
+        y: coords(item.y),
+        angle: normalizeFloorplanAngle(item.angle),
         width: Math.max(12, Math.min(300, Number(item.width) || 52)),
         height: Math.max(8, Math.min(200, Number(item.height) || 36)),
         propType: safeLabel(item.propType, 'Custom'),
@@ -371,16 +370,16 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
       })),
       actors: (Array.isArray(raw.actors) ? raw.actors : []).filter(item => item && typeof item === 'object').slice(0, 200).map((item, index) => ({
         id: safeId(item),
-        x: coords(item.x, 1000),
-        y: coords(item.y, 650),
-        angle: coords(item.angle, 360),
+        x: coords(item.x),
+        y: coords(item.y),
+        angle: normalizeFloorplanAngle(item.angle),
         label: safeLabel(item.label, 'Actor ' + String(index + 1).padStart(2, '0')),
         movement: safeLabel(item.movement, 'Blocking'),
         ...(safeColor(item.color) ? { color: safeColor(item.color) } : {}),
         ...(item.locked ? { locked: true } : {}),
         path: (Array.isArray(item.path) ? item.path : []).slice(0, 100).map(point => ({
-          x: coords(point?.x, 1000),
-          y: coords(point?.y, 650),
+          x: coords(point?.x),
+          y: coords(point?.y),
         })),
       })),
       cameras: (Array.isArray(raw.cameras) ? raw.cameras : [])
@@ -389,30 +388,30 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
         .map((item, index) => ({
           id: safeId(item),
           shotId: typeof item.shotId === 'string' && validShotIds.has(item.shotId) ? item.shotId : '',
-          x: coords(item.x, 1000),
-          y: coords(item.y, 650),
-          angle: coords(item.angle, 360),
+          x: coords(item.x),
+          y: coords(item.y),
+          angle: normalizeFloorplanAngle(item.angle),
           label: safeLabel(item.label, 'Camera ' + String(index + 1).padStart(2, '0')),
           movement: safeLabel(item.movement, 'Static'),
           ...(safeColor(item.color) ? { color: safeColor(item.color) } : {}),
           ...(item.locked ? { locked: true } : {}),
           path: (Array.isArray(item.path) ? item.path : []).slice(0, 100).map(point => ({
-            x: coords(point?.x, 1000),
-            y: coords(point?.y, 650),
+            x: coords(point?.x),
+            y: coords(point?.y),
           })),
         })),
       lights: (Array.isArray(raw.lights) ? raw.lights : []).filter(item => item && typeof item === 'object').slice(0, 200).map((item, index) => ({
         id: safeId(item),
-        x: coords(item.x, 1000),
-        y: coords(item.y, 650),
-        angle: coords(item.angle, 360),
+        x: coords(item.x),
+        y: coords(item.y),
+        angle: normalizeFloorplanAngle(item.angle),
         lightType: safeLabel(item.lightType || item.type, 'Key'),
         label: safeLabel(item.label, 'Light ' + String(index + 1)),
         movement: safeLabel(item.movement, 'Static'),
         ...(item.locked ? { locked: true } : {}),
         path: (Array.isArray(item.path) ? item.path : []).slice(0, 100).map(point => ({
-          x: coords(point?.x, 1000),
-          y: coords(point?.y, 650),
+          x: coords(point?.x),
+          y: coords(point?.y),
         })),
       })),
     }
@@ -421,12 +420,12 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
     const normalized = result[scene.id]
     const legacyOpenings = [
       ...(Array.isArray(raw.doors) ? raw.doors : []).filter(item => item && typeof item === 'object').map(item => ({
-        id: safeId(item), type: 'door', x: coords(item.x, 1000), y: coords(item.y, 650),
-        angle: coords(item.angle, 360), width: Math.max(12, Math.min(300, Number(item.width) || 52)),
+        id: safeId(item), type: 'door', x: coords(item.x), y: coords(item.y),
+        angle: normalizeFloorplanAngle(item.angle), width: Math.max(12, Math.min(300, Number(item.width) || 52)),
       })),
       ...(Array.isArray(raw.windows) ? raw.windows : []).filter(item => item && typeof item === 'object').map(item => ({
-        id: safeId(item), type: 'window', x: coords(item.x, 1000), y: coords(item.y, 650),
-        angle: coords(item.angle, 360), width: Math.max(12, Math.min(300, Number(item.width) || 58)),
+        id: safeId(item), type: 'window', x: coords(item.x), y: coords(item.y),
+        angle: normalizeFloorplanAngle(item.angle), width: Math.max(12, Math.min(300, Number(item.width) || 58)),
       })),
     ]
     delete normalized.doors
@@ -467,10 +466,10 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
         const halfLength = Math.max(70, opening.width)
         const wall = {
           id: crypto.randomUUID(),
-          x1: coords(point.x - Math.cos(angle) * halfLength, 1000),
-          y1: coords(point.y - Math.sin(angle) * halfLength, 650),
-          x2: coords(point.x + Math.cos(angle) * halfLength, 1000),
-          y2: coords(point.y + Math.sin(angle) * halfLength, 650),
+          x1: coords(point.x - Math.cos(angle) * halfLength),
+          y1: coords(point.y - Math.sin(angle) * halfLength),
+          x2: coords(point.x + Math.cos(angle) * halfLength),
+          y2: coords(point.y + Math.sin(angle) * halfLength),
           thickness: 6,
           openings: [{ ...embedded, offset: 0.5 }],
         }
