@@ -25,6 +25,7 @@ const CAMERA_PATH_MOVEMENTS = new Set([
 ])
 const MAP_WIDTH = 1000
 const MAP_HEIGHT = 650
+const TOUCH_ZOOM_SENSITIVITY = 1.3 * 1.5
 const EMPTY_LAYOUT = { rooms: [], walls: [], props: [], actors: [], cameras: [], lights: [] }
 
 function cloneLayoutSnapshot(layout) {
@@ -1140,7 +1141,8 @@ export default function Floorplan({
     const centerY = (first.clientY + second.clientY) / 2
     const distance = Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY)
     if (distance > 0 && pinchRef.current.distance > 0) {
-      zoomCanvas(1 + ((pinchRef.current.distance / distance) - 1) * 1.3, centerX, centerY)
+      const pinchZoomFactor = Math.max(0.2, 1 + ((pinchRef.current.distance / distance) - 1) * TOUCH_ZOOM_SENSITIVITY)
+      zoomCanvas(pinchZoomFactor, centerX, centerY)
     }
     pinchRef.current = { distance, centerX, centerY }
   }
