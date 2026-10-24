@@ -430,6 +430,19 @@ test('Props display their property name in Floorplan and printed reports', async
   assert.match(report, /\{prop\.label \|\| 'Prop'\}/)
 })
 
+test('PDF export keeps rotated object labels upright and movement paths in workspace coordinates', async () => {
+  const report = await readSource('../src/components/PrintReport.jsx')
+
+  assert.match(report, /transform=\{'rotate\(' \+ \(-\(prop\.angle \|\| 0\)\) \+ ' 0 4\)'\}/)
+  assert.match(report, /transform=\{'rotate\(' \+ \(-\(actor\.angle \|\| 0\)\) \+ ' 0 42\)'\}/)
+  assert.match(report, /transform=\{'rotate\(' \+ \(-\(camera\.angle \|\| 0\)\) \+ ' 0 46\)'\}/)
+  assert.match(report, /transform=\{'rotate\(' \+ \(-\(90 \+ \(light\.angle \|\| 0\)\)\) \+ ' 0 35\)'\}/)
+  assert.match(report, /<polyline key=\{'actor-path-' \+ actor\.id\} points=\{\[\{ x: actor\.x, y: actor\.y \}, \.\.\.actor\.path\]/)
+  assert.match(report, /<polyline key=\{'camera-path-' \+ camera\.id\} points=\{\[\{ x: camera\.x, y: camera\.y \}, \.\.\.camera\.path\]/)
+  assert.doesNotMatch(report, /\{\(actor\.path \|\| \[\]\)\.length > 0 && <polyline/)
+  assert.doesNotMatch(report, /\{\(camera\.path \|\| \[\]\)\.length > 0 && <polyline/)
+})
+
 test('Doors and windows support precise width, position, and polygon edge controls', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
 
