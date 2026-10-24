@@ -5,7 +5,7 @@ import ShotList from './components/ShotList'
 import Floorplan from './components/Floorplan'
 import PrintReport from './components/PrintReport'
 import { Download, Upload, Plus, Trash2, X, FileText, PanelsTopLeft, RectangleHorizontal, RectangleVertical, MoreHorizontal, Sun, Moon, Cloud } from 'lucide-react'
-import { loadAppState, saveAppState, subscribeToExternalSave } from './storage'
+import { loadAppState, saveAppState, saveAppStateOnExit, subscribeToExternalSave } from './storage'
 import CloudSyncDialog from './components/CloudSyncDialog'
 import {
   createCloudProject,
@@ -580,6 +580,17 @@ export default function App() {
   const cloudLinkHandledRef = useRef(false)
   const cloudConflictRef = useRef(null)
   const cloudLatestSnapshotRef = useRef(null)
+  const saveSnapshotRef = useRef(null)
+  saveSnapshotRef.current = () => ({
+    tab,
+    project,
+    scenes,
+    activeSceneId,
+    floorplans,
+    rooms: projectRooms || [],
+    projects: upsertProject(projects, createProjectRecord(activeProjectId, project, scenes, activeSceneId, floorplans, projectRooms || [])),
+    activeProjectId,
+  })
 
   const applyCloudRecord = (remote, role, replaceCurrentProject = false) => {
     const payload = remote?.payload && typeof remote.payload === 'object' ? remote.payload : {}
@@ -771,6 +782,24 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    if (!hydrated) return undefined
+    const flushCurrentSnapshot = () => {
+      if (!saveSnapshotRef.current || externalSaveDetectedRef.current) return
+      saveAppStateOnExit(saveSnapshotRef.current()).catch(error => {
+        console.error('CINEBLOCK could not flush the latest browser save:', error)
+      })
+    }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') flushCurrentSnapshot()
+    }
+    window.addEventListener('pagehide', flushCurrentSnapshot)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      window.removeEventListener('pagehide', flushCurrentSnapshot)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [hydrated])
   useEffect(() => {
     if (!hydrated) return undefined
 

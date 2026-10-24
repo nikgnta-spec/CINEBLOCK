@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Undo2, Redo2, Lock, Unlock, Ruler, Tag,
+  MousePointer2, Hand, Square, Minus, Route, Trash2, Plus, Layers2, X, Maximize2, Undo2, Redo2, Lock, Unlock, Ruler, Tag, RotateCcw, RotateCw,
 } from 'lucide-react'
 import SceneNavigator from './SceneNavigator'
 import { projectPointToSegment, snapRoomPoint } from '../utils/roomSnapping'
 import { createRoomPolygon, connectWallGeometry, updateRoomPolygonGeometry, updateWallEndpointGeometry } from '../utils/floorplanGeometry'
 import { findRoomMergeCandidate, mergeAdjacentRoomPolygons, snapRoomToEdge } from '../utils/roomMerge'
+import { rotateObjectGroup } from '../utils/objectTransforms'
 import {
   SIZES as SHOT_SIZES,
   ANGLES as SHOT_ANGLES,
@@ -917,6 +918,24 @@ export default function Floorplan({
     onSelectedShotIdChange?.('')
   }
 
+  const rotateSelectedGroup = degrees => {
+    const selected = selectionRef.current.filter(entry => ['prop', 'actor', 'camera', 'light'].includes(entry.type))
+    if (selected.length < 2) return
+    const originals = selected.map(entry => ({
+      ...entry,
+      original: (layout[entry.type + 's'] || []).find(item => item.id === entry.id),
+    })).filter(entry => entry.original && !entry.original.locked)
+    if (originals.length < 2) return
+    const rotated = rotateObjectGroup(originals.map(entry => entry.original), degrees)
+    const rotatedById = new Map(rotated.map(item => [item.id, item]))
+    updateLayout(previous => {
+      const next = { ...previous }
+      for (const type of ['props', 'actors', 'cameras', 'lights']) {
+        next[type] = previous[type].map(item => rotatedById.get(item.id) || item)
+      }
+      return next
+    })
+  }
   const deleteSelectedItems = () => {
     const selection = [...selectionRef.current]
     if (selection.length < 2) return
@@ -2704,6 +2723,10 @@ export default function Floorplan({
         {selectedItems.length > 1 && (
           <div className="floorplan-selection-actions" role="group" aria-label="Aksi beberapa objek terpilih">
             <span>{selectedItems.length} objek dipilih</span>
+            {selectedItems.filter(entry => ['prop', 'actor', 'camera', 'light'].includes(entry.type)).length > 1 && <>
+              <button type="button" className="floorplan-selection-rotate" onClick={() => rotateSelectedGroup(-15)} title="Putar grup 15° ke kiri"><RotateCcw size={14} /> −15°</button>
+              <button type="button" className="floorplan-selection-rotate" onClick={() => rotateSelectedGroup(15)} title="Putar grup 15° ke kanan"><RotateCw size={14} /> +15°</button>
+            </>}
             <button type="button" className="floorplan-selection-delete" onClick={deleteSelectedItems}><Trash2 size={14} /> Hapus pilihan</button>
             <button type="button" className="floorplan-selection-clear" onClick={() => applyEntitySelection([])} title="Batalkan pilihan" aria-label="Batalkan pilihan"><X size={14} /></button>
           </div>
@@ -3177,7 +3200,7 @@ export default function Floorplan({
                             strokeWidth="4"
                             paintOrder="stroke"
                           >
-                            {endpointName}
+                            {showObjectLabels && endpointName}
                           </text>
                         </g>
                       )

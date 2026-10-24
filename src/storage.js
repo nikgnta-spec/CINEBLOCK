@@ -220,3 +220,21 @@ export function saveAppState(value) {
   saveQueue = operation.catch(() => {})
   return operation
 }
+
+// Flush a synchronous recovery copy before a refresh or tab close. IndexedDB
+// writes remain queued as the primary save, while loadAppState prefers this
+// timestamped copy if the browser closes before the transaction completes.
+export function saveAppStateOnExit(value) {
+  let fallbackError = null
+  try {
+    const record = createStorageRecord(value)
+    globalThis.window.localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(record))
+  } catch (error) {
+    fallbackError = error
+  }
+
+  const operation = saveAppState(value)
+  return fallbackError
+    ? operation.catch(error => { throw error || fallbackError })
+    : operation
+}

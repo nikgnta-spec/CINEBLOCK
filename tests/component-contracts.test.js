@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
-const readSource = path => readFile(new URL(path, import.meta.url), 'utf8')
+const readSource = async path => (await readFile(new URL(path, import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
 
 test('camera creation links an unlinked shot or creates a paired shot when needed', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
@@ -70,7 +70,7 @@ test('movement path endpoints render the same object icon and name without a bac
   assert.match(source, /data-floorplan-path-end-object="true"/)
   assert.match(source, /const movementWaypoints = showPath \? \(object\.path \|\| \[\]\) : \[\]/)
   assert.match(source, /const endpointName = type === 'actor'/)
-  assert.match(endpoint, /\{endpointName\}/)
+  assert.match(endpoint, /\{showObjectLabels && endpointName\}/)
   assert.match(endpoint, /type === 'actor' \? \(/)
   assert.match(endpoint, /type === 'camera' \? \(/)
   assert.match(endpoint, /type === 'light' \? \(/)
@@ -163,4 +163,18 @@ test('share links use the current deployment origin so preview pairing is testab
   assert.match(app, /const shareAddress = new URL\(window\.location\.origin\)/)
   assert.match(app, /shareAddress\.search = generatedShareAddress\.search/)
   assert.doesNotMatch(app, /shareAddress\.origin = window\.location\.origin/)
+})
+
+test('Shot List has a one-at-a-time presentation view with keyboard navigation', async () => {
+  const source = await readSource('../src/components/ShotList.jsx')
+  assert.match(source, /viewMode === 'presentation'/)
+  assert.match(source, /Satu per satu/)
+  assert.match(source, /Shot \{presentationIndex \+ 1\} dari \{scene\.shots\.length\}/)
+  assert.match(source, /event\.key === 'ArrowLeft'/)
+  assert.match(source, /event\.key === 'ArrowRight'/)
+})
+
+test('movement path endpoint labels follow the object-label visibility setting', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+  assert.match(source, /\{showObjectLabels && endpointName\}/)
 })

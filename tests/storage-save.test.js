@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { loadAppState, saveAppState, selectNewestStorageRecord } from '../src/storage.js'
+import { loadAppState, saveAppState, saveAppStateOnExit, selectNewestStorageRecord } from '../src/storage.js'
 
 const STORAGE_KEY = 'cineblock.app-state.v1'
 
@@ -108,4 +108,17 @@ test('selectNewestStorageRecord prefers a genuinely newer timestamped fallback',
   }
 
   assert.equal(selectNewestStorageRecord(database, fallback), fallback)
+})
+
+test('saveAppStateOnExit writes the latest recovery snapshot synchronously', async () => {
+  const state = { project: { title: 'last edit before refresh' }, scenes: [{ id: 'latest-scene' }] }
+
+  await withUnavailableIndexedDB(async () => {
+    const pendingSave = saveAppStateOnExit(state)
+    const savedBeforeAwait = JSON.parse(window.localStorage.getItem(STORAGE_KEY))
+
+    assert.equal(savedBeforeAwait.state.project.title, 'last edit before refresh')
+    assert.deepEqual(savedBeforeAwait.state.scenes, [{ id: 'latest-scene' }])
+    await pendingSave
+  })
 })

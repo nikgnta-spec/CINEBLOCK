@@ -5,7 +5,7 @@ import { projectPointToSegment, snapRoomPoint } from '../src/utils/roomSnapping.
 import { mergeAdjacentRoomPolygons } from '../src/utils/roomMerge.js'
 import { connectWallGeometry, createRoomPolygon, normalizeWallJunctions, updateRoomPolygonGeometry, updateWallEndpointGeometry } from '../src/utils/floorplanGeometry.js'
 
-const readSource = path => readFile(new URL(path, import.meta.url), 'utf8')
+const readSource = async path => (await readFile(new URL(path, import.meta.url), 'utf8')).replace(/\r\n/g, '\n')
 
 test('Room drag snaps the whole polygon to nearby Room corners and aligned walls', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
@@ -441,7 +441,7 @@ test('Room opening normalization preserves the full supported 5-meter width', as
 test('Floorplan navigation supports shared cursor-anchored zoom, pinch, and explicit 1:1 reset', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
   assert.match(source, /const zoomCanvas = \(factor, clientX, clientY\) =>/)
-  assert.match(source, /zoomCanvas\(event\.deltaY < 0 \? 0\.9 : 1\.1, event\.clientX, event\.clientY\)/)
+  assert.match(source, /zoomCanvas\(event\.deltaY < 0 \? 0\.87 : 1\.13, event\.clientX, event\.clientY\)/)
   assert.match(source, /onTouchStart=\{handleCanvasTouchStart\}/)
   assert.match(source, /onTouchMove=\{handleCanvasTouchMove\}/)
   assert.match(source, /pinchRef\.current\.distance \/ distance/)
