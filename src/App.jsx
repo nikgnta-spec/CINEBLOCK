@@ -131,7 +131,7 @@ function normalizeSavedScenes(savedScenes) {
         id: shotId,
         // Shot numbers are positional; this also repairs duplicates from older versions.
         num: String(shotIndex + 1).padStart(3, '0'),
-        subject: stringField('subject'),
+        subject: stringField('subject', 1000),
         size: stringField('size', 100),
         camera: stringField('camera', 200),
         angle: stringField('angle', 100),
