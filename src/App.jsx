@@ -1410,7 +1410,10 @@ export default function App() {
               <img className="topbar-mark-dark" src="/cineblock-mark.svg" alt="" />
               <img className="topbar-mark-light" src="/cineblock-mark-light.svg" alt="" />
             </span>
-            <span className="topbar-wordmark">CINEBLOCK</span>
+            <span className="topbar-brand-copy">
+              <span className="topbar-wordmark">CINEBLOCK</span>
+              <span className="topbar-byline">by nikgnta</span>
+            </span>
           </div>
           <span style={{ color: 'var(--text-muted)' }}>/</span>
           <select
