@@ -459,7 +459,7 @@ function PrintFloorplan({ scene, layout }) {
         {props.map(prop => (
           <g key={'prop-' + prop.id} transform={'translate(' + prop.x + ' ' + prop.y + ') rotate(' + (prop.angle || 0) + ')'}>
             <rect x={-(Number(prop.width) || 52) / 2} y={-(Number(prop.height) || 36) / 2} width={Number(prop.width) || 52} height={Number(prop.height) || 36} rx={prop.propType === 'Sofa' ? 8 : 2} fill="#fff" stroke="#111827" strokeWidth="2" />
-            <text x="0" y="4" fontSize="12" fontWeight="600" fill="#111827" textAnchor="middle">{prop.propType || 'Prop'}</text>
+            <text x="0" y="4" fontSize="12" fontWeight="600" fill="#111827" textAnchor="middle">{prop.label || 'Prop'}</text>
           </g>
         ))}
 
