@@ -148,6 +148,18 @@ test('reusable Rooms are project-level records that can be attached to individua
   assert.match(source, /const resolvedFloorplans = projectRooms === null/)
 })
 
+test('Deleting a Room from Floorplan removes its reusable project record and scene references', async () => {
+  const source = await readSource('../src/components/Floorplan.jsx')
+
+  assert.match(source, /const deleteReusableRooms = roomIds =>/)
+  assert.match(source, /removeReusableRoomRecords\(previous, roomIds\)/)
+  assert.match(source, /removeReusableRoomReferences\(previous, roomIds\)/)
+  assert.match(source, /if \(selected\.type === 'room'\) deleteReusableRooms\(new Set\(\[selected\.id\]\)\)/)
+  assert.match(source, /deleteReusableRooms\(selectedRoomIds\)/)
+  assert.match(source, /deleteReusableRooms\(roomIds\)/)
+  assert.match(source, /restoreReusableRooms\(restoredRoomIds\)/)
+})
+
 test('local backup project records include reusable rooms and Scene references', async () => {
   const source = await readSource('../src/App.jsx')
 
