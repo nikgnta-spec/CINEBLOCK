@@ -197,7 +197,7 @@ test('Rooms use editable polygon vertices and a manually entered ceiling height'
   assert.match(source, /mode: 'room-vertex'/)
   assert.match(source, /id="room-ceiling-height"/)
   assert.match(source, /placeholder="Belum diisi"/)
-  assert.match(source, /Room hasil migrasi tidak diberi tinggi otomatis/)
+  assert.doesNotMatch(source, /Room hasil migrasi tidak diberi tinggi otomatis/)
   // Polygon Rooms expose editable overall bounds (not a legacy rectangle width),
   // while individual edge lengths are rendered separately and manual drawing
   // accepts a length in meters. All inspector dimension controls respect Room lock.
@@ -209,6 +209,15 @@ test('Rooms use editable polygon vertices and a manually entered ceiling height'
   assert.match(source, /aria-label="Panjang garis dalam meter"/)
   assert.match(source, /getRoomPoints\(selectedEntity\)\.length/)
   assert.match(source, /step="0\.01"/)
+})
+
+test('Floorplan inspector avoids redundant field notes and inline movement hints', async () => {
+  const floorplan = await readSource('../src/components/Floorplan.jsx')
+  const styles = await readSource('../src/index.css')
+
+  assert.doesNotMatch(floorplan, /className="floorplan-field-note"/)
+  assert.doesNotMatch(floorplan, /className="floorplan-opening-hint"/)
+  assert.doesNotMatch(styles, /\.floorplan-field-note|\.floorplan-opening-hint/)
 })
 
 test('Room dimensions are shown outside every polygon edge and can be toggled', async () => {
@@ -617,7 +626,7 @@ test('Merged Room inspector can restore its source Rooms', async () => {
   assert.match(source, /mergeParts: \{[\s\S]*?target: \{ \.\.\.target \}[\s\S]*?moving: \{ \.\.\.snappedMoving \}/)
   assert.match(source, /const unmergeRoom = room => \{/)
   assert.match(source, /rooms: previous\.rooms[\s\S]*?\.filter\(item => item\.id !== room\.id\)[\s\S]*?\.concat\([\s\S]*?parts\.target[\s\S]*?parts\.moving/)
-  assert.match(source, /Lepas ruangan/)
+  assert.match(source, /Pisahkan ruangan gabungan/)
 })
 
 test('Room connections persist independently of selection and Rooms remain draggable', async () => {

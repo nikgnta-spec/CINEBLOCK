@@ -3520,7 +3520,6 @@ export default function Floorplan({
                   {selectedEntity.locked ? <Unlock size={16} /> : <Lock size={16} />}
                   {selectedEntity.locked ? 'Buka Kunci Objek' : 'Kunci Objek'}
                 </button>
-                {selectedEntity.locked && <p className="floorplan-field-note">Objek terkunci: tidak bisa digeser, diputar, diubah ukuran, atau diedit jalurnya. Buka kunci untuk mengubah geometri.</p>}
               </section>
 
               {selectedType === 'actor' && (
@@ -3666,17 +3665,6 @@ export default function Floorplan({
                             <option key={movement} value={movement}>{movement}</option>
                           ))}
                         </select>
-                        {(selectedShot.movements || []).some(movement => movement === 'Pan Left' || movement === 'Pan Right' || movement === 'Pan') && (
-                          <p className="floorplan-field-note">
-                            {selectedShot.movements.includes('Pan Left') && selectedShot.movements.includes('Pan Right')
-                              ? 'Pan arrows show both directions on the canvas.'
-                              : selectedShot.movements.includes('Pan Left')
-                                ? 'Arrow points left.'
-                                : selectedShot.movements.includes('Pan Right')
-                                  ? 'Arrow points right.'
-                                  : 'Pan is shown with a two-way arrow.'}
-                          </p>
-                        )}
                       </section>
 
                       <section className="floorplan-inspector-section floorplan-shotlist-chip-section">
@@ -3742,8 +3730,7 @@ export default function Floorplan({
                   {selectedEntity.mergeParts?.target && selectedEntity.mergeParts?.moving && (
                     <section className="floorplan-inspector-section">
                       <div className="floorplan-section-title">Ruangan gabungan</div>
-                      <p className="floorplan-field-note">Pisahkan kembali Room ini menjadi {selectedEntity.mergeParts.target.label || 'Room'} dan {selectedEntity.mergeParts.moving.label || 'Room'}. Bentuk dan posisi sebelum penggabungan akan dipulihkan.</p>
-                      <button type="button" className="floorplan-opening-add" onClick={() => unmergeRoom(selectedEntity)} disabled={Boolean(selectedEntity.locked)}>Lepas ruangan</button>
+                      <button type="button" className="floorplan-opening-add" onClick={() => unmergeRoom(selectedEntity)} disabled={Boolean(selectedEntity.locked)} title={'Pulihkan bentuk dan posisi sebelum digabungkan: ' + (selectedEntity.mergeParts.target.label || 'Room') + ' + ' + (selectedEntity.mergeParts.moving.label || 'Room')}>Pisahkan ruangan gabungan</button>
                     </section>
                   )}
                   <section className="floorplan-inspector-section">
@@ -3753,7 +3740,6 @@ export default function Floorplan({
                   {Array.isArray(selectedEntity.connectedRoomIds) && selectedEntity.connectedRoomIds.some(id => layout.rooms.some(room => room.id === id)) && (
                     <section className="floorplan-inspector-section">
                       <div className="floorplan-section-title">Sambungan Room</div>
-                      <p className="floorplan-field-note">Room ini terhubung dengan {selectedEntity.connectedRoomIds.filter(id => layout.rooms.some(room => room.id === id)).map(id => layout.rooms.find(room => room.id === id)?.label || 'Room').join(', ')}.</p>
                       <button type="button" className="floorplan-opening-add" onClick={() => {
                         const connectedIds = new Set(selectedEntity.connectedRoomIds || [])
                         updateLayout(previous => ({
@@ -3775,7 +3761,6 @@ export default function Floorplan({
                   )}
                   <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Ukuran ruangan</div>
-                    <p className="floorplan-field-note">Atur ukuran keseluruhan denah secara presisi. Bentuk polygon dipertahankan; titik-titik pada sumbu terkait akan diskalakan.</p>
                     <div className="floorplan-dimension-grid">
                       <div className="floorplan-dimension-input">
                         <label htmlFor="room-length">Panjang (m)</label>
@@ -3798,12 +3783,10 @@ export default function Floorplan({
                         }} />
                       </div>
                     </div>
-                    <p className="floorplan-field-note">{getRoomPoints(selectedEntity).length} titik · panjang/lebar mengikuti bounding box polygon.</p>
                     <div className="floorplan-opening-actions">
                       <button type="button" disabled={Boolean(selectedEntity.locked) || selectedRoomEdge?.roomId !== selectedEntity.id} onClick={() => addRoomVertexAtEdgeMidpoint(selectedEntity)}>Tambah titik pada sisi terpilih</button>
                       <button type="button" disabled={Boolean(selectedEntity.locked) || selectedRoomVertex?.roomId !== selectedEntity.id} onClick={deleteSelectedRoomVertex}>Hapus titik terpilih</button>
                     </div>
-                    <p className="floorplan-field-note">Klik atau geser sisi dinding untuk memilihnya, lalu tekan Tambah titik. Pilih titik kuning untuk menghapusnya dengan tombol Hapus titik terpilih atau tekan Delete.</p>
                   </section>
                   <section className="floorplan-inspector-section">
                     <label htmlFor="room-ceiling-height">Tinggi ruangan (m)</label>
@@ -3821,7 +3804,6 @@ export default function Floorplan({
                         if (Number.isFinite(meters) && meters >= 1 && meters <= 10) updateSelected({ ceilingHeight: meters })
                       }
                     }} />
-                    <p className="floorplan-field-note">Room hasil migrasi tidak diberi tinggi otomatis. Isi manual jika sudah diketahui.</p>
                   </section>
                   <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Bukaan</div>
@@ -3926,7 +3908,6 @@ export default function Floorplan({
                             }} />
                           </div>
                         </div>
-                        <span className="floorplan-opening-hint">Bisa digeser langsung di denah.</span>
                       </div>
                     ))}
                   </section>
@@ -4058,7 +4039,6 @@ export default function Floorplan({
                             }} />
                           </div>
                         </div>
-                        <span className="floorplan-opening-hint">Bisa digeser langsung di denah.</span>
                       </div>
                     ))}
                   </section>
@@ -4089,7 +4069,6 @@ export default function Floorplan({
                         disabled={Boolean(selectedEntity.locked)}
                         onChange={event => updateSelected({ customPropType: event.target.value })}
                       />
-                      <p className="floorplan-field-note">Tulis tipe properti sendiri. Nama properti di atas tetap bisa diatur terpisah.</p>
                     </section>
                   )}
                   <section className="floorplan-inspector-section">
@@ -4112,7 +4091,6 @@ export default function Floorplan({
                         }} />
                       </div>
                     </div>
-                    <p className="floorplan-field-note">Panjang dan lebar bisa diketik manual. Ukuran 0,10–5,00 m.</p>
                   </section>
                 </>
               )}
