@@ -2678,21 +2678,7 @@ export default function Floorplan({
             <Route size={19} /><span>Jalur</span>
           </button>
         </div>
-        {scene?.shots?.length > 0 && <>
-          <span className="floorplan-tool-divider" />
-          <div className="floorplan-shot-navigation" role="group" aria-label="Navigasi shot Floorplan">
-            <button type="button" className="floorplan-shot-step" onClick={() => moveFloorplanShot(-1)} disabled={activeFloorplanShotIndex === 0} aria-label="Shot sebelumnya di Floorplan" title="Shot sebelumnya"><ChevronLeft size={16} /></button>
-            <label className="floorplan-shot-picker">
-              <span>Shot</span>
-              <select aria-label="Pilih shot untuk Floorplan" value={activeFloorplanShot?.id || ''} onChange={event => onSelectedShotIdChange?.(event.target.value)}>
-                {scene.shots.map(shot => <option key={shot.id} value={shot.id}>{shot.num} — {shot.subject || 'Subjek belum diisi'}</option>)}
-              </select>
-            </label>
-            <span className="floorplan-shot-position">{activeFloorplanShotIndex + 1}/{scene.shots.length}</span>
-            <button type="button" className="floorplan-shot-step" onClick={() => moveFloorplanShot(1)} disabled={activeFloorplanShotIndex >= scene.shots.length - 1} aria-label="Shot berikutnya di Floorplan" title="Shot berikutnya"><ChevronRight size={16} /></button>
-            <button type="button" className={'floorplan-shot-focus' + (shotFocusMode ? ' active' : '')} onClick={() => { if (!shotFocusMode && activeFloorplanShot) onSelectedShotIdChange?.(activeFloorplanShot.id); setShotFocusMode(value => !value) }} aria-pressed={shotFocusMode} title="Fokus pada kamera shot terpilih">{shotFocusMode ? 'Fokus aktif' : 'Fokus shot'}</button>
-          </div>
-        </>}
+
         <span className="floorplan-tool-divider" />
         <div className="floorplan-structure-group" role="group" aria-label="Struktur">
           <span className="floorplan-structure-label">Struktur</span>
@@ -2768,6 +2754,20 @@ export default function Floorplan({
               <span className="floorplan-scale-bar" style={{ width: scaleBarWidth }} />
               <span className="floorplan-scale-caption">Skala denah · 100 unit = 1 m</span>
             </div>
+            {scene?.shots?.length > 0 && <>
+              <div className="floorplan-shot-navigation floorplan-canvas-shot-navigation" role="group" aria-label="Navigasi shot Floorplan">
+                <button type="button" className="floorplan-shot-step" onClick={() => moveFloorplanShot(-1)} disabled={activeFloorplanShotIndex === 0} aria-label="Shot sebelumnya di Floorplan" title="Shot sebelumnya"><ChevronLeft size={16} /></button>
+                <label className="floorplan-shot-picker">
+                  <span>Shot</span>
+                  <select aria-label="Pilih shot untuk Floorplan" value={activeFloorplanShot?.id || ''} onChange={event => onSelectedShotIdChange?.(event.target.value)}>
+                    {scene.shots.map(shot => <option key={shot.id} value={shot.id}>{shot.num} — {shot.subject || 'Subjek belum diisi'}</option>)}
+                  </select>
+                </label>
+                <span className="floorplan-shot-position">{activeFloorplanShotIndex + 1}/{scene.shots.length}</span>
+                <button type="button" className="floorplan-shot-step" onClick={() => moveFloorplanShot(1)} disabled={activeFloorplanShotIndex >= scene.shots.length - 1} aria-label="Shot berikutnya di Floorplan" title="Shot berikutnya"><ChevronRight size={16} /></button>
+                <button type="button" className={'floorplan-shot-focus' + (shotFocusMode ? ' active' : '')} onClick={() => { if (!shotFocusMode && activeFloorplanShot) onSelectedShotIdChange?.(activeFloorplanShot.id); setShotFocusMode(value => !value) }} aria-pressed={shotFocusMode} title="Fokus pada kamera shot terpilih">{shotFocusMode ? 'Fokus aktif' : 'Fokus shot'}</button>
+              </div>
+            </>}
             <svg
               ref={svgRef}
               className={'floorplan-canvas' + (spaceHeld || tool === 'pan' ? ' can-pan' : tool === 'select' ? ' can-select' : ' can-draw')}

@@ -3193,3 +3193,8 @@ button:focus-visible,
 .floorplan-shot-focus.active { color:var(--accent); border-color:var(--accent); background:var(--bg); }
 @media (max-width:1024px) { .floorplan-shot-navigation { order:3; max-width:100%; } .floorplan-shot-picker select { width:min(240px,35vw); } }
 @media (max-width:680px) { .floorplan-shot-navigation { flex:1 1 100%; justify-content:center; } .floorplan-shot-picker { flex:1; } .floorplan-shot-picker select { width:100%; } }
+
+.floorplan-canvas-shot-navigation { position:absolute; top:14px; right:14px; z-index:5; max-width:calc(100% - 28px); box-shadow:0 3px 12px rgba(15,23,42,.14); }
+.floorplan-canvas-shot-navigation .floorplan-shot-picker { flex:0 1 auto; }
+.floorplan-canvas-shot-navigation .floorplan-shot-picker select { width:min(205px, 19vw); max-width:100%; }
+@media (max-width:680px) { .floorplan-canvas-shot-navigation { justify-content:flex-end; } .floorplan-canvas-shot-navigation .floorplan-shot-picker select { width:min(155px, 30vw); min-width:72px; } }
