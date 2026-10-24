@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import SceneNavigator from './SceneNavigator'
 import { SIZES, ANGLES, LENSES, MOVEMENTS, EQUIPMENT } from '../shotOptions'
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Trash2, Copy, Check, CircleSlash, ImagePlus, LayoutGrid, List } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Trash2, Copy, Check, CircleSlash, ImagePlus, LayoutGrid, List, Play } from 'lucide-react'
 
 
 
@@ -106,7 +106,24 @@ export default function ShotList({
   const scene = scenes[activeIdx]
   const totalSetupMinutes = scene.shots.reduce((sum, shot) => sum + durationMinutes(shot.setup), 0)
   const totalShootMinutes = scene.shots.reduce((sum, shot) => sum + durationMinutes(shot.estShoot), 0)
+  const presentationIndex = Math.max(0, scene.shots.findIndex(shot => shot.id === selectedShotId))
+  const presentationShot = scene.shots[presentationIndex] || null
+  const movePresentationShot = offset => {
+    if (!scene.shots.length) return
+    const nextIndex = Math.max(0, Math.min(scene.shots.length - 1, presentationIndex + offset))
+    onSelectedShotIdChange?.(scene.shots[nextIndex].id)
+  }
 
+  useEffect(() => {
+    if (viewMode !== 'presentation') return undefined
+    const navigate = event => {
+      if (event.target?.closest?.('input, textarea, select, [contenteditable="true"]')) return
+      if (event.key === 'ArrowLeft') { event.preventDefault(); movePresentationShot(-1) }
+      if (event.key === 'ArrowRight') { event.preventDefault(); movePresentationShot(1) }
+    }
+    window.addEventListener('keydown', navigate)
+    return () => window.removeEventListener('keydown', navigate)
+  }, [viewMode, presentationIndex, scene.id, scene.shots])
   useEffect(() => {
     if (!previewShot) return
     const closeOnEscape = event => {
@@ -352,6 +369,9 @@ export default function ShotList({
             <button type="button" className={'shot-view-toggle-button' + (viewMode === 'storyboard' ? ' active' : '')} onClick={() => setViewMode('storyboard')} aria-pressed={viewMode === 'storyboard'}>
               <LayoutGrid size={15} /><span>Storyboard</span>
             </button>
+            <button type="button" className={'shot-view-toggle-button' + (viewMode === 'presentation' ? ' active' : '')} onClick={() => { if (!selectedShotId && scene.shots[0]) onSelectedShotIdChange?.(scene.shots[0].id); setViewMode('presentation') }} aria-pressed={viewMode === 'presentation'}>
+              <Play size={15} /><span>Satu per satu</span>
+            </button>
           </div>
           <button
             className="btn btn-secondary"
@@ -403,7 +423,7 @@ export default function ShotList({
             </thead>
             <tbody>
               {scene.shots.map((shot) => (
-                <tr key={shot.id} data-shot-id={shot.id} className={'shot-row' + (selectedShotId === shot.id ? ' is-selected' : '') + (shot.status === 'done' ? ' status-done' : shot.status === 'skip' ? ' status-skip' : '')} onClick={event => { if (!event.target.closest('button')) onSelectedShotIdChange?.(shot.id) }}>
+                <tr key={shot.id} data-shot-id={shot.id} className={'shot-row' + (selectedShotId === shot.id ? ' is-selected' : '') + (shot.status === 'done' ? ' status-done' : shot.status === 'skip' ? ' status-skip' : '')} onClick={event => { if (!event.target?.closest?.('button')) onSelectedShotIdChange?.(shot.id) }}>
                   <td><div className="shot-num">{shot.num}</div></td>
                   <td>
                     <input className="cell-input" value={shot.subject} onChange={e => updateShot(shot.id, 'subject', e.target.value)} placeholder="Subjek" />
@@ -549,7 +569,7 @@ export default function ShotList({
             </tbody>
           </table>
         </div>
-        ) : (
+        ) : viewMode === 'storyboard' ? (
           <div className="storyboard-grid">
             {scene.shots.map(shot => (
               <article key={shot.id} className={'storyboard-card' + (selectedShotId === shot.id ? ' is-selected' : '')}>
@@ -579,6 +599,43 @@ export default function ShotList({
             <button type="button" className="storyboard-add-card" onClick={addShot}>
               <Plus size={18} /><span>Tambah shot</span>
             </button>
+          </div>
+        ) : (
+          <div className="shot-presentation">
+            {presentationShot ? <>
+              <header className="shot-presentation-header">
+                <button type="button" className="btn btn-secondary" onClick={() => movePresentationShot(-1)} disabled={presentationIndex === 0} aria-label="Shot sebelumnya"><ChevronLeft size={16} /> Sebelumnya</button>
+                <span>Shot {presentationIndex + 1} dari {scene.shots.length}</span>
+                <button type="button" className="btn btn-secondary" onClick={() => movePresentationShot(1)} disabled={presentationIndex >= scene.shots.length - 1} aria-label="Shot berikutnya">Berikutnya <ChevronRight size={16} /></button>
+              </header>
+              <article className="shot-presentation-card">
+                <div className="shot-presentation-visual">
+                  {presentationShot.storyboardImage
+                    ? <button type="button" className="shot-presentation-image-button" onClick={() => setPreviewShot(presentationShot)} aria-label="Perbesar storyboard"><img src={presentationShot.storyboardImage} alt={'Storyboard shot ' + presentationShot.num} /></button>
+                    : <div className="shot-presentation-placeholder"><ImagePlus size={36} /><span>Belum ada gambar storyboard</span><StoryboardControl shot={presentationShot} onUpload={file => handleStoryboardUpload(presentationShot.id, file)} onRemove={() => removeStoryboard(presentationShot.id)} onPreview={() => setPreviewShot(presentationShot)} /></div>}
+                </div>
+                <div className="shot-presentation-copy">
+                  <div className="shot-presentation-kicker">{scene.name} · SHOT {presentationShot.num}</div>
+                  <h2>{presentationShot.subject || 'Subjek belum diisi'}</h2>
+                  <ShotStatusControls shot={presentationShot} onSetStatus={nextStatus => setShotStatus(presentationShot.id, nextStatus)} />
+                  <div className="shot-presentation-details">
+                    <span><small>Ukuran</small><strong>{presentationShot.size || '—'}</strong></span>
+                    <span><small>Kamera</small><strong>{presentationShot.camera || '—'}</strong></span>
+                    <span><small>Angle</small><strong>{presentationShot.angle || '—'}</strong></span>
+                    <span><small>Lens</small><strong>{presentationShot.lens || '—'}</strong></span>
+                    <span><small>Movement</small><strong>{(presentationShot.movements || []).map(item => item === 'Handheld Movement' ? 'Handheld' : item).join(', ') || '—'}</strong></span>
+                    <span><small>Equipment</small><strong>{(Array.isArray(presentationShot.equipment) ? presentationShot.equipment : []).join(', ') || '—'}</strong></span>
+                    <span><small>Audio</small><strong>{presentationShot.sound || '—'}</strong></span>
+                    <span><small>Take / Naskah</small><strong>{[presentationShot.take, presentationShot.script].filter(Boolean).join(' / ') || '—'}</strong></span>
+                  </div>
+                  {presentationShot.notes && <p className="shot-presentation-notes">{presentationShot.notes}</p>}
+                  <button type="button" className="btn btn-secondary shot-presentation-add" onClick={addShot}><Plus size={14} /> Tambah shot</button>
+                </div>
+              </article>
+              <nav className="shot-presentation-strip" aria-label="Pilih shot untuk presentasi">
+                {scene.shots.map((shot, index) => <button type="button" key={shot.id} className={index === presentationIndex ? 'active' : ''} onClick={() => onSelectedShotIdChange?.(shot.id)} aria-current={index === presentationIndex ? 'step' : undefined}><span>{shot.num}</span>{shot.subject || 'Subjek belum diisi'}</button>)}
+              </nav>
+            </> : <div className="shot-presentation-empty"><p>Belum ada shot untuk ditampilkan.</p><button type="button" className="btn btn-primary" onClick={addShot}><Plus size={14} /> Tambah shot</button></div>}
           </div>
         )}
         {previewShot?.storyboardImage && (
