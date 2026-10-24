@@ -80,7 +80,6 @@ function getFittedViewBox(layout) {
   const centerY = (minY + maxY) / 2
   return { x: centerX - width / 2, y: centerY - height / 2, width, height }
 }
-const PROP_TYPES = ['Table', 'Chair', 'Sofa', 'Bed', 'Desk', 'Cabinet', 'Counter', 'Custom']
 const RESIZE_HANDLES = [
   { key: 'nw', sx: -1, sy: -1, cursor: 'nwse-resize' },
   { key: 'ne', sx: 1, sy: -1, cursor: 'nesw-resize' },
@@ -2576,7 +2575,7 @@ export default function Floorplan({
       return shot ? ('Shot ' + shot.num + (shot.subject ? ' — ' + shot.subject : '')) : 'Unlinked camera'
     }
     if (type === 'light') return (item.label || 'Light') + ' — ' + (item.lightType || 'Key')
-    if (type === 'prop') return item.label || item.customPropType || item.propType || 'Prop'
+    if (type === 'prop') return item.label || 'Prop'
     const fallback = ({ room: 'Room', wall: 'Wall', door: 'Pintu', window: 'Jendela', actor: 'Actor' })[type] || type
     return item.label || fallback
   }
@@ -3129,7 +3128,7 @@ export default function Floorplan({
                         : type === 'camera' || type === 'light'
                           ? objectName(type, object)
                           : type === 'prop'
-                            ? (object.propType || 'Prop')
+                            ? (object.label || 'Prop')
                             : object.label || (type === 'door' ? 'Door' : type === 'window' ? 'Window' : type)
                       return (
                         <g
@@ -3394,7 +3393,7 @@ export default function Floorplan({
                           paintOrder="stroke"
                           pointerEvents="none"
                         >
-                          {type === 'prop' ? (object.propType || 'Prop') : (object.label || (type === 'door' ? 'Door' : 'Window'))}
+                          {object.label || (type === 'door' ? 'Door' : type === 'window' ? 'Window' : 'Prop')}
                         </text>
                       )}
                     </g>
@@ -4051,26 +4050,6 @@ export default function Floorplan({
                     <label htmlFor="prop-label">Nama properti</label>
                     <input id="prop-label" className="floorplan-field" value={selectedEntity.label || ''} maxLength={80} onChange={event => updateSelected({ label: event.target.value })} />
                   </section>
-                  <section className="floorplan-inspector-section">
-                    <label htmlFor="prop-type">Tipe properti</label>
-                    <select id="prop-type" className="floorplan-field" value={selectedEntity.propType || 'Custom'} onChange={event => updateSelected({ propType: event.target.value, ...(event.target.value === 'Custom' ? {} : { customPropType: '' }), label: selectedEntity.label || event.target.value })}>
-                      {PROP_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
-                    </select>
-                  </section>
-                  {(selectedEntity.propType || 'Custom') === 'Custom' && (
-                    <section className="floorplan-inspector-section">
-                      <label htmlFor="prop-custom-type">Tipe kustom</label>
-                      <input
-                        id="prop-custom-type"
-                        className="floorplan-field"
-                        value={selectedEntity.customPropType || ''}
-                        maxLength={80}
-                        placeholder="Contoh: Lemari senjata, Vas bunga"
-                        disabled={Boolean(selectedEntity.locked)}
-                        onChange={event => updateSelected({ customPropType: event.target.value })}
-                      />
-                    </section>
-                  )}
                   <section className="floorplan-inspector-section">
                     <div className="floorplan-section-title">Dimensi (meter)</div>
                     <div className="floorplan-opening-actions">

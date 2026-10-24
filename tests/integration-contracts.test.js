@@ -390,7 +390,7 @@ test('Props have editable names and manual dimensions in meters', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
 
   assert.match(source, /id="prop-label"/)
-  assert.match(source, /id="prop-type"/)
+  assert.doesNotMatch(source, /id="prop-type"|id="prop-custom-type"/)
   assert.match(source, /id="prop-width"/)
   assert.match(source, /id="prop-height"/)
   assert.match(source, /selectedEntity\.locked\)\} onChange/)
@@ -407,12 +407,15 @@ test('Object locking prevents moving, resizing, rotating, and editing paths or o
   assert.match(source, /selectedEntity\.locked \|\| !selectedType/)
 })
 
-test('Props Custom type accepts free text and displays the entered type/name', async () => {
-  const source = await readSource('../src/components/Floorplan.jsx')
+test('Props display their property name in Floorplan and printed reports', async () => {
+  const [source, report] = await Promise.all([
+    readSource('../src/components/Floorplan.jsx'),
+    readSource('../src/components/PrintReport.jsx'),
+  ])
 
-  assert.match(source, /id="prop-custom-type"/)
-  assert.match(source, /customPropType: event\.target\.value/)
-  assert.match(source, /if \(type === 'prop'\) return item\.label \|\| item\.customPropType \|\| item\.propType \|\| 'Prop'/)
+  assert.match(source, /if \(type === 'prop'\) return item\.label \|\| 'Prop'/)
+  assert.match(source, /\{object\.label \|\| \(type === 'door' \? 'Door' : type === 'window' \? 'Window' : 'Prop'\)\}/)
+  assert.match(report, /\{prop\.label \|\| 'Prop'\}/)
 })
 
 test('Doors and windows support precise width, position, and polygon edge controls', async () => {
