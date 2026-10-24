@@ -443,6 +443,24 @@ test('PDF export keeps rotated object labels upright and movement paths in works
   assert.doesNotMatch(report, /\{\(camera\.path \|\| \[\]\)\.length > 0 && <polyline/)
 })
 
+test('Every uploaded project or storyboard image can be added, removed, and enlarged', async () => {
+  const [projectInfo, shotList] = await Promise.all([
+    readSource('../src/components/ProjectInfo.jsx'),
+    readSource('../src/components/ShotList.jsx'),
+  ])
+
+  assert.match(projectInfo, /accept="image\\/\\*"/)
+  assert.match(projectInfo, /const removeRef = \\(idx\\) =>/)
+  assert.match(projectInfo, /Perbesar referensi visual/)
+  assert.match(projectInfo, /role="dialog" aria-modal="true"/)
+  assert.match(projectInfo, /Tambah referensi visual/)
+  assert.match(projectInfo, /MAX_VISUAL_REFERENCE_COUNT = 24/)
+  assert.match(shotList, /Perbesar storyboard/)
+  assert.match(shotList, /Hapus storyboard shot/)
+  assert.match(shotList, /Ganti gambar storyboard/)
+  assert.match(shotList, /StoryboardControl shot=\\{presentationShot\\}[\\s\\S]*?showThumbnail=\\{false\\}/)
+})
+
 test('Doors and windows support precise width, position, and polygon edge controls', async () => {
   const source = await readSource('../src/components/Floorplan.jsx')
 
