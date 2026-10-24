@@ -456,10 +456,17 @@ function PrintFloorplan({ scene, layout }) {
           )
         })}
 
+        {actors.filter(actor => (actor.path || []).length > 0).map(actor => (
+          <polyline key={'actor-path-' + actor.id} points={[{ x: actor.x, y: actor.y }, ...actor.path].map(point => point.x + ',' + point.y).join(' ')} fill="none" stroke="#475569" strokeWidth="2" strokeDasharray="7 5" />
+        ))}
+        {cameras.filter(camera => (camera.path || []).length > 0).map(camera => (
+          <polyline key={'camera-path-' + camera.id} points={[{ x: camera.x, y: camera.y }, ...camera.path].map(point => point.x + ',' + point.y).join(' ')} fill="none" stroke="#475569" strokeWidth="2" strokeDasharray="7 5" />
+        ))}
+
         {props.map(prop => (
           <g key={'prop-' + prop.id} transform={'translate(' + prop.x + ' ' + prop.y + ') rotate(' + (prop.angle || 0) + ')'}>
             <rect x={-(Number(prop.width) || 52) / 2} y={-(Number(prop.height) || 36) / 2} width={Number(prop.width) || 52} height={Number(prop.height) || 36} rx={prop.propType === 'Sofa' ? 8 : 2} fill="#fff" stroke="#111827" strokeWidth="2" />
-            <text x="0" y="4" fontSize="12" fontWeight="600" fill="#111827" textAnchor="middle">{prop.label || 'Prop'}</text>
+            <text x="0" y="4" fontSize="12" fontWeight="600" fill="#111827" textAnchor="middle" transform={'rotate(' + (-(prop.angle || 0)) + ' 0 4)'}>{prop.label || 'Prop'}</text>
           </g>
         ))}
 
@@ -467,8 +474,7 @@ function PrintFloorplan({ scene, layout }) {
           <g key={'actor-' + actor.id} transform={'translate(' + actor.x + ' ' + actor.y + ') rotate(' + (actor.angle || 0) + ')'}>
             <circle r="13" fill="#fff" stroke="#111827" strokeWidth="2.5" />
             <path d="M-17 24 Q0 8 17 24" fill="none" stroke="#111827" strokeWidth="3" strokeLinecap="round" />
-            <text x="0" y="42" fontSize="13" fontWeight="600" fill="#111827" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{actor.label || 'Actor'}</text>
-            {(actor.path || []).length > 0 && <polyline points={[{ x: actor.x, y: actor.y }, ...actor.path].map(point => point.x + ',' + point.y).join(' ')} fill="none" stroke="#475569" strokeWidth="2" strokeDasharray="7 5" />}
+            <text x="0" y="42" fontSize="13" fontWeight="600" fill="#111827" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle" transform={'rotate(' + (-(actor.angle || 0)) + ' 0 42)'}>{actor.label || 'Actor'}</text>
           </g>
         ))}
 
@@ -478,8 +484,7 @@ function PrintFloorplan({ scene, layout }) {
             <g key={'camera-' + camera.id} transform={'translate(' + camera.x + ' ' + camera.y + ') rotate(' + (camera.angle || 0) + ')'}>
               <path d="M9 -9 L33 -20 L33 20 L9 9 Z" fill="#fff" stroke="#111827" strokeWidth="2.5" />
               <rect x="-29" y="-15" width="40" height="30" rx="6" fill="#fff" stroke="#111827" strokeWidth="2.5" />
-              <text x="0" y="46" fontSize="14" fontWeight="700" fill="#111827" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{shot?.num || 'CAM'}</text>
-              {(camera.path || []).length > 0 && <polyline points={[{ x: camera.x, y: camera.y }, ...camera.path].map(point => point.x + ',' + point.y).join(' ')} fill="none" stroke="#475569" strokeWidth="2" strokeDasharray="7 5" />}
+              <text x="0" y="46" fontSize="14" fontWeight="700" fill="#111827" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle" transform={'rotate(' + (-(camera.angle || 0)) + ' 0 46)'}>{shot?.num || 'CAM'}</text>
             </g>
           )
         })}
@@ -488,7 +493,7 @@ function PrintFloorplan({ scene, layout }) {
           <g key={'light-' + light.id} transform={'translate(' + light.x + ' ' + light.y + ') rotate(' + (90 + (light.angle || 0)) + ')'}>
             <path d="M-13 -8 L-8 -11 L3 -11 L11 -7 L11 7 L3 11 L-8 11 L-13 8 Z" fill="#fff" stroke="#111827" strokeWidth="2.5" />
             <circle cx="7" cy="0" r="4" fill="#111827" />
-            <text x="0" y="35" fontSize="13" fontWeight="600" fill="#111827" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle">{light.lightType || 'Key'}</text>
+            <text x="0" y="35" fontSize="13" fontWeight="600" fill="#111827" stroke="#fff" strokeWidth="3" paintOrder="stroke" textAnchor="middle" transform={'rotate(' + (-(90 + (light.angle || 0))) + ' 0 35)'}>{light.lightType || 'Key'}</text>
           </g>
         ))}
         </g>
