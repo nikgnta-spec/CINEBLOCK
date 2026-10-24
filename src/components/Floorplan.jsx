@@ -2805,7 +2805,7 @@ export default function Floorplan({
                 const pointString = points.map(point => point.x + ',' + point.y).join(' ')
                 const openings = room.openings || []
                 const active = selected?.type === 'room' && selected.id === room.id
-                const groupSelected = selectedItems.some(entry => entry.type === 'room' && entry.id === room.id)
+
                 const bounds = getRoomBounds(room)
                 const edges = getRoomEdges(room)
                 const connectedRoomIds = new Set(Array.isArray(room.connectedRoomIds) ? room.connectedRoomIds : [])
@@ -2827,7 +2827,7 @@ export default function Floorplan({
                 return (
                   <g key={room.id} data-floorplan-object="true" onPointerEnter={() => setHoveredRoomEdge({ roomId: room.id, edgeIndex: null })} onPointerLeave={() => setHoveredRoomEdge(current => current?.roomId === room.id ? null : current)} onPointerDown={event => beginObjectDrag('room', room, event)} onClick={event => event.stopPropagation()}>
                     <polygon points={pointString} fill={active ? 'var(--bg-hover)' : 'var(--bg-subtle)'} stroke="none" />
-                    {groupSelected && !active && <polygon points={pointString} fill="none" stroke="var(--accent)" strokeWidth="2" strokeDasharray="6 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
+
                     {edges.map(edge => {
                       const edgeOpenings = openings.filter(opening => opening.wallType !== 'internal' && !Number.isInteger(opening.internalWallIndex) && (Number.isInteger(opening.edgeIndex) ? opening.edgeIndex : ({ top: 0, right: 1, bottom: 2, left: 3 }[opening.side] ?? 2)) === edge.edgeIndex)
                       return getOpeningSegments(edge.length, edgeOpenings).map((segment, index) => {
@@ -2984,7 +2984,7 @@ export default function Floorplan({
                       const openingWidth = Math.min(Number(opening.width ?? 48), placement.length)
                       return (
                         <g key={opening.id} transform={'translate(' + placement.x + ' ' + placement.y + ') rotate(' + placement.angle + ')'} data-floorplan-object="true" style={{ cursor: 'grab' }} onPointerDownCapture={event => beginOpeningDrag('room', room, opening, event)} onClick={event => event.stopPropagation()}>
-                          <rect x={-(Math.min(Number(opening.width ?? 48), placement.length) / 2) - 8} y="-16" width={Math.min(Number(opening.width ?? 48), placement.length) + 16} height="32" fill="transparent" pointerEvents="all" />
+                          <rect x={-openingWidth / 2} y="-7" width={openingWidth} height="14" fill="transparent" pointerEvents="all" />
                           <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type !== 'window' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">{openingLabel(opening)}</text>
                           
                           {opening.type === 'door' ? (
@@ -3031,7 +3031,7 @@ export default function Floorplan({
                       />
                     ))}
                     <line x1={wall.x1} y1={wall.y1} x2={wall.x2} y2={wall.y2}
-                      stroke="transparent" strokeWidth="20" vectorEffect="non-scaling-stroke" />
+                      stroke="transparent" strokeWidth={Math.max(6, Number(wall.thickness) || 6)} vectorEffect="non-scaling-stroke" />
                     {openings.map(opening => {
                       const center = clamp(opening.offset, 0, 1) * length
                       const openingWidth = Math.min(Number(opening.width ?? 48), length)
@@ -3044,7 +3044,7 @@ export default function Floorplan({
                           onPointerDownCapture={event => beginOpeningDrag('wall', wall, opening, event)}
                           onClick={event => event.stopPropagation()}
                         >
-                          <rect x={-(openingWidth / 2) - 8} y="-16" width={openingWidth + 16} height="32" fill="transparent" pointerEvents="all" />
+                          <rect x={-openingWidth / 2} y="-7" width={openingWidth} height="14" fill="transparent" pointerEvents="all" />
                           <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type !== 'window' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">
                             {openingLabel(opening)}
                            </text>
@@ -3103,7 +3103,7 @@ export default function Floorplan({
               ].map(object => {
                 const type = object._kind
                 const active = selected?.type === type && selected.id === object.id
-                const groupSelected = selectedItems.some(entry => entry.type === type && entry.id === object.id)
+
                 const shot = type === 'camera' ? scene.shots.find(item => item.id === object.shotId) : null
                 const focalRange = type === 'camera' ? parseFocalLengthRange(shot?.lens) : null
                 const cameraFov = focalRange ? {
@@ -3263,24 +3263,6 @@ export default function Floorplan({
                       onPointerDown={event => beginObjectDrag(type, object, event)}
                       style={{ cursor: 'grab' }}
                     >
-                      <rect
-                        x={['door', 'window', 'prop'].includes(type) ? -(Number(object.width) || 48) / 2 : type === 'actor' ? -36 : type === 'camera' ? -36 : -25}
-                        y={['door', 'window', 'prop'].includes(type) ? -(Number(object.height) || 32) / 2 : type === 'actor' ? -30 : type === 'camera' ? -25 : -24}
-                        width={['door', 'window', 'prop'].includes(type) ? Math.max(48, Number(object.width) || 48) : type === 'actor' ? 72 : type === 'camera' ? 74 : 50}
-                        height={['door', 'window', 'prop'].includes(type) ? Math.max(38, Number(object.height) || 32) : type === 'actor' ? 80 : type === 'camera' ? 78 : 62}
-                        fill="transparent"
-                        pointerEvents="all"
-                      />
-                      {groupSelected && !active && (
-                        <rect
-                          x={['door', 'window', 'prop'].includes(type) ? -(Number(object.width) || 48) / 2 - 5 : type === 'actor' ? -41 : type === 'camera' ? -41 : -30}
-                          y={['door', 'window', 'prop'].includes(type) ? -(Number(object.height) || 32) / 2 - 5 : type === 'actor' ? -35 : type === 'camera' ? -30 : -29}
-                          width={['door', 'window', 'prop'].includes(type) ? Math.max(48, Number(object.width) || 48) + 10 : type === 'actor' ? 82 : type === 'camera' ? 84 : 60}
-                          height={['door', 'window', 'prop'].includes(type) ? Math.max(38, Number(object.height) || 32) + 10 : type === 'actor' ? 90 : type === 'camera' ? 88 : 72}
-                          rx="4" fill="none" stroke="var(--accent)" strokeWidth="2" strokeDasharray="5 4"
-                          vectorEffect="non-scaling-stroke" pointerEvents="none"
-                        />
-                      )}
                       {type === 'camera' && cameraFov && (
                         <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none">
                           <path
@@ -3307,7 +3289,7 @@ export default function Floorplan({
                         </g>
                       )}
                       {type === 'camera' && (
-                        <g transform={'rotate(' + (object.angle || 0) + ') scale(0.42)'} pointerEvents="none">
+                        <g transform={'rotate(' + (object.angle || 0) + ') scale(0.42)'} pointerEvents="visiblePainted">
                           <path d="M9 -9 L33 -20 L33 20 L9 9 Z" fill="var(--bg)" stroke={getObjectColor(type, object)} strokeWidth="2.5" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
                           <rect x="-29" y="-15" width="40" height="30" rx="6" fill="var(--bg)" stroke={getObjectColor(type, object)} strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
                         </g>
@@ -3335,20 +3317,20 @@ export default function Floorplan({
                         </g>
                       )}
                       {type === 'door' && (
-                        <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none" fill="none" stroke="var(--text)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+                        <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="visiblePainted" fill="none" stroke="var(--text)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
                           <path d={'M ' + (-object.width / 2) + ' 0 H ' + (object.width / 2)} strokeWidth="5" />
                           <path d={'M ' + (-object.width / 2) + ' 0 V ' + (-object.width) + ' A ' + object.width + ' ' + object.width + ' 0 0 1 ' + (object.width / 2) + ' 0'} strokeDasharray="4 4" strokeOpacity="0.72" />
                           <path d={'M ' + (-object.width / 2) + ' 0 L ' + (-object.width / 2) + ' ' + (-object.width)} />
                         </g>
                       )}
                       {type === 'window' && (
-                        <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none" fill="none" stroke="var(--text)" strokeWidth="2.4" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+                        <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="visiblePainted" fill="none" stroke="var(--text)" strokeWidth="2.4" strokeLinecap="round" vectorEffect="non-scaling-stroke">
                           <path d={'M ' + (-object.width / 2) + ' ' + (-Math.max(5, object.height / 2)) + ' H ' + (object.width / 2) + ' M ' + (-object.width / 2) + ' 0 H ' + (object.width / 2) + ' M ' + (-object.width / 2) + ' ' + Math.max(5, object.height / 2) + ' H ' + (object.width / 2)} />
                           <path d={'M ' + (-object.width / 2) + ' ' + (-Math.max(5, object.height / 2) - 3) + ' V ' + (Math.max(5, object.height / 2) + 3) + ' M ' + (object.width / 2) + ' ' + (-Math.max(5, object.height / 2) - 3) + ' V ' + (Math.max(5, object.height / 2) + 3)} />
                         </g>
                       )}
                       {type === 'prop' && (
-                        <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="none" fill="var(--bg-subtle)" stroke="var(--text)" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
+                        <g transform={'rotate(' + (object.angle || 0) + ')'} pointerEvents="visiblePainted" fill="var(--bg-subtle)" stroke="var(--text)" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
                           <rect x={-object.width / 2} y={-object.height / 2} width={object.width} height={object.height} rx={object.propType === 'Sofa' ? 8 : 2} />
                           {object.propType === 'Chair' ? (
                             <path d={'M ' + (-object.width * 0.32) + ' ' + (-object.height * 0.25) + ' H ' + (object.width * 0.32) + ' V ' + (object.height * 0.28)} fill="none" />
@@ -3362,7 +3344,7 @@ export default function Floorplan({
                         </g>
                       )}
                       {type === 'actor' && (
-                        <g transform={'rotate(' + (object.angle || 0) + ') scale(0.28)'} pointerEvents="none">
+                        <g transform={'rotate(' + (object.angle || 0) + ') scale(0.28)'} pointerEvents="visiblePainted">
                           <g fill={getObjectColor(type, object)} fillOpacity="0.12" stroke={getObjectColor(type, object)} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke">
                             <path d="M-22 -6 C-30 -10 -37 -6 -40 2 C-43 12 -36 22 -27 23 C-21 31 -10 34 0 34 C10 34 21 31 27 23 C36 22 43 12 40 2 C37 -6 30 -10 22 -6" />
                             <path d="M0 -31 C-17 -31 -22 -17 -21 -6 C-20 5 -15 13 -8 15 C-5 16 -4 20 0 21 C4 20 5 16 8 15 C15 13 20 5 21 -6 C22 -17 17 -31 0 -31 Z" />
@@ -3389,7 +3371,7 @@ export default function Floorplan({
                       {type === 'light' && (
                         <g
                           transform={'rotate(' + (90 + (object.angle || 0)) + ') scale(0.48)'}
-                          pointerEvents="none"
+                          pointerEvents="visiblePainted"
                           fill="var(--bg)"
                           stroke={getObjectColor(type, object)}
                           strokeWidth="2.5"
@@ -3402,23 +3384,6 @@ export default function Floorplan({
                           <path d="M-2 -6 L-2 6" strokeOpacity="0.65" fill="none" />
                         </g>
                       )}
-                      {active && ['door', 'window', 'prop'].includes(type) ? (
-                        <rect
-                          x={-object.width / 2 - 5}
-                          y={-object.height / 2 - 5}
-                          width={object.width + 10}
-                          height={object.height + 10}
-                          rx="3"
-                          fill="none"
-                          stroke="var(--text-muted)"
-                          strokeWidth="1.5"
-                          strokeDasharray="4 4"
-                          vectorEffect="non-scaling-stroke"
-                          pointerEvents="none"
-                        />
-                      ) : active ? (
-                        <circle cx="0" cy="0" r="34" fill="none" stroke="var(--text-muted)" strokeWidth="1.5" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />
-                      ) : null}
                       {type === 'camera' && showObjectLabels && (
                         <text x="0" y="46" textAnchor="middle" fontSize="15" fontWeight="600" fill="var(--text)" stroke="var(--bg)" strokeWidth="4" paintOrder="stroke" pointerEvents="none">
                           {objectName('camera', object)}
