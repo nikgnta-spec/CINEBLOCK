@@ -612,7 +612,8 @@ export default function ShotList({
                 <div className="shot-presentation-visual">
                   {presentationShot.storyboardImage
                     ? <button type="button" className="shot-presentation-image-button" onClick={() => setPreviewShot(presentationShot)} aria-label="Perbesar storyboard"><img src={presentationShot.storyboardImage} alt={'Storyboard shot ' + presentationShot.num} /></button>
-                    : <div className="shot-presentation-placeholder"><ImagePlus size={36} /><span>Belum ada gambar storyboard</span><StoryboardControl shot={presentationShot} onUpload={file => handleStoryboardUpload(presentationShot.id, file)} onRemove={() => removeStoryboard(presentationShot.id)} onPreview={() => setPreviewShot(presentationShot)} /></div>}
+                    : <div className="shot-presentation-placeholder"><ImagePlus size={36} /><span>Belum ada gambar storyboard</span></div>}
+                  <StoryboardControl shot={presentationShot} onUpload={file => handleStoryboardUpload(presentationShot.id, file)} onRemove={() => removeStoryboard(presentationShot.id)} onPreview={() => setPreviewShot(presentationShot)} compact showThumbnail={false} />
                 </div>
                 <div className="shot-presentation-copy">
                   <div className="shot-presentation-kicker">{scene.name} · SHOT {presentationShot.num}</div>
@@ -669,16 +670,16 @@ function ShotStatusControls({ shot, onSetStatus }) {
   )
 }
 
-function StoryboardControl({ shot, onUpload, onRemove, onPreview, compact = false }) {
+function StoryboardControl({ shot, onUpload, onRemove, onPreview, compact = false, showThumbnail = true }) {
   return (
     <div className={'storyboard-control' + (compact ? ' is-compact' : '')}>
-      {shot.storyboardImage ? (
+      {shot.storyboardImage && showThumbnail ? (
         <button type="button" className="storyboard-thumb-button" onClick={onPreview} title={'Lihat storyboard shot ' + shot.num} aria-label={'Lihat storyboard shot ' + shot.num}>
           <img src={shot.storyboardImage} alt={'Storyboard shot ' + shot.num} loading="lazy" />
         </button>
-      ) : (
+      ) : !shot.storyboardImage && showThumbnail ? (
         <span className="storyboard-empty-thumb" aria-hidden="true"><ImagePlus size={18} /></span>
-      )}
+      ) : null}
       <label className="storyboard-upload-button" title={shot.storyboardImage ? 'Ganti gambar storyboard' : 'Tambah gambar storyboard'}>
         <ImagePlus size={14} /><span>{compact ? (shot.storyboardImage ? 'Ganti' : 'Tambah') : (shot.storyboardImage ? 'Ganti gambar' : 'Tambah gambar')}</span>
         <input type="file" accept="image/*" aria-label={'Unggah storyboard shot ' + shot.num} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) onUpload(file) }} />
