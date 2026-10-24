@@ -244,7 +244,7 @@ function normalizeRoomPolygon(room, index = 0) {
       next.edgeIndex = legacyRectangle ? (oldSideToEdge[next.side] ?? 2) : 0
     }
     next.id = typeof next.id === 'string' && next.id ? next.id : crypto.randomUUID()
-    next.type = next.type === 'window' ? 'window' : 'door'
+    next.type = ['window', 'doorway'].includes(next.type) ? next.type : 'door'
     next.offset = Math.max(0.02, Math.min(0.98, Number.isFinite(Number(next.offset)) ? Number(next.offset) : 0.5))
     // Legacy bottom and left edges run opposite to the polygon perimeter order.
     if (legacyRectangle && ['bottom', 'left'].includes(next.side)) next.offset = 1 - next.offset
@@ -275,6 +275,7 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
     const safeId = item => typeof item?.id === 'string' && item.id ? item.id.slice(0, 100) : crypto.randomUUID()
     const safeLabel = (value, fallback) => typeof value === 'string' ? value.slice(0, 80) : fallback
     const coords = (value, max) => normalizeFloorplanCoordinate(value, max)
+    const safeColor = value => typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value : undefined
     const normalizeOpenings = (openings, allowSide = false) => (Array.isArray(openings) ? openings : [])
       .filter(opening => opening && typeof opening === 'object')
       .slice(0, 100)
@@ -345,6 +346,7 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
         angle: coords(item.angle, 360),
         label: safeLabel(item.label, 'Actor ' + String(index + 1).padStart(2, '0')),
         movement: safeLabel(item.movement, 'Blocking'),
+        ...(safeColor(item.color) ? { color: safeColor(item.color) } : {}),
         path: (Array.isArray(item.path) ? item.path : []).slice(0, 100).map(point => ({
           x: coords(point?.x, 1000),
           y: coords(point?.y, 650),
@@ -361,6 +363,7 @@ function normalizeSavedFloorplans(savedFloorplans, savedScenes) {
           angle: coords(item.angle, 360),
           label: safeLabel(item.label, 'Camera ' + String(index + 1).padStart(2, '0')),
           movement: safeLabel(item.movement, 'Static'),
+          ...(safeColor(item.color) ? { color: safeColor(item.color) } : {}),
           path: (Array.isArray(item.path) ? item.path : []).slice(0, 100).map(point => ({
             x: coords(point?.x, 1000),
             y: coords(point?.y, 650),
