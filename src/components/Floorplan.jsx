@@ -3028,7 +3028,7 @@ export default function Floorplan({
                       return (
                         <g key={opening.id} transform={'translate(' + placement.x + ' ' + placement.y + ') rotate(' + placement.angle + ')'} data-floorplan-object="true" style={{ cursor: 'grab' }} onPointerDownCapture={event => beginOpeningDrag('room', room, opening, event)} onClick={event => event.stopPropagation()}>
                           <rect x={-openingWidth / 2} y="-7" width={openingWidth} height="14" fill="transparent" pointerEvents="all" />
-                          <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type !== 'window' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">{openingLabel(opening)}</text>
+                          <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type !== 'window' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none" transform={'rotate(' + (-placement.angle) + ' 0 -12)'}>{openingLabel(opening)}</text>
                           
                           {opening.type === 'door' ? (
                             <DoorSwingSymbol opening={opening} width={openingWidth} />
@@ -3088,10 +3088,10 @@ export default function Floorplan({
                           onClick={event => event.stopPropagation()}
                         >
                           <rect x={-openingWidth / 2} y="-7" width={openingWidth} height="14" fill="transparent" pointerEvents="all" />
-                          <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type !== 'window' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">
+                          <text x="0" y="-12" textAnchor="middle" fontSize="10" fontWeight="600" fill={opening.type !== 'window' ? '#fbbf24' : '#7dd3fc'} stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none" transform={'rotate(' + (-wallAngle) + ' 0 -12)'}>
                             {openingLabel(opening)}
                            </text>
-                           {opening.type === 'door' && <text x="0" y="25" textAnchor="middle" fontSize="9" fontWeight="600" fill="#fbbf24" stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none">{'Daun pintu ' + (Number(opening.width ?? 48) / 100).toFixed(2) + ' m'}</text>}
+                           {opening.type === 'door' && <text x="0" y="25" textAnchor="middle" fontSize="9" fontWeight="600" fill="#fbbf24" stroke="var(--bg)" strokeWidth="3" paintOrder="stroke" pointerEvents="none" transform={'rotate(' + (-wallAngle) + ' 0 25)'}>{'Daun pintu ' + (Number(opening.width ?? 48) / 100).toFixed(2) + ' m'}</text>}
                            {opening.type === 'door' ? (
                             <DoorSwingSymbol opening={opening} width={openingWidth} />
                           ) : opening.type === 'doorway' ? null : (
