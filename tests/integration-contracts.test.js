@@ -500,10 +500,22 @@ test('Floorplan navigation supports shared cursor-anchored zoom, pinch, and expl
   assert.match(source, /onTouchStart=\{handleCanvasTouchStart\}/)
   assert.match(source, /onTouchMove=\{handleCanvasTouchMove\}/)
   assert.match(source, /pinchRef\.current\.distance \/ distance/)
+  assert.match(source, /const TOUCH_ZOOM_SENSITIVITY = 1\.3 \* 1\.5/)
+  assert.match(source, /Math\.max\(0\.2, 1 \+ \(\(pinchRef\.current\.distance \/ distance\) - 1\) \* TOUCH_ZOOM_SENSITIVITY\)/)
   assert.match(source, /const resetZoom = \(\) => setViewBox/)
   assert.match(source, /Reset zoom ke 100% \(1:1\)/)
   assert.match(source, /Muat seluruh denah ke kanvas/)
   assert.match(source, /<aside className="floorplan-inspector" onWheel=\{event => event\.stopPropagation\(\)\} style=\{\{ overscrollBehavior: 'contain' \}\}>/)
+})
+
+test('Cineblok branding includes a small byline below the wordmark', async () => {
+  const [app, styles] = await Promise.all([
+    readSource('../src/App.jsx'),
+    readSource('../src/index.css'),
+  ])
+  assert.match(app, /<span className="topbar-byline">by nikgnta<\/span>/)
+  assert.match(styles, /\.topbar-brand-copy \{ display:flex; flex-direction:column/)
+  assert.match(styles, /\.topbar-byline \{ color:var\(--text-muted\); font-size:8px/)
 })
 
 test('Floorplan pan capture takes priority over object interactions and select-box is blank-canvas only', async () => {
