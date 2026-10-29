@@ -1622,15 +1622,17 @@ button:focus-visible,
     page-break-after: avoid !important;
   }
 
-  /* Keep a scene on one page if it fits; allow long scenes to continue safely. */
+  /* Keep every scene whole on a single page — a scene's rows must never
+     straddle a page break and blend into the next scene below it. */
   .print-mode-shotlist-table .print-scene-shots,
   .print-mode-full .print-scene-shots {
     break-inside: avoid-page !important;
     page-break-inside: avoid !important;
   }
-  .print-shot-table {
-    page-break-inside: auto !important;
-    break-inside: auto !important;
+  .print-mode-shotlist-table .print-shot-table,
+  .print-mode-full .print-shot-table {
+    page-break-inside: avoid !important;
+    break-inside: avoid-page !important;
   }
   .print-shot-table thead {
     display: table-header-group !important;
