@@ -3,6 +3,8 @@ import SceneNavigator from './SceneNavigator'
 import { SIZES, ANGLES, LENSES, MOVEMENTS, EQUIPMENT } from '../shotOptions'
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Trash2, Copy, Check, CircleSlash, ImagePlus, LayoutGrid, List, Play } from 'lucide-react'
 
+const MAX_STORYBOARD_IMAGES_PER_SHOT = 12
+
 
 
 
@@ -101,6 +103,7 @@ export default function ShotList({
 }) {
   const [viewMode, setViewMode] = useState('table')
   const [previewShot, setPreviewShot] = useState(null)
+  const [previewIndex, setPreviewIndex] = useState(0)
   const matchingIdx = scenes.findIndex(s => s.id === activeSceneId)
   const activeIdx = matchingIdx >= 0 ? matchingIdx : 0
   const scene = scenes[activeIdx]
@@ -124,14 +127,26 @@ export default function ShotList({
     window.addEventListener('keydown', navigate)
     return () => window.removeEventListener('keydown', navigate)
   }, [viewMode, presentationIndex, scene.id, scene.shots])
+  const previewImages = previewShot ? (previewShot.storyboardImages || []) : []
+  const movePreview = offset => {
+    if (!previewImages.length) return
+    setPreviewIndex(current => (current + offset + previewImages.length) % previewImages.length)
+  }
+  const openPreview = (shot, index = 0) => {
+    setPreviewShot(shot)
+    setPreviewIndex(index)
+  }
+
   useEffect(() => {
     if (!previewShot) return
-    const closeOnEscape = event => {
+    const handleKey = event => {
       if (event.key === 'Escape') setPreviewShot(null)
+      if (event.key === 'ArrowLeft') movePreview(-1)
+      if (event.key === 'ArrowRight') movePreview(1)
     }
-    window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [previewShot])
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [previewShot, previewImages.length])
 
   useEffect(() => {
     if (!selectedShotId || !scene?.shots.some(shot => shot.id === selectedShotId)) return
@@ -194,6 +209,7 @@ export default function ShotList({
         status: 'planned',
         movements: [...(original.movements || [])],
         equipment: [...(Array.isArray(original.equipment) ? original.equipment : original.equipment ? [original.equipment] : [])],
+        storyboardImages: [...(original.storyboardImages || [])],
       }
       const shots = [...s.shots]
       shots.splice(index + 1, 0, copy)
@@ -219,18 +235,44 @@ export default function ShotList({
     }))
   }
 
-  const handleStoryboardUpload = async (shotId, file) => {
-    if (!file) return
-    try {
-      const image = await prepareStoryboardImage(file)
-      updateShot(shotId, 'storyboardImage', image)
-    } catch (error) {
-      window.alert(error.message || 'Storyboard tidak dapat ditambahkan.')
+  const handleStoryboardUpload = async (shotId, files) => {
+    const fileList = Array.from(files || []).filter(file => file)
+    if (!fileList.length) return
+
+    const currentCount = scene.shots.find(shot => shot.id === shotId)?.storyboardImages?.length || 0
+    const room = Math.max(0, MAX_STORYBOARD_IMAGES_PER_SHOT - currentCount)
+    if (room <= 0) {
+      window.alert(`Maksimal ${MAX_STORYBOARD_IMAGES_PER_SHOT} gambar storyboard per shot.`)
+      return
+    }
+    if (fileList.length > room) {
+      window.alert(`Hanya ${room} gambar lagi yang bisa ditambahkan (maksimal ${MAX_STORYBOARD_IMAGES_PER_SHOT} per shot).`)
+    }
+
+    const toProcess = fileList.slice(0, room)
+    const results = await Promise.allSettled(toProcess.map(prepareStoryboardImage))
+    const images = results.filter(result => result.status === 'fulfilled').map(result => result.value)
+    const firstError = results.find(result => result.status === 'rejected')
+    if (images.length) {
+      updateScene(s => ({
+        ...s,
+        shots: s.shots.map(sh => sh.id === shotId
+          ? { ...sh, storyboardImages: [...(sh.storyboardImages || []), ...images] }
+          : sh)
+      }))
+    }
+    if (firstError) {
+      window.alert(firstError.reason?.message || 'Sebagian gambar storyboard tidak dapat ditambahkan.')
     }
   }
 
-  const removeStoryboard = shotId => {
-    updateShot(shotId, 'storyboardImage', '')
+  const removeStoryboard = (shotId, index) => {
+    updateScene(s => ({
+      ...s,
+      shots: s.shots.map(sh => sh.id === shotId
+        ? { ...sh, storyboardImages: (sh.storyboardImages || []).filter((_, i) => i !== index) }
+        : sh)
+    }))
     setPreviewShot(current => current?.id === shotId ? null : current)
   }
 
@@ -434,9 +476,9 @@ export default function ShotList({
                   <td>
                     <StoryboardControl
                       shot={shot}
-                      onUpload={file => handleStoryboardUpload(shot.id, file)}
-                      onRemove={() => removeStoryboard(shot.id)}
-                      onPreview={() => setPreviewShot(shot)}
+                      onUpload={files => handleStoryboardUpload(shot.id, files)}
+                      onRemove={index => removeStoryboard(shot.id, index)}
+                      onPreview={index => openPreview(shot, index)}
                       compact
                     />
                   </td>
@@ -582,9 +624,9 @@ export default function ShotList({
                 </header>
                 <StoryboardControl
                   shot={shot}
-                  onUpload={file => handleStoryboardUpload(shot.id, file)}
-                  onRemove={() => removeStoryboard(shot.id)}
-                  onPreview={() => setPreviewShot(shot)}
+                  onUpload={files => handleStoryboardUpload(shot.id, files)}
+                  onRemove={index => removeStoryboard(shot.id, index)}
+                  onPreview={index => openPreview(shot, index)}
                 />
                 <div className="storyboard-card-details">
                   <span><small>Ukuran</small><strong>{shot.size || '—'}</strong></span>
@@ -610,10 +652,10 @@ export default function ShotList({
               </header>
               <article className="shot-presentation-card">
                 <div className="shot-presentation-visual">
-                  {presentationShot.storyboardImage
-                    ? <button type="button" className="shot-presentation-image-button" onClick={() => setPreviewShot(presentationShot)} aria-label="Perbesar storyboard"><img src={presentationShot.storyboardImage} alt={'Storyboard shot ' + presentationShot.num} /></button>
+                  {presentationShot.storyboardImages?.length
+                    ? <button type="button" className="shot-presentation-image-button" onClick={() => openPreview(presentationShot, 0)} aria-label="Perbesar storyboard"><img src={presentationShot.storyboardImages[0]} alt={'Storyboard shot ' + presentationShot.num} /></button>
                     : <div className="shot-presentation-placeholder"><ImagePlus size={36} /><span>Belum ada gambar storyboard</span></div>}
-                  <StoryboardControl shot={presentationShot} onUpload={file => handleStoryboardUpload(presentationShot.id, file)} onRemove={() => removeStoryboard(presentationShot.id)} onPreview={() => setPreviewShot(presentationShot)} compact showThumbnail={false} />
+                  <StoryboardControl shot={presentationShot} onUpload={files => handleStoryboardUpload(presentationShot.id, files)} onRemove={index => removeStoryboard(presentationShot.id, index)} onPreview={index => openPreview(presentationShot, index)} compact showThumbnail={false} />
                 </div>
                 <div className="shot-presentation-copy">
                   <div className="shot-presentation-kicker">{scene.name} · SHOT {presentationShot.num}</div>
@@ -639,15 +681,39 @@ export default function ShotList({
             </> : <div className="shot-presentation-empty"><p>Belum ada shot untuk ditampilkan.</p><button type="button" className="btn btn-primary" onClick={addShot}><Plus size={14} /> Tambah shot</button></div>}
           </div>
         )}
-        {previewShot?.storyboardImage && (
+        {previewImages.length > 0 && (
           <div className="storyboard-preview-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setPreviewShot(null) }}>
             <section className="storyboard-preview-dialog" role="dialog" aria-modal="true" aria-label={'Storyboard shot ' + previewShot.num}>
               <header>
-                <div><span>STORYBOARD · {previewShot.num}</span><h2>{previewShot.subject || 'Subjek belum diisi'}</h2></div>
+                <div>
+                  <span>STORYBOARD · {previewShot.num}{previewImages.length > 1 ? ` · ${previewIndex + 1}/${previewImages.length}` : ''}</span>
+                  <h2>{previewShot.subject || 'Subjek belum diisi'}</h2>
+                </div>
                 <button type="button" className="storyboard-preview-close" onClick={() => setPreviewShot(null)} aria-label="Tutup preview storyboard"><X size={18} /></button>
               </header>
-              <img src={previewShot.storyboardImage} alt={'Storyboard shot ' + previewShot.num} />
-              <footer><span>Status: {statusLabel(previewShot.status)}</span><button type="button" className="btn btn-secondary" onClick={() => setPreviewShot(null)}><X size={14} /> Tutup preview</button></footer>
+              <div className="storyboard-preview-image-wrap">
+                {previewImages.length > 1 && (
+                  <button type="button" className="storyboard-preview-nav is-prev" onClick={() => movePreview(-1)} aria-label="Gambar sebelumnya"><ChevronLeft size={18} /></button>
+                )}
+                <img src={previewImages[previewIndex]} alt={'Storyboard shot ' + previewShot.num} />
+                {previewImages.length > 1 && (
+                  <button type="button" className="storyboard-preview-nav is-next" onClick={() => movePreview(1)} aria-label="Gambar berikutnya"><ChevronRight size={18} /></button>
+                )}
+              </div>
+              {previewImages.length > 1 && (
+                <div className="storyboard-preview-dots" role="tablist" aria-label="Pilih gambar storyboard">
+                  {previewImages.map((_, index) => (
+                    <button key={index} type="button" className={index === previewIndex ? 'active' : ''} onClick={() => setPreviewIndex(index)} aria-label={`Lihat gambar ${index + 1}`} aria-current={index === previewIndex ? 'true' : undefined} />
+                  ))}
+                </div>
+              )}
+              <footer>
+                <span>Status: {statusLabel(previewShot.status)}</span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button type="button" className="btn btn-danger" onClick={() => removeStoryboard(previewShot.id, previewIndex)}><Trash2 size={14} /> Hapus gambar ini</button>
+                  <button type="button" className="btn btn-secondary" onClick={() => setPreviewShot(null)}><X size={14} /> Tutup preview</button>
+                </div>
+              </footer>
             </section>
           </div>
         )}
@@ -671,20 +737,54 @@ function ShotStatusControls({ shot, onSetStatus }) {
 }
 
 function StoryboardControl({ shot, onUpload, onRemove, onPreview, compact = false, showThumbnail = true }) {
+  const [isDragOver, setIsDragOver] = useState(false)
+  const images = shot.storyboardImages || []
+  const hasImages = images.length > 0
+  const atLimit = images.length >= MAX_STORYBOARD_IMAGES_PER_SHOT
+
+  const extractFiles = dataTransfer => Array.from(dataTransfer?.files || []).filter(file => file.type.startsWith('image/'))
+
+  const handleDrop = event => {
+    event.preventDefault()
+    setIsDragOver(false)
+    const files = extractFiles(event.dataTransfer)
+    if (files.length) onUpload(files)
+  }
+
   return (
-    <div className={'storyboard-control' + (compact ? ' is-compact' : '')}>
-      {shot.storyboardImage && showThumbnail ? (
-        <button type="button" className="storyboard-thumb-button" onClick={onPreview} title={'Lihat storyboard shot ' + shot.num} aria-label={'Lihat storyboard shot ' + shot.num}>
-          <img src={shot.storyboardImage} alt={'Storyboard shot ' + shot.num} loading="lazy" />
-        </button>
-      ) : !shot.storyboardImage && showThumbnail ? (
-        <span className="storyboard-empty-thumb" aria-hidden="true"><ImagePlus size={18} /></span>
+    <div
+      className={'storyboard-control' + (compact ? ' is-compact' : '') + (isDragOver ? ' is-drag-over' : '')}
+      onDragOver={event => { event.preventDefault(); if (!atLimit) setIsDragOver(true) }}
+      onDragLeave={event => { if (event.target === event.currentTarget) setIsDragOver(false) }}
+      onDrop={handleDrop}
+    >
+      {showThumbnail ? (
+        hasImages ? (
+          <div className="storyboard-thumb-strip">
+            {images.map((image, index) => (
+              <div key={index} className="storyboard-thumb-item">
+                <button type="button" className="storyboard-thumb-button" onClick={() => onPreview(index)} title={`Lihat storyboard shot ${shot.num} #${index + 1}`} aria-label={`Lihat storyboard shot ${shot.num} #${index + 1}`}>
+                  <img src={image} alt={`Storyboard shot ${shot.num} #${index + 1}`} loading="lazy" />
+                </button>
+                <button type="button" className="storyboard-thumb-remove" onClick={() => onRemove(index)} title="Hapus gambar storyboard" aria-label={`Hapus storyboard shot ${shot.num} #${index + 1}`}><X size={11} /></button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <span className="storyboard-empty-thumb" aria-hidden="true"><ImagePlus size={18} /></span>
+        )
       ) : null}
-      <label className="storyboard-upload-button" title={shot.storyboardImage ? 'Ganti gambar storyboard' : 'Tambah gambar storyboard'}>
-        <ImagePlus size={14} /><span>{compact ? (shot.storyboardImage ? 'Ganti' : 'Tambah') : (shot.storyboardImage ? 'Ganti gambar' : 'Tambah gambar')}</span>
-        <input type="file" accept="image/*" aria-label={'Unggah storyboard shot ' + shot.num} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) onUpload(file) }} />
+      <label className={'storyboard-upload-button' + (atLimit ? ' is-disabled' : '')} title={atLimit ? `Maksimal ${MAX_STORYBOARD_IMAGES_PER_SHOT} gambar` : 'Tambah gambar storyboard, atau drag & drop ke sini'}>
+        <ImagePlus size={14} /><span>{compact ? (hasImages ? 'Tambah' : 'Tambah') : (hasImages ? 'Tambah gambar' : 'Tambah gambar, atau drag & drop')}</span>
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          disabled={atLimit}
+          aria-label={'Unggah storyboard shot ' + shot.num}
+          onChange={event => { const files = event.target.files; event.target.value = ''; if (files?.length) onUpload(files) }}
+        />
       </label>
-      {shot.storyboardImage && <button type="button" className="storyboard-remove-button" onClick={onRemove} title="Hapus gambar storyboard" aria-label={'Hapus storyboard shot ' + shot.num}><X size={13} /></button>}
     </div>
   )
 }

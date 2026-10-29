@@ -92,6 +92,25 @@ function normalizeSavedProject(savedProject) {
   }
 }
 
+const MAX_STORYBOARD_IMAGES_PER_SHOT = 12
+
+function isValidStoryboardImage(value) {
+  return typeof value === 'string'
+    && value.length <= 2500000
+    && /^data:image\/(?:jpeg|png|webp);base64,/i.test(value)
+}
+
+// Older saves stored a single `storyboardImage` string. New saves use the
+// `storyboardImages` array so a shot can carry more than one frame.
+function normalizeStoryboardImages(sourceShot) {
+  const fromArray = Array.isArray(sourceShot.storyboardImages)
+    ? sourceShot.storyboardImages.filter(isValidStoryboardImage)
+    : []
+  const legacy = isValidStoryboardImage(sourceShot.storyboardImage) ? [sourceShot.storyboardImage] : []
+  const combined = fromArray.length ? fromArray : legacy
+  return combined.slice(0, MAX_STORYBOARD_IMAGES_PER_SHOT)
+}
+
 function normalizeSavedScenes(savedScenes) {
   if (!Array.isArray(savedScenes) || savedScenes.length === 0) return null
 
@@ -141,11 +160,7 @@ function normalizeSavedScenes(savedScenes) {
           : [],
         equipment: [...new Set(legacyEquipment.filter(item => typeof item === 'string'))],
         status: ['planned', 'done', 'skip'].includes(sourceShot.status) ? sourceShot.status : 'planned',
-        storyboardImage: typeof sourceShot.storyboardImage === 'string'
-          && sourceShot.storyboardImage.length <= 2500000
-          && /^data:image\/(?:jpeg|png|webp);base64,/i.test(sourceShot.storyboardImage)
-          ? sourceShot.storyboardImage
-          : '',
+        storyboardImages: normalizeStoryboardImages(sourceShot),
         sound: stringField('sound', 100),
         take: stringField('take', 100),
         script: stringField('script', 100),
@@ -189,7 +204,7 @@ const defaultShot = (num, cameraDefault = '') => ({
   movements: [],
   equipment: [],
   status: 'planned',
-  storyboardImage: '',
+  storyboardImages: [],
   sound: '',
   take: '',
   script: '',

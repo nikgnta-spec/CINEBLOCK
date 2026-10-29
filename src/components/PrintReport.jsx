@@ -598,10 +598,14 @@ export default function PrintReport({ project, scenes, floorplans, mode = 'full'
                       {shot.status === 'done' ? 'Done' : shot.status === 'skip' ? 'Skip' : 'Planned'}
                     </small>
                   </header>
-                  {shot.storyboardImage ? (
-                    <figure className="print-storyboard-image">
-                      <img src={shot.storyboardImage} alt={'Storyboard shot ' + (shot.num || shotIndex + 1)} />
-                    </figure>
+                  {shot.storyboardImages?.length ? (
+                    <div className="print-storyboard-image-group">
+                      {shot.storyboardImages.map((image, imageIndex) => (
+                        <figure className="print-storyboard-image" key={imageIndex}>
+                          <img src={image} alt={'Storyboard shot ' + (shot.num || shotIndex + 1) + ' #' + (imageIndex + 1)} />
+                        </figure>
+                      ))}
+                    </div>
                   ) : (
                     <div className="print-storyboard-placeholder">Storyboard belum ditambahkan</div>
                   )}
